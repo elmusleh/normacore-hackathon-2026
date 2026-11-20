@@ -102,6 +102,7 @@ To maximize velocity and avoid duplicate work during the 48-hour sprint:
 ├── docs/                       # Comprehensive documentation
 │   ├── NormaCore_Winning_Plan.md        # Master strategy & judge perturbation demo script
 │   ├── NormaCore_Challenge_Guide.md     # Detailed technical challenge & Station specs
+│   ├── NormaCore_Station_SDK_Reference.md # Official Station runtime, binary & Protobuf SDK docs
 │   ├── Hackathon_Event_Logistics.md     # Event dates, Berlin venue, links, contacts
 │   ├── hardware_setup_and_usb_serial.md # Linux USB serial & ST3215 bus servo setup guide
 │   └── apriltags_printable.html         # Instant printable/screen calibration tags
