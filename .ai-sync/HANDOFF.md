@@ -39,6 +39,8 @@ stop_reason: completed
 
 ## Files Modified/Created
 
+- `.gitignore` (comprehensive Python, robotics logs, secrets, and IDE ignores)
+- `CHANGELOG.md`
 - `README.md`
 - `GUIDELINES.md`
 - `PREFERENCES.md`
