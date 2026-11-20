@@ -1,0 +1,13 @@
+# ai-sync: Cross-platform AI agent synchronization
+# Read these files at the start of every session for project context
+
+read:
+  - .ai-sync/HANDOFF.md
+  - .ai-sync/PROGRESS.md
+  - .ai-sync/PLAN.md
+
+# Conventions: Follow .ai-sync/ protocol
+# - Check PROGRESS.md before starting — don't repeat completed work
+# - Follow PLAN.md — no unplanned features or refactors
+# - Before stopping, update HANDOFF.md with progress and next steps
+# - Run build/typecheck verification before stopping

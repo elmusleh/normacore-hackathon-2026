@@ -1,0 +1,34 @@
+# Progress Tracker
+
+## Phase 1: Pre-Event Scaffolding & Offline Simulation — COMPLETE
+- [x] Initialize ai-sync cross-agent synchronization
+- [x] Implement offline hardware & Station simulator (`src/mock_station.py`)
+- [x] Implement perspective homography calibration and metric grid generator (`src/vision_homography.py`)
+- [x] Implement deterministic kinematics safety wrapper & $Z$-floor protection (`src/kinematics_safety.py`)
+- [x] Build Model Context Protocol (MCP) server & `.mcp.json` (`src/mcp_server.py`)
+- [x] Build autonomous error recovery test runner simulating judge perturbations (`src/agent_prompts.py`)
+- [x] Create comprehensive automated test suite (`tests/test_pipeline.py`) - 5/5 passing
+- [x] Create Linux USB serial setup guide and installer script (`docs/hardware_setup_and_usb_serial.md`, `scripts/setup_usb_serial.sh`)
+- [x] Create instant AprilTag calibration sheet generator (`scripts/generate_apriltags.py`, `docs/apriltags_printable.html`)
+- [x] Structure repository (`docs/`, `src/`, `scripts/`, `tests/`, `archive/`)
+- [x] Create team onboarding `README.md`, `GUIDELINES.md`, `PREFERENCES.md`
+
+## Phase 2: Saturday Morning Hardware Onboarding — PENDING
+- [ ] Connect ElRobot USB serial cable and execute `./scripts/setup_usb_serial.sh`
+- [ ] Launch NormaCore Station Web console and verify joint zero positions
+- [ ] Place 4 AprilTag markers at workspace corners and calibrate camera
+- [ ] First physical hardware move to safe clearance height
+
+## Phase 3: Agent Integration & Tabletop Primitives — PENDING
+- [ ] Connect MCP server to live NormaCore Station runtime (`gremlin_py`)
+- [ ] Validate camera stream overlay against real table measurements
+- [ ] Execute single-object natural language pick-and-place
+
+## Phase 4: Closed-Loop Recovery & Stress Testing — PENDING
+- [ ] Tune ST3215 gripper motor load thresholds
+- [ ] Rehearse judge perturbation test 5+ times consecutively
+- [ ] Run multi-object sorting sequence autonomously
+
+## Phase 5: Demo Polishing & Sunday Pitch — PENDING
+- [ ] Build split-screen display
+- [ ] Rehearse 3-minute winning stage demo
