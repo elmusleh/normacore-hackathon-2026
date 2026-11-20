@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Official Station & ElRobot SDK Reference Guide `docs/NormaCore_Station_SDK_Reference.md` with release binaries, `station --web --tcp` CLI options, Protobuf topics (`st3215/inference`), and ST3215 register structures.
 - Direct link to NormaCore's online 3D URDF interactive viewer `https://normacore.dev/elrobot-urdf/`.
 
+- Real-hardware joint-level bridge `src/elrobot_hardware.py` for the ST3215 bus via the NormaCore Station (`ElRobotHardware` async client and `ElRobotHardwareSync` facade). Reads motor registers, sets torque, and moves motors 1–8. Motion is refused without `enable_motion=True`, goals are clamped to calibrated range minus a margin, wrap-around or uncalibrated motors are refused, and any motor fault blocks motion.
+- Read-only hardware preflight `scripts/hardware_preflight.py`: confirms all 8 ElRobot motors are visible, calibrated and fault-free. It never moves the arm or changes torque.
+- Unit tests `tests/test_elrobot_hardware.py` (14 tests) for the safety helpers: sign-bit decoding, goal clamping, calibration refusal, fault detection, and motion-enable gating. No hardware needed.
+
 ### Changed
 - Expanded `.gitignore` with comprehensive rules for Python bytecode, virtualenvs, robotics runtime logs, secrets, testing caches, and IDE artifacts.
 

@@ -1,85 +1,68 @@
 ---
-last_agent: Antigravity
-timestamp: 2026-11-20T18:12:00.000Z
-status: ready
-current_phase: "Phase 1: Pre-Event Scaffolding & Offline Simulation"
-current_task: "Repository structured and offline test harness verified"
-stop_reason: completed
+last_agent: claude
+timestamp: 2026-11-20T21:30:00Z
+status: ready-for-hardware
+current_phase: "Phase 3: Agent Integration & Tabletop Primitives (partial)"
+current_task: "Hardware bridge written and tested offline; first run on the real arm pending"
+stop_reason: needs-physical-arm
 ---
 
 ## What Was Completed
 
-1. **Repository & Directory Restructuring:**
-   - Moved comprehensive documentation into `docs/` (`NormaCore_Winning_Plan.md`, `NormaCore_Challenge_Guide.md`, `Hackathon_Event_Logistics.md`, `hardware_setup_and_usb_serial.md`).
-   - Created `scripts/` with executable automation tools (`setup_usb_serial.sh`, `generate_apriltags.py`).
-   - Created `tests/` with 5 passing unit/integration tests (`test_pipeline.py`).
-   - Standardized root with `README.md`, `GUIDELINES.md`, `PREFERENCES.md`, `CHANGELOG.md`, `requirements.txt`, and `.mcp.json`.
+Researched ElRobot online and in the official repo (`norma-core/norma-core`, downloaded in `external/norma-core/`). Findings are in `docs/elrobot_hardware_bridge.md`.
 
-2. **Core Technical Modules (`src/`):**
-   - `src/mock_station.py`: Offline Station runtime simulator with ElRobot kinematics, ST3215 servo loads, table objects, and camera stream.
-   - `src/vision_homography.py`: Metric tabletop homography engine mapping pixels to millimeters and drawing metric grid annotations.
-   - `src/kinematics_safety.py`: Cartesian bounds checker with hard table floor clamp ($Z \ge 12\text{mm}$) and multi-stage pick-and-place trajectories.
-   - `src/mcp_server.py`: Model Context Protocol server exposing `get_calibrated_view`, `pick_at`, `place_at`, `verify_grasp`, `reset_home`.
-   - `src/agent_prompts.py`: System prompt and end-to-end autonomous error recovery demo.
-
-3. **Hardware & Calibration Preparations:**
-   - Linux USB serial and udev setup guide + one-click setup script (`scripts/setup_usb_serial.sh`).
-   - AprilTag 36h11 (IDs 0–3) generator producing printable/screen-displayable calibration sheets (`docs/apriltags_printable.html`).
+1. **Joint-level hardware bridge** `src/elrobot_hardware.py`:
+   - `ElRobotHardware` (async) and `ElRobotHardwareSync` (for the MCP server).
+   - Reads motor registers, sets torque, moves motors 1–8.
+   - Motion needs `enable_motion=True`. Goals are clamped to calibrated range minus a 20-step margin. Uncalibrated or wrap-around motors are refused. Any fault blocks motion. Speed capped at 800, acceleration at 30.
+2. **Read-only preflight** `scripts/hardware_preflight.py`. Checks motors 1–8 are visible, calibrated and fault-free. Never moves the arm.
+3. **Tests** `tests/test_elrobot_hardware.py`: 14 new tests. Full suite: 19 pass.
+4. **Runbook** `docs/elrobot_hardware_bridge.md`: hardware-day steps, a joint-mapping table to fill in, and emergency stop.
+5. **Station connection** verified against the real `bin/station` binary. No robot attached, so the preflight reports no frames. This is the expected result.
 
 ## Work In Progress
 
-- Ready for travel to Berlin and physical hardware onboarding on Saturday morning.
+None in code. Nothing has run on the physical arm yet.
 
 ## Next Steps
 
-1. On Saturday morning at venue check-in: connect ElRobot USB cable and run `./scripts/setup_usb_serial.sh`.
-2. Launch NormaCore Station Web console and verify joint zero positions.
-3. Place AprilTag markers at workspace corners and run camera calibration.
-4. Execute first physical test move to safe clearance height $(0, 140, 70)$.
+1. **Power and connect** the ElRobot (12 V supply, data-rated USB to the Waveshare driver). Start `./bin/station --web --tcp`.
+2. **Run** `python3 scripts/hardware_preflight.py --server localhost --bus auto`. Expect READY with motors 1–8 listed. Fix any MISSING, UNCALIBRATED or FAULT before moving anything.
+3. **Fill in the joint-mapping table** in `docs/elrobot_hardware_bridge.md` (motor ID, URDF joint, direction). Use the Station console, jogging one motor at a time.
+4. **First motion** with the example in the runbook: one joint, +100 steps, `max_speed=300`, `max_accel=10`.
+5. **Cartesian tools** (`pick_at`, `place_at`) still run on the mock. Mapping them to joints needs a verified kinematics model. The Station has no Cartesian API.
+6. **Before the demo:** current-overload guard (SUGGESTIONS item 8), table-size reconciliation (item 9).
 
 ## Files Modified/Created
 
-- `cli.sh` (Master project CLI runner)
-- `src/digital_twin.html` (3D Three.js tabletop digital twin dashboard)
-- `src/digital_twin_server.py` (Local HTTP/JSON API server for digital twin)
-- `.gitignore` (comprehensive Python, robotics logs, secrets, and IDE ignores)
-- `CHANGELOG.md`
-- `README.md`
-- `GUIDELINES.md`
-- `PREFERENCES.md`
-- `CHANGELOG.md`
-- `requirements.txt`
-- `.mcp.json`
-- `SUGGESTIONS.md`
-- `docs/NormaCore_Repositories_and_Tooling.md`
-- `docs/NormaCore_Station_SDK_Reference.md`
-- `docs/NormaCore_Winning_Plan.md`
-- `docs/NormaCore_Challenge_Guide.md`
-- `docs/Hackathon_Event_Logistics.md`
-- `docs/hardware_setup_and_usb_serial.md`
-- `docs/apriltags_printable.html`
-- `scripts/setup_usb_serial.sh`
-- `scripts/generate_apriltags.py`
-- `src/mock_station.py`
-- `src/vision_homography.py`
-- `src/kinematics_safety.py`
-- `src/mcp_server.py`
-- `src/agent_prompts.py`
-- `tests/test_pipeline.py`
-- `.ai-sync/PLAN.md`
-- `.ai-sync/PROGRESS.md`
-- `.ai-sync/HANDOFF.md`
+- `src/elrobot_hardware.py` (new)
+- `scripts/hardware_preflight.py` (new)
+- `tests/test_elrobot_hardware.py` (new)
+- `docs/elrobot_hardware_bridge.md` (new)
+- `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/PROGRESS.md`, `.ai-sync/HANDOFF.md`
+- Station test run left `station.yaml` and `station_data/` in the project root. A delete was denied, so they remain. Remove them if they are not wanted, then add them to `.gitignore` (SUGGESTIONS item 10).
+- `src/digital_twin.html` is still untracked. It was not part of this work and was not committed.
 
 ## Blockers
 
-None. Offline simulation and test suite (5/5 tests) pass cleanly.
+- No physical arm available in this session. Motion code is verified only by offline tests and by reading the SDK source.
 
 ## Key Decisions
 
-- **Decoupled AI from joint servos:** Claude/Codex commands Cartesian millimeter targets; Python kinematics engine enforces safety boundaries and table floor limit.
-- **Metric grid overlay:** Vision layer annotates the camera frame with labeled millimeter coordinates so LLMs avoid 2D depth hallucinations.
-- **Closed-loop verification:** Dual-check verification (motor load + camera re-inspection) triggers autonomous self-healing if objects shift.
+- **Joint-level only.** The Station exposes motor registers, not Cartesian poses. Cartesian control waits for a verified kinematics model.
+- **Motion is opt-in and clamped.** Reads never change torque or position. Default motion is slow.
+- **SDK path** comes from `NORMACORE_ROOT`, defaulting to `external/norma-core`. The SDK is imported lazily so the offline tests run without the Station.
+- **Motor-to-joint mapping is assumed** (IDs 1–8 in URDF order). Unverified until the arm is jogged.
+- Calibration comes from the Station, not the URDF.
 
 ## Build Status
 
-- `pytest tests/test_pipeline.py`: 5 passed in 0.64s.
+- `python3 -m pytest tests/`: 19 passed.
+- `scripts/hardware_preflight.py` against the real `bin/station` with no robot: exits 1 with a clear message (no bus frames), as expected.
+- No physical verification.
+
+## Source Facts (verified 2026-11-20)
+
+- URDF joints `rev_motor_01`..`08`. Limits in radians, for example `rev_motor_01` ±1.5509, `rev_motor_05` -2.62..3.252. Gripper is `rev_motor_08` plus two prismatic fingers.
+- ElRobot BOM: ST3215 12 V / 30 kg on the follower, 8 motors. Waveshare Serial Bus Servo Driver (A). Reach 430 mm.
+- Station: TCP 8888, web 8889. Topic `st3215/inference`. Commands go as `DriverCommand` with `STC_ST3215_COMMAND`.

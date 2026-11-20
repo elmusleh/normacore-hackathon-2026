@@ -19,8 +19,12 @@
 - [ ] Place 4 AprilTag markers at workspace corners and calibrate camera
 - [ ] First physical hardware move to safe clearance height
 
-## Phase 3: Agent Integration & Tabletop Primitives — PENDING
+## Phase 3: Agent Integration & Tabletop Primitives — PARTIAL
+- [x] Joint-level hardware bridge to the Station SDK written (`src/elrobot_hardware.py`), unit-tested offline (19/19 pass). Not yet run against a real arm.
+- [x] Read-only preflight script (`scripts/hardware_preflight.py`); connection path verified against the real `bin/station` binary (no robot attached, so no frames).
+- [ ] Run preflight with the ElRobot powered and USB connected; confirm motors 1–8 and calibration
 - [ ] Connect MCP server to live NormaCore Station runtime (`gremlin_py`)
+- [ ] Decide how Cartesian tools (`pick_at`, `place_at`) map to joints: needs URDF-based kinematics verified on the physical arm; Station has no Cartesian API
 - [ ] Validate camera stream overlay against real table measurements
 - [ ] Execute single-object natural language pick-and-place
 
