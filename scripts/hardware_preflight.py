@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from elrobot_hardware import ELROBOT_MOTOR_IDS, ElRobotHardware  # noqa: E402
+from elrobot_log import setup_logging  # noqa: E402
 
 
 def _print_table(readings) -> list:
@@ -46,18 +47,22 @@ def _print_table(readings) -> list:
 
 
 async def main_async(args) -> int:
-    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
-    hw = ElRobotHardware(server=args.server, bus=args.bus, logger=logging.getLogger("preflight"))
+    log = logging.getLogger("elrobot.preflight")
+    hw = ElRobotHardware(server=args.server, bus=args.bus)
     try:
         await hw.connect(timeout_s=args.timeout)
     except Exception as exc:  # noqa: BLE001 - report any connection problem plainly
+        log.error("could not reach the Station at %s: %s", args.server, exc)
         print(f"FAIL: could not reach the Station at {args.server}: {exc}")
-        print("Check that the Station is running (`./bin/station --web --tcp`) and the USB cable is connected.")
+        print("Check that the Station is running (`./cli.sh station`) and the USB cable is connected.")
+        print("Details: ./cli.sh logs")
         return 1
     try:
         print(f"Station {args.server}, bus {hw.bus_serial}")
         readings = await hw.read()
         problems = _print_table(readings)
+        for p in problems:
+            log.error("preflight: %s", p)
     finally:
         await hw.close()
 
@@ -65,7 +70,9 @@ async def main_async(args) -> int:
         print("\nNOT READY:")
         for p in problems:
             print(f"  - {p}")
+        print("Details: ./cli.sh logs")
         return 1
+    log.info("preflight passed: all 8 motors visible, calibrated, fault-free")
     print("\nREADY: all 8 motors visible, calibrated, and fault-free. No motion was commanded.")
     return 0
 
@@ -75,7 +82,9 @@ def main() -> int:
     parser.add_argument("--server", default="localhost", help="Station host (default localhost)")
     parser.add_argument("--bus", default="auto", help="Bus serial, or 'auto' for a single-bus station")
     parser.add_argument("--timeout", type=float, default=10.0, help="Seconds to wait for the first frame")
+    parser.add_argument("--debug", action="store_true", help="show DEBUG output on the console")
     args = parser.parse_args()
+    setup_logging("preflight", debug=args.debug)
     return asyncio.run(main_async(args))
 
 

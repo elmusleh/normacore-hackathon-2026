@@ -1,41 +1,68 @@
 # ElRobot Hardware Bridge — Runbook
 
-Purpose: bring the ElRobot up on the real arm through the NormaCore Station, safely, on Saturday.
+Purpose: bring the ElRobot up on the real arm through the NormaCore Station, safely.
 
 Sources checked (2026-11-20):
-- Official repo `norma-core/norma-core` (pushed 2026-11-10), downloaded to `external/norma-core/`.
+- Official repo `norma-core/norma-core` (pushed 2026-11-10), in `external/norma-core/`.
 - ElRobot README: `external/norma-core/hardware/elrobot/README.md`.
 - URDF joint limits: `external/norma-core/hardware/elrobot/simulation/elrobot_follower.urdf`.
-- Teleop example (reference for register map and safety margins): `external/norma-core/software/station/examples/st3215-remote-teleop-py/`.
+- Teleop example (register map, safety margins): `external/norma-core/software/station/examples/st3215-remote-teleop-py/`.
 
-## What is ready
+## Quick commands
 
-| Piece | File | State |
+All hardware-day work goes through `./cli.sh`. Progress is saved in `logs/hw_day_state.json`, so you can stop and resume.
+
+| Command | What it does | Moves the arm? |
 | :--- | :--- | :--- |
-| Joint-level bridge (read, torque, move) | `src/elrobot_hardware.py` | Written, 19 offline tests pass. Not yet run on the arm. |
-| Read-only preflight | `scripts/hardware_preflight.py` | Connection path checked against the real `bin/station` (no robot attached). |
-| Safety helper tests | `tests/test_elrobot_hardware.py` | Pass. No hardware needed. |
+| `./cli.sh hw` | Checklist, next step, joint map | No |
+| `./cli.sh hw next` | Run or show the next open step | No. Manual steps only ask y/N. Motion happens only through `jog` |
+| `./cli.sh hw run <n>` | Run step n. Auto steps run a command; manual steps ask y/N | No |
+| `./cli.sh hw done <n> [--undo]` | Mark a manual step done or open again | No |
+| `./cli.sh hw map <m> <joint> <dir> [note]` | Record which joint motor m drives | No |
+| `./cli.sh hw motors` | Live table of motors 1–8 | No |
+| `./cli.sh hw jog <m> <steps> [--speed N]` | Move one motor. Max ±200 steps. You type `MOVE` to confirm | **Yes** |
+| `./cli.sh hw stop` | Torque OFF on all motors | Releases the arm |
+| `./cli.sh preflight` | Read-only readiness check | No |
+| `./cli.sh logs [-f]` | Newest run log (`-f` follows it live) | No |
+| `./cli.sh hw logs` | Last lines of the latest hardware log | No |
+| `./cli.sh hw bundle` | Pack logs, state and `station.yaml` for debugging | No |
+| `./cli.sh hw reset --yes` | Clear progress and joint map | No |
 
-## What is NOT ready
+Add `--debug` to any `hw` command to see DEBUG output on the console. The log file always has DEBUG.
 
-- **Cartesian moves.** The Station has no Cartesian API. It only speaks motor registers (goal position, speed, acceleration, torque). `pick_at` and `place_at` still run on the mock. Mapping them to joints needs a verified kinematics model (see Step 3).
-- **Joint mapping is assumed.** The URDF names `rev_motor_01` to `rev_motor_08`. The code assumes these map to ST3215 IDs 1 to 8, in order. Not yet checked on the arm.
-- **Calibration is taken from the Station.** Motion limits come from each motor's calibrated range, as stored by the Station. They are not taken from the URDF.
-- **Current-overload guard is missing.** See SUGGESTIONS.md item 8.
+## Logs and debugging
+
+- Each run writes `logs/<tool>-<timestamp>.log` with full DEBUG detail, and `logs/<tool>-latest.log` points at it.
+- Every log starts with a header: git commit, Python version, platform, arguments, SDK path.
+- The file records every move request, each clamp, each register write (hex), and full tracebacks.
+- The console shows INFO for anything that talks to the arm, and one short line on failure.
+- If something fails, run `./cli.sh logs`. Then, if you need help, run `./cli.sh hw bundle` and share the file it prints. Check the bundle first: it contains logs and `station.yaml`.
+
+### Common failures and what they mean
+
+| Console message | Likely cause | Fix |
+| :--- | :--- | :--- |
+| `cannot use the Station at localhost` | Station not running, or wrong port | Start `./cli.sh station` in another terminal |
+| `no st3215/inference frame ... Usually the Station is not running, no bus is connected...` | Station is up but sees no bus | Check the USB cable and the driver board's power |
+| `--bus auto needs exactly one bus` | More than one bus on the station | Set `ELROBOT_BUS=<serial>` |
+| `motor N: goal clamped` (warning) | Target was outside the safe range | Expected near the calibrated ends. Repeated clamps mean the calibration or target is wrong |
+| `motor N: calibration invalid` | Motor not calibrated, or its range wraps past zero | Calibrate in the Station console |
+| `motor N reports fault status 0x..` | Servo error, e.g. overheating or overload | Stop, let it cool, check the cable. Do not force it |
+| `SDK import failed` | `external/norma-core` missing or `target/gen_python` not generated | Set `NORMACORE_ROOT`, or re-check the download |
 
 ## Hardware-day steps
 
-1. **Power and cable.** 12 V / 4 A supply on the follower arm. USB data cable to the Waveshare bus servo driver (A). Data-rated cable only.
-2. **Start the Station.** From the project root: `./bin/station --web --tcp`. Web console at `http://localhost:8889`. TCP API on port 8888.
-3. **Preflight (read only).**
-   ```bash
-   python3 scripts/hardware_preflight.py --server localhost --bus auto
-   ```
-   Expect `READY` with motors 1–8 listed. If anything is `MISSING`, `UNCALIBRATED` or `FAULT`, fix that first. Do not move the arm.
-4. **Calibrate in the Station console** if any motor is uncalibrated. Move each joint through its full travel when prompted.
-5. **Map joints (SUGGESTIONS item 7).** In the console, jog one motor at a time at low speed. Record motor ID, joint name, and direction in the table below.
+The checklist is built into the tool. Run `./cli.sh hw` at any time.
 
-   | Motor ID | URDF joint | Positive direction | Notes |
+1. **Power and cable.** 12 V / 4 A supply on the follower arm. Data-rated USB cable to the Waveshare bus servo driver (A). Keep one hand near the power switch.
+2. **Start the Station.** In a separate terminal: `./cli.sh station`. Web console at `http://localhost:8889`.
+3. **Preflight.** `./cli.sh hw run 3` (or `./cli.sh preflight`). Expect READY with motors 1–8 listed. Fix any MISSING, UNCALIBRATED or FAULT first. Moves nothing.
+4. **Calibrate if needed.** Only when preflight showed UNCALIBRATED. Move each joint through its full travel in the Station console, then re-run step 3.
+5. **Map motors to joints.** Jog each motor at low speed in the Station console, then record it:
+   `./cli.sh hw map 2 rev_motor_02 "+" "shoulder lift"`
+   Step 5 passes when all 8 motors are mapped. Fill in the table below as you go.
+
+   | Motor | URDF joint | Positive direction | Notes |
    | :--- | :--- | :--- | :--- |
    | 1 | rev_motor_01 | | |
    | 2 | rev_motor_02 | | |
@@ -46,44 +73,27 @@ Sources checked (2026-11-20):
    | 7 | rev_motor_07 | | |
    | 8 | rev_motor_08 (gripper) | | |
 
-6. **First motion.** Use the Python bridge with `enable_motion=True`. Move one joint a small amount, away from the table, with low `max_speed`. Example:
-   ```python
-   import asyncio
-   from src.elrobot_hardware import ElRobotHardware
-
-   async def main():
-       hw = ElRobotHardware(server="localhost", bus="auto")
-       await hw.connect()
-       readings = await hw.read()
-       start = readings[2].present                     # motor 2, a shoulder joint
-       result = await hw.move_motors(
-           {2: start + 100},                           # about 9 degrees on a 4096-step encoder
-           enable_motion=True, max_speed=300, max_accel=10,
-       )
-       print(result)
-       await hw.close()
-
-   asyncio.run(main())
-   ```
-   Keep one hand near the power switch. Check `result[2]["clamped"]` before trusting the move.
-7. **Safe clearance height.** Once single joints behave, move to the clearance pose from `PLAN.md` (end effector at (0, 140, 70) mm). This needs the Cartesian mapping from step 5 first, so do it through joint targets until then.
+6. **First small move.** `./cli.sh hw jog 2 100 --speed 300`. Check the printed target, type `MOVE`, then watch the joint. Mark step 6 done with `./cli.sh hw done 6`.
+7. **Clearance pose.** Move to a safe height above the table using joint targets. Cartesian moves are not ready (see below).
 
 ## Safety rules in the code
 
-- Motion needs `enable_motion=True`. Reads never move the arm.
-- Goals are clamped to `[range_min + margin, range_max - margin]` (default margin 20 steps). The result reports `clamped`.
-- Uncalibrated or wrap-around motors are refused. Recalibrate in the Station console.
+- Motion needs explicit enabling. `jog` asks you to type `MOVE`. Reads never move the arm.
+- Goals are clamped to `[range_min + 20, range_max - 20]` steps. Clamps are logged as warnings.
+- Uncalibrated or wrap-around motors are refused.
 - Any motor status other than under-voltage blocks the move.
-- Defaults are slow on purpose: `max_speed=800`, `max_accel=30`. Raise only after watching a test move.
+- Jog is limited to ±200 steps (about 17°) per command and 800 speed. Defaults are slow on purpose.
+- `hw stop` always runs. It turns torque off, so **support the arm first**.
 
-## Emergency stop
+## What is NOT ready, and what to do about it
 
-Disable torque on all motors so the arm goes limp:
-```python
-await hw.set_torque([1, 2, 3, 4, 5, 6, 7, 8], enable=False)
-```
-Or close the Station process. Power is the last resort.
+1. **Motor-to-joint mapping (unverified).** The code assumes motor IDs 1–8 follow URDF joints 01–08. *Do this first, on the arm.* It is low risk: jog one motor a few steps at a time and write down what moves. Step 5 of the checklist tracks it.
+2. **Cartesian moves (`pick_at`, `place_at`) are not ready.** The Station only has motor-level control. Real IK needs the URDF geometry checked against the physical arm. *Do not build on this for the demo.* Instead:
+   - **Teach joint waypoints.** Move the arm by hand or with `jog` to the poses you need (home, above the cube, grasp, bin A, bin B). Record each as a list of 8 joint targets in a file.
+   - The agent then calls named waypoints, and only the vision layer decides *which* waypoint to use. This works without IK and is easy to debug.
+   - Add IK later only if there is time after the demo works.
+3. **No current-overload guard yet.** A blocked servo can strain its gears. *Before any gripper test on a real object*, read the current while moving slowly and set per-motor thresholds, as the teleop example does (`config.py`). Until then, keep gripper tests slow and short.
+4. **Workspace limits disagree.** The mock table is 400 × 300 mm, the MCP server uses Y 90–270 mm, and the README gives 430 mm reach. *Measure the real table with a tape measure* and update the constants in one place.
+5. **Station runtime files.** `station.yaml` and `station_data/` are created in the project root and not yet in `.gitignore`.
 
-## Known gaps to close before the demo
-
-See `SUGGESTIONS.md` items 7–9 and `.ai-sync/PROGRESS.md` Phase 3.
+Suggested order for the next session: 1 → 3 → 4 → 2 (waypoints) → 5 → 6 (only once the gripper overload guard exists).

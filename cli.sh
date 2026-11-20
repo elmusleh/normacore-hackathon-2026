@@ -36,6 +36,20 @@ print_usage() {
     echo -e "  ${C_YELLOW}mcp${C_RESET}                 Run Model Context Protocol (MCP) server for Claude / Codex"
     echo -e "  ${C_YELLOW}urdf${C_RESET}                Open official NormaCore online 3D URDF interactive viewer"
     echo ""
+    echo -e "${C_BOLD}Hardware Day (ElRobot):${C_RESET}"
+    echo -e "  ${C_GREEN}hw${C_RESET}                  Show the hardware-day checklist and joint map"
+    echo -e "  ${C_GREEN}hw next${C_RESET}             Run or show the next open step"
+    echo -e "  ${C_GREEN}hw run <n>${C_RESET}          Run step n (auto steps run a command; manual steps ask y/N)"
+    echo -e "  ${C_GREEN}hw done <n> [--undo]${C_RESET} Mark a manual step done or open again"
+    echo -e "  ${C_GREEN}hw map <m> <joint> <dir>${C_RESET} Record which joint motor m drives"
+    echo -e "  ${C_GREEN}hw motors${C_RESET}           Live read-only table of motors 1-8"
+    echo -e "  ${C_RED}hw jog <m> <steps>${C_RESET}   Move one motor (max ±200 steps, asks you to type MOVE)"
+    echo -e "  ${C_RED}hw stop${C_RESET}              Torque OFF on all motors (emergency)"
+    echo -e "  ${C_CYAN}hw bundle${C_RESET}            Pack logs + state + config for debugging or sharing"
+    echo -e "  ${C_CYAN}hw reset${C_RESET}             Clear checklist progress and joint map"
+    echo -e "  ${C_CYAN}logs [-f]${C_RESET}            Show the newest run log (-f follows it live)"
+    echo -e "  ${C_CYAN}preflight${C_RESET}            Read-only ElRobot readiness check (writes logs/)"
+    echo ""
     echo -e "${C_BOLD}General Commands:${C_RESET}"
     echo -e "  ${C_CYAN}help${C_RESET}                Display this help menu"
     echo -e "${C_BOLD}${C_BLUE}================================================================${C_RESET}"
@@ -117,6 +131,29 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
             xdg-open "https://normacore.dev/elrobot-urdf/"
         else
             echo "Browse to: https://normacore.dev/elrobot-urdf/"
+        fi
+        ;;
+
+    hw)
+        python3 scripts/hw_day.py "$@"
+        ;;
+
+    preflight)
+        python3 scripts/hardware_preflight.py "$@"
+        ;;
+
+    logs)
+        # Newest run log of any tool (hw, preflight, ...). -f follows it live.
+        LATEST=$(ls -t logs/*.log 2>/dev/null | grep -v -- '-latest.log$' | head -1 || true)
+        if [ -z "$LATEST" ]; then
+            echo -e "${C_YELLOW}No logs yet. Run ./cli.sh preflight or ./cli.sh hw first.${C_RESET}"
+            exit 1
+        fi
+        echo -e "${C_CYAN}--- ${LATEST} ---${C_RESET}"
+        if [ "$1" = "-f" ]; then
+            tail -n 80 -f "$LATEST"
+        else
+            tail -n 80 "$LATEST"
         fi
         ;;
 

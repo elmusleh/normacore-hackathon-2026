@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-hardware joint-level bridge `src/elrobot_hardware.py` for the ST3215 bus via the NormaCore Station (`ElRobotHardware` async client and `ElRobotHardwareSync` facade). Reads motor registers, sets torque, and moves motors 1–8. Motion is refused without `enable_motion=True`, goals are clamped to calibrated range minus a margin, wrap-around or uncalibrated motors are refused, and any motor fault blocks motion.
 - Read-only hardware preflight `scripts/hardware_preflight.py`: confirms all 8 ElRobot motors are visible, calibrated and fault-free. It never moves the arm or changes torque.
 - Unit tests `tests/test_elrobot_hardware.py` (14 tests) for the safety helpers: sign-bit decoding, goal clamping, calibration refusal, fault detection, and motion-enable gating. No hardware needed.
+- Run logging `src/elrobot_log.py`: each run writes a full DEBUG log to `logs/<tool>-<timestamp>.log` and updates `logs/<tool>-latest.log`. Each log starts with a header (git commit, Python, platform, arguments, SDK path). Uncaught exceptions are written with tracebacks. The console stays short.
+- Hardware-day tool `scripts/hw_day.py`, exposed as `./cli.sh hw ...`: a persistent checklist (`status`, `next`, `run <n>`, `done <n>`), joint map (`map`), live table (`motors`), confirmed single-motor move (`jog`, requires typing `MOVE`, max ±200 steps), `stop` (torque off, always available), `logs`, `bundle` (packs logs, state and config for sharing), and `reset`.
+- `./cli.sh preflight` (read-only readiness check) and `./cli.sh logs [-f]` (newest run log).
+- Runbook `docs/elrobot_hardware_bridge.md` now covers the commands, a common-failures table, and a recommended order for what is not ready yet.
 
 ### Changed
 - Expanded `.gitignore` with comprehensive rules for Python bytecode, virtualenvs, robotics runtime logs, secrets, testing caches, and IDE artifacts.

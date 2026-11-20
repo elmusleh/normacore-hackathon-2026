@@ -169,7 +169,7 @@ class ElRobotHardware:
         self.server = server
         self.bus_request = bus
         self.root = Path(os.environ.get("NORMACORE_ROOT", normacore_root or DEFAULT_NORMACORE_ROOT))
-        self.log = logger or logging.getLogger("elrobot")
+        self.log = logger or logging.getLogger("elrobot.hw")
         self.client = None
         self.bus_serial: Optional[str] = None
         self._queue: Optional[asyncio.Queue] = None
@@ -178,30 +178,45 @@ class ElRobotHardware:
     # -- connection ---------------------------------------------------------
 
     async def connect(self, timeout_s: float = 10.0) -> None:
+        self.log.info("connecting to station %s (bus=%s, sdk=%s)", self.server, self.bus_request, self.root)
         _ensure_sdk_on_path(self.root)
-        from software.station.shared.station_py import new_station_client  # noqa: WPS433
-        from target.gen_python.protobuf.drivers.st3215 import st3215  # noqa: WPS433
+        try:
+            from software.station.shared.station_py import new_station_client  # noqa: WPS433
+            from target.gen_python.protobuf.drivers.st3215 import st3215  # noqa: WPS433
+        except ImportError:
+            self.log.exception("SDK import failed; check NORMACORE_ROOT=%s and that target/gen_python exists", self.root)
+            raise
 
         self._st3215 = st3215
         self.client = await new_station_client(self.server, self.log)
+        self.log.debug("station client created, subscribing to st3215/inference")
         self._queue = asyncio.Queue()
         self._err_queue = self.client.follow("st3215/inference", self._queue)
         await self._wait_for_frame(timeout_s)
         self.bus_serial = self._resolve_bus(self.bus_request)
+        self.log.info("connected: bus serial %s", self.bus_serial)
 
     async def _wait_for_frame(self, timeout_s: float) -> None:
         deadline = asyncio.get_running_loop().time() + timeout_s
+        frames = 0
         while self._latest is None:
             remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
+                self.log.error(
+                    "no st3215/inference frame from %s after %.1fs. Usually the Station is not running, "
+                    "no bus is connected, or the USB cable is unplugged.", self.server, timeout_s)
                 raise RuntimeError(f"no st3215/inference frames from station {self.server} within {timeout_s}s")
             try:
                 entry = await asyncio.wait_for(self._queue.get(), timeout=remaining)
             except asyncio.TimeoutError:
                 continue
             if entry is None:
+                self.log.error("st3215/inference stream closed by the station")
                 raise RuntimeError("st3215/inference stream closed by station")
+            frames += 1
             self._latest = self._st3215.InferenceStateReader(entry.Data)
+            if frames == 1:
+                self.log.debug("first st3215/inference frame received (%d bytes)", len(entry.Data))
 
     def _drain(self) -> None:
         """Keep only the newest frame so reads never work from a backlog."""
@@ -216,13 +231,18 @@ class ElRobotHardware:
     def _resolve_bus(self, requested: str) -> str:
         buses = self._latest.get_buses() or []
         serials = [b.get_bus().get_serial_number() for b in buses if b.get_bus()]
+        self.log.debug("buses on station: %s (requested=%s)", serials, requested)
         if not serials:
+            self.log.error("station reports no ST3215 bus. Check the USB cable and the driver board power.")
             raise RuntimeError("no ST3215 bus visible on the station")
         if requested == "auto":
             if len(serials) != 1:
+                self.log.error("--bus auto needs exactly one bus, found %d: %s. Pass the serial explicitly.",
+                               len(serials), serials)
                 raise RuntimeError(f"--bus auto needs exactly one bus, found {serials}")
             return serials[0]
         if requested not in serials:
+            self.log.error("bus %r not on station; visible: %s", requested, serials)
             raise RuntimeError(f"bus {requested!r} not on station; visible: {serials}")
         return requested
 
@@ -230,6 +250,7 @@ class ElRobotHardware:
         if self.client is not None:
             try:
                 self.client.close_connection()
+                self.log.info("station connection closed")
             except Exception:  # noqa: BLE001 - best effort on shutdown
                 self.log.exception("error while closing station connection")
             self.client = None
@@ -252,15 +273,23 @@ class ElRobotHardware:
         """Read every ElRobot motor on the bus. Read-only."""
         bus = self._bus_reader()
         readings: Dict[int, MotorReading] = {}
+        seen = []
         for m in bus.get_motors() or []:
             if m is None:
                 continue
             mid = m.get_id()
+            seen.append(mid)
             if mid not in ELROBOT_MOTOR_IDS:
                 continue
-            readings[mid] = parse_motor_state(
-                mid, bytes(m.get_state()), m.get_range_min(), m.get_range_max(),
+            raw = bytes(m.get_state())
+            readings[mid] = parse_motor_state(mid, raw, m.get_range_min(), m.get_range_max())
+            self.log.debug(
+                "motor %d: present=%d goal=%d torque=%s status=0x%02x current=%d range=%d..%d state_len=%d",
+                mid, readings[mid].present, readings[mid].goal, readings[mid].torque_on,
+                readings[mid].status, readings[mid].current, readings[mid].range_min,
+                readings[mid].range_max, len(raw),
             )
+        self.log.debug("snapshot: motors on bus %s; ElRobot motors read %s", seen, sorted(readings))
         return readings
 
     # -- writes -------------------------------------------------------------
@@ -268,6 +297,7 @@ class ElRobotHardware:
     async def set_torque(self, motor_ids: List[int], enable: bool) -> None:
         """Enable or disable torque. Disabling makes the arm go limp."""
         value = b"\x01" if enable else b"\x00"
+        self.log.info("torque %s on motors %s", "ON" if enable else "OFF", list(motor_ids))
         await self._sync_write(RAM_TORQUE_ENABLE, [(mid, value) for mid in motor_ids])
 
     async def move_motors(
@@ -283,15 +313,20 @@ class ElRobotHardware:
 
         Returns one result per motor, including whether the goal was clamped.
         """
+        self.log.info("move request: goals=%s enable_motion=%s margin=%d max_speed=%d max_accel=%d",
+                      goals, enable_motion, margin, max_speed, max_accel)
         if not enable_motion:
+            self.log.error("move refused: enable_motion is False")
             raise PermissionError("motion disabled: pass enable_motion=True to move the real arm")
         unknown = set(goals) - set(ELROBOT_MOTOR_IDS)
         if unknown:
+            self.log.error("move refused: not ElRobot motors %s", sorted(unknown))
             raise ValueError(f"not ElRobot motors: {sorted(unknown)}")
 
         readings = self.snapshot()
         missing = set(goals) - set(readings)
         if missing:
+            self.log.error("move refused: motors %s not visible on bus %s", sorted(missing), self.bus_serial)
             raise RuntimeError(f"motors not visible on the bus: {sorted(missing)}")
 
         results: Dict[int, dict] = {}
@@ -299,8 +334,17 @@ class ElRobotHardware:
         for mid, goal in goals.items():
             r = readings[mid]
             if r.faulted:
+                self.log.error("move refused: motor %d status 0x%02x (only under-voltage 0x01 is tolerated)",
+                               mid, r.status)
                 raise RuntimeError(f"motor {mid} reports fault status 0x{r.status:02x}; not moving")
-            clamped, was_clamped = clamp_goal(int(goal), r.range_min, r.range_max, margin)
+            try:
+                clamped, was_clamped = clamp_goal(int(goal), r.range_min, r.range_max, margin)
+            except ValueError as exc:
+                self.log.error("move refused: motor %d: %s", mid, exc)
+                raise
+            if was_clamped:
+                self.log.warning("motor %d: goal %d clamped to %d (calibrated %d..%d, margin %d)",
+                                 mid, int(goal), clamped, r.range_min, r.range_max, margin)
             final_goals[mid] = clamped
             results[mid] = {
                 "requested": int(goal),
@@ -308,13 +352,18 @@ class ElRobotHardware:
                 "clamped": was_clamped,
                 "present": r.present,
             }
+            self.log.debug("motor %d: present=%d -> goal=%d (delta %+d steps)",
+                           mid, r.present, clamped, clamped - r.present)
 
         # Speed and acceleration go out before the goal, as in the teleop example.
         speed = max(1, min(max_speed, 3300))
         accel = max(1, min(max_accel, 254))
+        self.log.info("sending: speed=%d accel=%d goals=%s", speed, accel, final_goals)
         await self._sync_write(RAM_GOAL_SPEED, [(mid, to_u16_le(speed)) for mid in final_goals])
         await self._sync_write(RAM_ACC, [(mid, bytes([accel])) for mid in final_goals])
         await self._sync_write(RAM_GOAL_POSITION, [(mid, to_u16_le(g)) for mid, g in final_goals.items()])
+        self.log.info("move command sent for motors %s; check present positions with `./cli.sh hw status`",
+                      sorted(final_goals))
         return results
 
     async def _sync_write(self, address: int, motors: List[Tuple[int, bytes]]) -> None:
@@ -323,6 +372,8 @@ class ElRobotHardware:
         from target.gen_python.protobuf.station import commands as station_commands, drivers  # noqa: WPS433
         from software.station.shared.station_py import send_commands  # noqa: WPS433
 
+        self.log.debug("sync_write addr=0x%02x bus=%s motors=%s", address, self.bus_serial,
+                       [(mid, val.hex()) for mid, val in motors])
         st = self._st3215
         cmd = st.Command(
             target_bus_serial=self.bus_serial,
@@ -352,7 +403,12 @@ class ElRobotHardwareSync:
         self._thread.start()
 
     def _run(self, coro, timeout: float = 30.0):
-        return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout)
+        try:
+            return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout)
+        except Exception as exc:
+            # Full traceback goes to the log file only; the console gets the short message.
+            logging.getLogger("elrobot.hw").debug("hardware call failed: %r", exc, exc_info=True)
+            raise
 
     def connect(self, timeout_s: float = 10.0) -> None:
         self._run(self._hw.connect(timeout_s), timeout=timeout_s + 5)
@@ -367,5 +423,21 @@ class ElRobotHardwareSync:
         return self._run(self._hw.move_motors(goals, **kwargs))
 
     def close(self) -> None:
-        self._run(self._hw.close())
-        self._loop.call_soon_threadsafe(self._loop.stop)
+        try:
+            self._run(self._hw.close(), timeout=5)
+        finally:
+            # Cancel and await anything left pending (e.g. the SDK's reconnect loop after a
+            # failed connect), so the interpreter does not warn about destroyed tasks.
+            async def _drain():
+                me = asyncio.current_task()
+                pending = [t for t in asyncio.all_tasks() if t is not me]
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+
+            try:
+                asyncio.run_coroutine_threadsafe(_drain(), self._loop).result(timeout=5)
+            except Exception:  # noqa: BLE001 - shutdown is best effort
+                logging.getLogger("elrobot.hw").debug("task drain on close failed", exc_info=True)
+            self._loop.call_soon_threadsafe(self._loop.stop)
+            self._thread.join(timeout=5)

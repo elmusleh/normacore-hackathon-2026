@@ -69,3 +69,17 @@
     How: Add `.github/workflows/tests.yml` with checkout, Python 3.11 setup, `pip install -r requirements.txt`, and `pytest tests/`.
     Status: ⏳ Unimplemented
     Reason Deferred: Repo has no remote set up for hackathon work yet, and the job would also need the NormaCore SDK checkout.
+
+12. Teach-and-replay joint waypoints for the demo — Priority 88% (High value) [Best practices]
+    What: Record a handful of named arm poses (home, above cube, grasp, bin A, bin B) as 8 joint targets each, then replay them by name.
+    Why: The Station has no Cartesian control and IK is unverified on the real arm. Named joint poses avoid that gap, are easy to debug, and are enough for a sorting demo.
+    How: Add a `./cli.sh hw teach <name>` command that saves the current motor positions to `docs/waypoints.json`, and a `hw goto <name>` command that moves there through the same clamped `jog`-style path, with the MOVE confirmation.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Needs the joint mapping (checklist step 5) and a working first move (step 6) on the real arm first.
+
+13. Rotate and prune old run logs — Priority 40% (Optional) [Professionalism]
+    What: Delete hardware logs older than a set number of days, so `logs/` does not grow forever.
+    Why: Every run writes a new file, and at DEBUG level each file can be several KB. This matters only over many sessions.
+    How: In `src/elrobot_log.py`, keep the newest 50 files per tool name and delete the rest when a new run starts.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Low value for hardware day; logs are small and the bundle command only reads the most recent files.
