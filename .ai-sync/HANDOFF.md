@@ -39,6 +39,9 @@ stop_reason: completed
 
 ## Files Modified/Created
 
+- `cli.sh` (Master project CLI runner)
+- `src/digital_twin.html` (3D Three.js tabletop digital twin dashboard)
+- `src/digital_twin_server.py` (Local HTTP/JSON API server for digital twin)
 - `.gitignore` (comprehensive Python, robotics logs, secrets, and IDE ignores)
 - `CHANGELOG.md`
 - `README.md`

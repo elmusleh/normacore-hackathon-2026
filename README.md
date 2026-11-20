@@ -20,32 +20,43 @@ Most hackathon teams naively feed raw 2D camera images and raw joint angles into
 
 ## ⚡ 5-Minute Team Quickstart
 
-You can test the entire pipeline on your laptop **right now** before touching physical hardware:
+You can test the entire pipeline on your laptop **right now** before touching physical hardware using our master CLI runner (`./cli.sh`):
 
-### 1. Clone & Install Dependencies
+### 1. Run the Test Suite
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd "AI & Robotics Hackathon"
-
-# Install requirements
-pip install -r requirements.txt
+./cli.sh test
 ```
 
-### 2. Run the Offline Verification Suite
+### 2. Launch the Interactive 3D Digital Twin
 ```bash
-# Run all unit and integration tests
-python3 -m pytest tests/test_pipeline.py -v
+# Opens the interactive 3D WebGL Digital Twin and live telemetry in your browser
+./cli.sh digital-twin
 ```
 
 ### 3. Run the Autonomous Perturbation Demo
 ```bash
-# Runs the simulated judge perturbation and self-healing recovery loop
-python3 src/agent_prompts.py
+# Runs the simulated judge perturbation and self-healing recovery loop in the terminal
+./cli.sh demo
 ```
 
 ### 4. Connect to Claude Code / Cursor / Codex via MCP
 This repo includes a pre-configured `.mcp.json` file. When you open this folder in Claude Code or Cursor, the tools (`get_calibrated_view`, `pick_at`, `place_at`, `verify_grasp`, `reset_home`) are automatically registered!
+
+---
+
+## 🛠️ Master CLI Commands (`./cli.sh`)
+
+| Command | Action |
+| :--- | :--- |
+| `./cli.sh test [name]` | Run full test suite or filter by test name |
+| `./cli.sh digital-twin` | Start 3D Three.js Digital Twin server at `http://localhost:8080` |
+| `./cli.sh demo` | Run autonomous judge perturbation simulation in terminal |
+| `./cli.sh view-camera` | Capture fresh calibrated camera snapshot with metric grid |
+| `./cli.sh apriltags` | Generate 4-corner AprilTags sheet for printing/screen calibration |
+| `./cli.sh station` | Launch official Station binary (`./bin/station --web --tcp`) |
+| `./cli.sh setup-serial` | Run Linux USB serial & udev permissions setup for ElRobot |
+| `./cli.sh mcp` | Launch MCP server over stdin/stdout |
+| `./cli.sh urdf` | Open official NormaCore online 3D URDF interactive viewer |
 
 ---
 

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NormaCore Digital Twin — ElRobot 7+1 DOF Tabletop</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f1117;
+            --panel-bg: #181b24;
+            --border: #2a2f3d;
+            --accent: #3b82f6;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        header {
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .badge {
+            background: #1e3a8a;
+            color: #93c5fd;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            flex: 1;
+            overflow: hidden;
+        }
+        .viewport-container {
+            position: relative;
+            background: #090a0f;
+            width: 100%;
+            height: 100%;
+        }
+        #three-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .viewport-overlay {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(24, 27, 36, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .sidebar {
+            background: var(--panel-bg);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .sidebar-section {
+            border-bottom: 1px solid var(--border);
+            padding: 16px;
+        }
+        .sidebar-section h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .camera-preview {
+            width: 100%;
+            height: 220px;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            object-fit: contain;
+        }
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .telemetry-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .telemetry-label {
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+        .telemetry-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            margin-top: 2px;
+        }
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        button {
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        button:hover { background: #1d4ed8; }
+        button:active { transform: translateY(1px); }
+        button.btn-warn { background: #d97706; }
+        button.btn-warn:hover { background: #b45309; }
+        button.btn-danger { background: #dc2626; }
+        button.btn-danger:hover { background: #b91c1c; }
+        button.btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+        button.btn-outline:hover { background: rgba(255, 255, 255, 0.05); }
+        .log-box {
+            background: #0d0f14;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            height: 180px;
+            overflow-y: auto;
+            font-size: 11px;
+            line-height: 1.5;
+            font-family: monospace;
+            color: #cbd5e1;
+        }
+        .log-entry { margin-bottom: 4px; }
+        .log-info { color: #60a5fa; }
+        .log-success { color: #34d399; }
+        .log-warn { color: #fbbf24; }
+        .log-danger { color: #f87171; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-title">
+            <span class="status-dot"></span>
+            <h2>NormaCore Digital Twin</h2>
+            <span class="badge">ElRobot 7+1 DOF</span>
+            <span class="badge" style="background: #14532d; color: #86efac;">Simulation Mode</span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-muted);">
+            NormaCore Station: <strong>localhost:8888</strong> (TCP) · <strong>8889</strong> (Web)
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <!-- 3D Tabletop Viewport -->
+        <div class="viewport-container">
+            <canvas id="three-canvas"></canvas>
+            <div class="viewport-overlay">
+                <div><strong>3D Interactive Twin</strong> (Click & Drag to Rotate · Scroll to Zoom)</div>
+                <div style="color: var(--text-muted); margin-top: 4px;">Table: 400×300mm · Reach: 430mm · ST3215 Bus Servos</div>
+            </div>
+        </div>
+
+        <!-- Sidebar Controls & Camera -->
+        <div class="sidebar">
+            <!-- Calibrated Vision Feed -->
+            <div class="sidebar-section">
+                <h3>Overhead Vision (Calibrated Grid)</h3>
+                <img id="camera-feed" class="camera-preview" src="/api/camera" alt="Camera Feed">
+            </div>
+
+            <!-- Telemetry -->
+            <div class="sidebar-section">
+                <h3>Kinematics & Telemetry</h3>
+                <div class="telemetry-grid">
+                    <div class="telemetry-item">
+                        <div class="telemetry-label">End Effector (X, Y, Z)</div>
+                        <div class="telemetry-value" id="val-xyz">0.0, 140.0, 120.0 mm</div>
+                    </div>
+                    <div class="telemetry-item">
+                        <div class="telemetry-label">Gripper Status</div>
+                        <div class="telemetry-value" id="val-gripper">OPEN (1.00)</div>
+                    </div>
+                    <div class="telemetry-item">
+                        <div class="telemetry-label">Gripper Motor Load</div>
+                        <div class="telemetry-value" id="val-load">0.00 / 1.00</div>
+                    </div>
+                    <div class="telemetry-item">
+                        <div class="telemetry-label">Held Object</div>
+                        <div class="telemetry-value" id="val-held">None</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Actions -->
+            <div class="sidebar-section">
+                <h3>Interactive Actions</h3>
+                <div class="btn-group">
+                    <button onclick="runAutonomousDemo()" style="background: #059669;">
+                        ▶ Run Autonomous Recovery Demo
+                    </button>
+                    <button class="btn-warn" onclick="sendAction('perturb', {object_id: 'blue_cube_01', x: -30, y: 195})">
+                        ⚡ Simulate Judge Perturbation (Slide Cube)
+                    </button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button class="btn-outline" onclick="sendAction('pick', {x: -60, y: 180})">Pick Blue Cube</button>
+                        <button class="btn-outline" onclick="sendAction('place', {x: -130, y: 210})">Place Left Bin</button>
+                    </div>
+                    <button class="btn-outline" onclick="sendAction('home')">Reset Arm to Home</button>
+                </div>
+            </div>
+
+            <!-- Event Logs -->
+            <div class="sidebar-section" style="flex: 1;">
+                <h3>System Logs & MCP Stream</h3>
+                <div class="log-box" id="log-box">
+                    <div class="log-entry log-info">[INIT] Digital Twin initialized.</div>
+                    <div class="log-entry">[READY] Listening for MCP tool calls...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Three.js 3D Tabletop Setup ---
+        const canvas = document.getElementById('three-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        renderer.shadowMap.enabled = true;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f1117);
+
+        const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+        camera.position.set(0, 380, 360);
+        camera.lookAt(0, 160, 20);
+
+        // Lights
+        const ambLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(100, 400, 200);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // Workbench Table (400x300mm)
+        const tableGeo = new THREE.BoxGeometry(400, 10, 300);
+        const tableMat = new THREE.MeshStandardMaterial({ color: 0x222634, roughness: 0.8 });
+        const table = new THREE.Mesh(tableGeo, tableMat);
+        table.position.set(0, -5, 170);
+        table.receiveShadow = true;
+        scene.add(table);
+
+        // Grid on table
+        const gridHelper = new THREE.GridHelper(360, 18, 0x3b82f6, 0x1f293d);
+        gridHelper.position.set(0, 0.1, 170);
+        scene.add(gridHelper);
+
+        // Target Bins
+        function createBin(x, y, color, label) {
+            const binGeo = new THREE.BoxGeometry(70, 20, 70);
+            const binMat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.6 });
+            const bin = new THREE.Mesh(binGeo, binMat);
+            bin.position.set(x, 10, y);
+            scene.add(bin);
+            return bin;
+        }
+        createBin(-130, 210, 0x3b82f6, 'Left Bin');
+        createBin(130, 210, 0x10b981, 'Right Bin');
+
+        // 3D Objects
+        const objectMeshes = {};
+        function createObjectMesh(id, color, rad) {
+            const geo = new THREE.CylinderGeometry(rad, rad, rad * 1.5, 16);
+            const mat = new THREE.MeshStandardMaterial({ color, metalness: 0.2, roughness: 0.4 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.castShadow = true;
+            scene.add(mesh);
+            objectMeshes[id] = mesh;
+            return mesh;
+        }
+        createObjectMesh('blue_cube_01', 0x2563eb, 12);
+        createObjectMesh('green_tool_01', 0x10b981, 14);
+        createObjectMesh('red_cylinder_01', 0xef4444, 11);
+
+        // Simplified 7-DOF Robotic Arm Visualization (Base + Link segments + End Effector)
+        const armGroup = new THREE.Group();
+        scene.add(armGroup);
+
+        const baseGeo = new THREE.CylinderGeometry(30, 35, 20, 32);
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5 });
+        const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+        baseMesh.position.set(0, 10, 0);
+        armGroup.add(baseMesh);
+
+        // End-Effector / Gripper Mesh
+        const eeGeo = new THREE.SphereGeometry(10, 16, 16);
+        const eeMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+        const eeMesh = new THREE.Mesh(eeGeo, eeMat);
+        eeMesh.position.set(0, 120, 140);
+        armGroup.add(eeMesh);
+
+        // Segment cylinder connecting base to EE
+        const linkGeo = new THREE.CylinderGeometry(6, 6, 1, 16);
+        const linkMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
+        const linkMesh = new THREE.Mesh(linkGeo, linkMat);
+        armGroup.add(linkMesh);
+
+        function updateArmGeometry(x, y, z) {
+            eeMesh.position.set(x, z, y);
+            
+            // Connect base (0, 20, 0) to EE
+            const start = new THREE.Vector3(0, 20, 0);
+            const end = new THREE.Vector3(x, z, y);
+            const dist = start.distanceTo(end);
+            linkMesh.scale.set(1, dist, 1);
+            linkMesh.position.copy(start).lerp(end, 0.5);
+            linkMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.clone().sub(start).normalize());
+        }
+
+        // Orbit Interaction
+        let isDragging = false;
+        let prevMousePos = { x: 0, y: 0 };
+        canvas.addEventListener('mousedown', (e) => { isDragging = true; prevMousePos = { x: e.clientX, y: e.clientY }; });
+        window.addEventListener('mouseup', () => { isDragging = false; });
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const deltaX = e.clientX - prevMousePos.x;
+            const deltaY = e.clientY - prevMousePos.y;
+            camera.position.x += deltaX * 0.5;
+            camera.position.y -= deltaY * 0.5;
+            camera.lookAt(0, 160, 20);
+            prevMousePos = { x: e.clientX, y: e.clientY };
+        });
+        canvas.addEventListener('wheel', (e) => {
+            camera.position.z += e.deltaY * 0.2;
+            camera.lookAt(0, 160, 20);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 2. Live Telemetry Polling & Sync ---
+        function appendLog(msg, type = 'info') {
+            const box = document.getElementById('log-box');
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function fetchState() {
+            try {
+                const res = await fetch('/api/state');
+                const data = await res.json();
+                
+                // Update Telemetry UI
+                const p = data.arm_pose;
+                document.getElementById('val-xyz').textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)} mm`;
+                document.getElementById('val-gripper').textContent = data.gripper_state > 0.5 ? 'OPEN' : 'CLOSED';
+                document.getElementById('val-load').textContent = `${data.gripper_load.toFixed(2)} / 1.00`;
+                document.getElementById('val-held').textContent = data.held_object || 'None';
+
+                // Update 3D Arm
+                updateArmGeometry(p.x, p.y, p.z);
+
+                // Update 3D Objects
+                for (const [id, obj] of Object.entries(data.objects)) {
+                    if (objectMeshes[id]) {
+                        objectMeshes[id].position.set(obj.x, obj.z, obj.y);
+                    }
+                }
+
+                // Update Camera Snapshot
+                if (data.camera_base64) {
+                    document.getElementById('camera-feed').src = 'data:image/png;base64,' + data.camera_base64;
+                }
+            } catch (err) {
+                // server offline or reconnecting
+            }
+        }
+        setInterval(fetchState, 500);
+
+        async function sendAction(action, params = {}) {
+            appendLog(`Command sent: ${action} ${JSON.stringify(params)}`, 'info');
+            try {
+                const res = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, ...params })
+                });
+                const data = await res.json();
+                appendLog(`Result: ${data.status} (${JSON.stringify(data)})`, data.status.includes('ERROR') ? 'danger' : 'success');
+                fetchState();
+            } catch (err) {
+                appendLog(`Error: ${err.message}`, 'danger');
+            }
+        }
+
+        async function runAutonomousDemo() {
+            appendLog('--- STARTING AUTONOMOUS STAGE DEMO ---', 'warn');
+            await sendAction('run_demo');
+        }
+    </script>
+</body>
+</html>

@@ -101,5 +101,15 @@ def test_closed_loop_recovery_on_perturbation():
     assert pick_res2["object_id"] == "blue_cube_01"
 
 
+def test_digital_twin_html_exists():
+    import os
+    html_path = os.path.join(os.path.dirname(__file__), "..", "src", "digital_twin.html")
+    assert os.path.exists(html_path)
+    with open(html_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "Three.js" in content
+    assert "NormaCore Digital Twin" in content
+
+
 if __name__ == "__main__":
     pytest.main(["-v", "tests/test_pipeline.py"])
