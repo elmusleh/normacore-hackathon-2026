@@ -145,6 +145,52 @@ def to_u16_le(value: int) -> bytes:
     return int(value).to_bytes(2, "little")
 
 
+DEFAULT_CURRENT_THRESHOLD = 100
+
+
+class OverloadDetector:
+    """Flags a motor drawing high current while not making progress.
+
+    Triggers after `consecutive` polls where current > threshold and the position
+    moved less than `stall_steps`. threshold 0 disables the check (same convention
+    as the NormaCore teleop example). Does not handle the 0/4095 wrap-around.
+    """
+
+    def __init__(self, threshold: int, consecutive: int = 3, stall_steps: int = 3):
+        self.threshold = threshold
+        self.consecutive = consecutive
+        self.stall_steps = stall_steps
+        self.peak = 0
+        self._count = 0
+        self._last_present: Optional[int] = None
+
+    def update(self, current: int, present: int) -> bool:
+        self.peak = max(self.peak, current)
+        moved = 0 if self._last_present is None else abs(present - self._last_present)
+        self._last_present = present
+        if self.threshold > 0 and current > self.threshold and moved < self.stall_steps:
+            self._count += 1
+        else:
+            self._count = 0
+        return self._count >= self.consecutive
+
+
+def plan_goto(
+    present: Dict[int, int],
+    target: Dict[int, int],
+    max_delta: int,
+) -> Dict[int, int]:
+    """Per-motor step changes for a goto. Raises if any change is larger than max_delta."""
+    missing = set(target) - set(present)
+    if missing:
+        raise ValueError(f"waypoint motors not visible: {sorted(missing)}")
+    deltas = {m: target[m] - present[m] for m in target}
+    too_big = {m: d for m, d in deltas.items() if abs(d) > max_delta}
+    if too_big:
+        raise ValueError(f"moves larger than {max_delta} steps need --allow-large: {too_big}")
+    return deltas
+
+
 # ---------------------------------------------------------------------------
 # Async client over the Station TCP API.
 # ---------------------------------------------------------------------------
@@ -174,6 +220,8 @@ class ElRobotHardware:
         self.bus_serial: Optional[str] = None
         self._queue: Optional[asyncio.Queue] = None
         self._latest = None  # latest decoded st3215.InferenceStateReader
+        # Highest current seen per motor during the last move_and_watch call (for probing).
+        self.last_peaks: Dict[int, int] = {}
 
     # -- connection ---------------------------------------------------------
 
@@ -337,6 +385,10 @@ class ElRobotHardware:
                 self.log.error("move refused: motor %d status 0x%02x (only under-voltage 0x01 is tolerated)",
                                mid, r.status)
                 raise RuntimeError(f"motor {mid} reports fault status 0x{r.status:02x}; not moving")
+            if not r.torque_on:
+                # With torque off a goal write does nothing, so refuse rather than appear to work.
+                self.log.error("move refused: motor %d has torque OFF. Run ./cli.sh hw torque on first.", mid)
+                raise RuntimeError(f"motor {mid} has torque OFF; enable it with ./cli.sh hw torque on")
             try:
                 clamped, was_clamped = clamp_goal(int(goal), r.range_min, r.range_max, margin)
             except ValueError as exc:
@@ -365,6 +417,88 @@ class ElRobotHardware:
         self.log.info("move command sent for motors %s; check present positions with `./cli.sh hw status`",
                       sorted(final_goals))
         return results
+
+    async def hold(self, motor_ids: List[int]) -> None:
+        """Freeze motors at their present positions (goal = present). Used on overload or timeout."""
+        readings = self.snapshot()
+        writes = [(mid, to_u16_le(readings[mid].present)) for mid in motor_ids if mid in readings]
+        if writes:
+            self.log.warning("HOLD: freezing motors %s at their present positions", [m for m, _ in writes])
+            await self._sync_write(RAM_GOAL_POSITION, writes)
+
+    async def torque_on_hold(self, motor_ids: List[int]) -> None:
+        """Enable torque without a jump: set goal = present first, then enable torque."""
+        readings = self.snapshot()
+        missing = [m for m in motor_ids if m not in readings]
+        if missing:
+            raise RuntimeError(f"motors not visible on the bus: {missing}")
+        self.log.info("torque ON (holding current pose) for motors %s", list(motor_ids))
+        await self._sync_write(RAM_GOAL_POSITION, [(m, to_u16_le(readings[m].present)) for m in motor_ids])
+        await self._sync_write(RAM_TORQUE_ENABLE, [(m, b"\x01") for m in motor_ids])
+
+    async def move_and_watch(
+        self,
+        goals: Dict[int, int],
+        *,
+        enable_motion: bool = False,
+        margin: int = DEFAULT_SAFETY_MARGIN_STEPS,
+        max_speed: int = DEFAULT_MAX_SPEED,
+        max_accel: int = DEFAULT_MAX_ACCEL,
+        thresholds: Optional[Dict[int, int]] = None,
+        tolerance: int = 12,
+        poll_s: float = 0.1,
+    ) -> Dict[int, str]:
+        """Move, then watch each motor until it arrives, overloads, faults, or times out.
+
+        On overload, fault, or timeout, every motor still moving is held in place.
+        Returns a status per motor: reached, overload, fault, missing or timeout.
+        """
+        results = await self.move_motors(
+            goals, enable_motion=enable_motion, margin=margin, max_speed=max_speed, max_accel=max_accel)
+        targets = {mid: r["goal"] for mid, r in results.items()}
+        distance = max(abs(targets[m] - results[m]["present"]) for m in targets)
+        timeout = max(3.0, 3.0 * distance / max(max_speed, 50) + 2.0)
+        thresholds = thresholds or {}
+        detectors = {m: OverloadDetector(thresholds.get(m, DEFAULT_CURRENT_THRESHOLD)) for m in targets}
+        status: Dict[int, str] = {}
+        self.last_peaks = {m: 0 for m in targets}
+        started = asyncio.get_running_loop().time()
+
+        while len(status) < len(targets):
+            await asyncio.sleep(poll_s)
+            readings = self.snapshot()
+            for mid, goal in targets.items():
+                if mid in status:
+                    continue
+                r = readings.get(mid)
+                if r is not None:
+                    self.last_peaks[mid] = max(self.last_peaks[mid], r.current)
+                if r is None:
+                    status[mid] = "missing"
+                elif r.faulted:
+                    status[mid] = "fault"
+                    self.log.error("motor %d fault 0x%02x during move", mid, r.status)
+                elif abs(r.present - goal) <= tolerance:
+                    status[mid] = "reached"
+                    self.log.info("motor %d reached %d (present %d)", mid, goal, r.present)
+                elif detectors[mid].update(r.current, r.present):
+                    status[mid] = "overload"
+                    self.log.error("motor %d OVERLOAD: current %d above %d while stalled at %d",
+                                   mid, r.current, detectors[mid].threshold, r.present)
+                else:
+                    self.log.debug("motor %d moving: present=%d goal=%d current=%d",
+                                   mid, r.present, goal, r.current)
+            stopping = any(s in ("overload", "fault", "missing") for s in status.values())
+            elapsed = asyncio.get_running_loop().time() - started
+            if stopping or elapsed > timeout:
+                pending = [m for m in targets if m not in status]
+                for m in pending:
+                    status[m] = "timeout" if not stopping else "held"
+                if pending:
+                    await self.hold(pending)
+                break
+        self.log.info("move finished: %s", status)
+        return status
 
     async def _sync_write(self, address: int, motors: List[Tuple[int, bytes]]) -> None:
         if not motors:
@@ -421,6 +555,20 @@ class ElRobotHardwareSync:
 
     def move_motors(self, goals: Dict[int, int], **kwargs) -> Dict[int, dict]:
         return self._run(self._hw.move_motors(goals, **kwargs))
+
+    def move_and_watch(self, goals: Dict[int, int], **kwargs) -> Dict[int, str]:
+        # Watching takes longer than the default call timeout, so allow the move's own timeout.
+        return self._run(self._hw.move_and_watch(goals, **kwargs), timeout=120)
+
+    @property
+    def last_peaks(self) -> Dict[int, int]:
+        return dict(self._hw.last_peaks)
+
+    def torque_on_hold(self, motor_ids: List[int]) -> None:
+        self._run(self._hw.torque_on_hold(motor_ids))
+
+    def hold(self, motor_ids: List[int]) -> None:
+        self._run(self._hw.hold(motor_ids))
 
     def close(self) -> None:
         try:

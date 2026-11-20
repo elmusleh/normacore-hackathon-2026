@@ -97,3 +97,66 @@ def test_move_rejects_non_elrobot_motor_before_touching_bus():
     hw = ElRobotHardware(server="localhost")
     with pytest.raises(ValueError, match="not ElRobot motors"):
         asyncio.run(hw.move_motors({42: 1000}, enable_motion=True))
+
+
+# ---- overload detection and goto planning ----------------------------------
+
+from src.elrobot_hardware import OverloadDetector, plan_goto  # noqa: E402
+from src.elrobot_config import DEFAULTS, _deep_merge  # noqa: E402
+
+
+def test_overload_triggers_after_consecutive_stalled_high_current():
+    d = OverloadDetector(threshold=100, consecutive=3, stall_steps=3)
+    # Three stalled, high-current samples in a row trigger it (the first sample counts too).
+    assert d.update(current=500, present=1000) is False
+    assert d.update(current=500, present=1000) is False
+    assert d.update(current=500, present=1000) is True
+
+
+def test_overload_ignored_while_arm_is_moving():
+    d = OverloadDetector(threshold=100, consecutive=3, stall_steps=3)
+    for pos in range(1000, 1100, 20):  # high current but moving 20 steps per poll
+        assert d.update(current=500, present=pos) is False
+
+
+def test_overload_resets_when_current_drops():
+    d = OverloadDetector(threshold=100, consecutive=3, stall_steps=3)
+    d.update(current=500, present=1000)
+    d.update(current=500, present=1000)
+    d.update(current=10, present=1000)
+    assert d.update(current=500, present=1000) is False
+
+
+def test_overload_threshold_zero_disables_check():
+    d = OverloadDetector(threshold=0, consecutive=1)
+    for _ in range(10):
+        assert d.update(current=10_000, present=500) is False
+
+
+def test_overload_tracks_peak_current():
+    d = OverloadDetector(threshold=0)
+    for c in (10, 80, 30):
+        d.update(current=c, present=100)
+    assert d.peak == 80
+
+
+def test_plan_goto_returns_deltas():
+    assert plan_goto({1: 1000, 2: 2000}, {1: 1100, 2: 1800}, max_delta=600) == {1: 100, 2: -200}
+
+
+def test_plan_goto_refuses_large_move_without_allow_flag():
+    with pytest.raises(ValueError, match="allow-large"):
+        plan_goto({1: 1000}, {1: 2500}, max_delta=600)
+
+
+def test_plan_goto_refuses_missing_motor():
+    with pytest.raises(ValueError, match="not visible"):
+        plan_goto({1: 1000}, {1: 1000, 2: 1000}, max_delta=600)
+
+
+def test_config_override_merges_without_losing_defaults():
+    merged = _deep_merge(DEFAULTS, {"workspace": {"y_max_mm": 300.0}, "joint_map": {"2": {"joint": "x"}}})
+    assert merged["workspace"]["y_max_mm"] == 300.0
+    assert merged["workspace"]["x_min_mm"] == DEFAULTS["workspace"]["x_min_mm"]
+    assert merged["joint_map"] == {"2": {"joint": "x"}}
+    assert DEFAULTS["joint_map"] == {}  # defaults themselves are not mutated

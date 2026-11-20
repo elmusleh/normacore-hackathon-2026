@@ -7,17 +7,24 @@ and executes smooth pick-and-place primitive trajectories.
 from typing import Dict, Any, Tuple
 import time
 
+try:
+    from elrobot_config import load_config
+except ImportError:  # imported as src.kinematics_safety from the project root
+    from src.elrobot_config import load_config
+
+_WS = load_config()["workspace"]  # config/elrobot.json; defaults equal the old hardcoded values
+
 
 class SafetyLimits:
-    """Hard physical boundaries for the 7+1 DOF ElRobot workspace."""
-    X_MIN = -180.0
-    X_MAX = 180.0
-    Y_MIN = 90.0
-    Y_MAX = 270.0
-    Z_TABLE_FLOOR = 12.0     # Never descend below 12mm above tabletop surface
-    Z_TRANSIT_HEIGHT = 70.0  # Horizontal moves occur safely at this clearance
-    Z_HOVER_HEIGHT = 45.0    # Pre-grasp approach height
-    Z_GRASP_HEIGHT = 14.0    # Grasping height
+    """Hard physical boundaries for the 7+1 DOF ElRobot workspace (from config/elrobot.json)."""
+    X_MIN = float(_WS["x_min_mm"])
+    X_MAX = float(_WS["x_max_mm"])
+    Y_MIN = float(_WS["y_min_mm"])
+    Y_MAX = float(_WS["y_max_mm"])
+    Z_TABLE_FLOOR = float(_WS["z_table_floor_mm"])  # Never descend below this height above the table
+    Z_TRANSIT_HEIGHT = float(_WS["z_transit_mm"])   # Horizontal moves occur safely at this clearance
+    Z_HOVER_HEIGHT = float(_WS["z_hover_mm"])       # Pre-grasp approach height
+    Z_GRASP_HEIGHT = float(_WS["z_grasp_mm"])       # Grasping height
 
 
 class KinematicsSafetyEngine:

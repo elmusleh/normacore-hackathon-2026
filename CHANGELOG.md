@@ -24,6 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hardware-day tool `scripts/hw_day.py`, exposed as `./cli.sh hw ...`: a persistent checklist (`status`, `next`, `run <n>`, `done <n>`), joint map (`map`), live table (`motors`), confirmed single-motor move (`jog`, requires typing `MOVE`, max ±200 steps), `stop` (torque off, always available), `logs`, `bundle` (packs logs, state and config for sharing), and `reset`.
 - `./cli.sh preflight` (read-only readiness check) and `./cli.sh logs [-f]` (newest run log).
 - Runbook `docs/elrobot_hardware_bridge.md` now covers the commands, a common-failures table, and a recommended order for what is not ready yet.
+- Config and state are separate. `config/elrobot.json` (joint map, current thresholds, workspace limits) and `config/waypoints.json` are committed. Checklist progress moved to `data/hw_day_state.json` (gitignored), so clearing progress never deletes calibration data.
+- Guided motor identification `./cli.sh hw identify`: nudges each motor 30 steps, returns it, and records the joint and physical direction.
+- Torque commands `./cli.sh hw torque on|off`. Torque on holds the current pose (goal set before torque is enabled, so there is no jump). Moves are refused while torque is off, with a clear message.
+- Overload guard in `move_and_watch`: watches each motor until it arrives, overloads, faults or times out. On overload, fault or timeout it holds the motors still moving. `OverloadDetector` is pure and unit-tested.
+- Current probe `./cli.sh hw probe-current <m>`: small move with the guard off. Reports peak current out and back, and offers to save `2 x peak` as the threshold.
+- Named waypoints: `./cli.sh hw teach <name>`, `hw waypoints`, `hw goto <name>`. Goto shows a per-motor plan, clamps to calibrated range, refuses moves over 600 steps per motor unless `--allow-large`, and checks arrival afterwards.
+- Workspace limits moved to `config/elrobot.json` (`workspace`). `SafetyLimits` and the MCP server read them. Defaults equal the previous hardcoded values. `./cli.sh hw workspace` shows whether they were measured.
+- `.gitignore`: `data/`, `station.yaml`, `station_data/`.
+- Tests: `tests/test_hw_day.py` runs the identify, jog, probe, teach, goto, torque and stop flows against a fake bridge and in-memory config. 44 tests pass in total.
+- Runbook rewritten as a step-by-step walkthrough for each item that was not ready.
 
 ### Changed
 - Expanded `.gitignore` with comprehensive rules for Python bytecode, virtualenvs, robotics runtime logs, secrets, testing caches, and IDE artifacts.

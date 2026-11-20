@@ -1,0 +1,20 @@
+{
+  "station": {
+    "server": "localhost",
+    "bus": "auto"
+  },
+  "joint_map": {},
+  "current_threshold": {},
+  "default_current_threshold": 100,
+  "workspace": {
+    "x_min_mm": -180.0,
+    "x_max_mm": 180.0,
+    "y_min_mm": 90.0,
+    "y_max_mm": 270.0,
+    "z_table_floor_mm": 12.0,
+    "z_transit_mm": 70.0,
+    "z_hover_mm": 45.0,
+    "z_grasp_mm": 14.0,
+    "measured": false
+  }
+}

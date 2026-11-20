@@ -87,3 +87,10 @@ Thumbs.db
 # External vendors and local binaries
 bin/
 external/
+
+# ElRobot hardware-day local state (checklist progress). Config in config/ is committed.
+data/
+
+# Station runtime files created in the project root
+station.yaml
+station_data/

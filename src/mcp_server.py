@@ -10,11 +10,11 @@ from typing import Dict, Any, Optional
 try:
     from mock_station import MockStation
     from vision_homography import TabletopCalibrator
-    from kinematics_safety import KinematicsSafetyEngine
+    from kinematics_safety import KinematicsSafetyEngine, SafetyLimits, _WS
 except ImportError:
     from src.mock_station import MockStation
     from src.vision_homography import TabletopCalibrator
-    from src.kinematics_safety import KinematicsSafetyEngine
+    from src.kinematics_safety import KinematicsSafetyEngine, SafetyLimits, _WS
 
 
 class NormaCoreMCPServer:
@@ -59,9 +59,10 @@ class NormaCoreMCPServer:
             "image_base64": b64_image,
             "telemetry": telemetry,
             "table_limits": {
-                "x_range_mm": [-180, 180],
-                "y_range_mm": [90, 270],
-                "z_floor_mm": 12.0,
+                "x_range_mm": [SafetyLimits.X_MIN, SafetyLimits.X_MAX],
+                "y_range_mm": [SafetyLimits.Y_MIN, SafetyLimits.Y_MAX],
+                "z_floor_mm": SafetyLimits.Z_TABLE_FLOOR,
+                "measured": bool(_WS.get("measured")),
             },
             "instructions": "Inspect the image using the metric grid labels. Coordinates are in millimeters relative to arm base (0,0).",
         }
