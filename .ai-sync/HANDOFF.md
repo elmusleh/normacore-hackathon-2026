@@ -48,6 +48,7 @@ stop_reason: completed
 - `requirements.txt`
 - `.mcp.json`
 - `SUGGESTIONS.md`
+- `docs/NormaCore_Repositories_and_Tooling.md`
 - `docs/NormaCore_Station_SDK_Reference.md`
 - `docs/NormaCore_Winning_Plan.md`
 - `docs/NormaCore_Challenge_Guide.md`

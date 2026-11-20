@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Downloaded and verified pre-built Station binary `bin/station` (v0.1.0-beta.10 Linux x86_64).
+- Unpacked official source tree and ElRobot hardware manuals into `external/norma-core/`.
+- NormaCore GitHub Repositories & Tooling Guide `docs/NormaCore_Repositories_and_Tooling.md`.
 - Official Station & ElRobot SDK Reference Guide `docs/NormaCore_Station_SDK_Reference.md` with release binaries, `station --web --tcp` CLI options, Protobuf topics (`st3215/inference`), and ST3215 register structures.
 - Direct link to NormaCore's online 3D URDF interactive viewer `https://normacore.dev/elrobot-urdf/`.
 

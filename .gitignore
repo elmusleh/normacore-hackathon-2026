@@ -83,3 +83,7 @@ captures/*.jpg
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# External vendors and local binaries
+bin/
+external/
