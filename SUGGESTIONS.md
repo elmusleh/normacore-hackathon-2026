@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Persist selected Table and Person camera assignments to `config/elrobot.json` from Mission Control — Priority 91% (Critical) [Best practices]
+   What: Add a "Save Camera Mapping" button next to the Table/Person dropdowns in Mission Control that writes the chosen USB ports or device paths directly into `config/elrobot.json`.
+   Why: Prevents having to re-select which camera is Table vs. Person every time you restart the dashboard or launch the MCP server for Claude.
+   How: Add a `save_camera_config` action in `src/digital_twin_server.py` that maps the chosen Station `port:...` or `v4l2:...` IDs into `config/elrobot.json` (`cameras.table` and `cameras.person`) and reloads the config.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Waiting for the hardware owner to visually confirm which camera points at the table vs. the person first.
+
+2. Add OBSBOT Meet SE (`3564:fefe`) to `scripts/99-normacore-cameras.rules` and install `v4l-utils` — Priority 84% (High value) [Security]
+   What: Add the OBSBOT Meet SE USB vendor/product ID (`3564:fefe`) to the camera udev rule and install `v4l-utils` so both the Station and manual exposure controls work cleanly without root privileges.
+   Why: Stops the Station from logging repeated USB permission errors (`-3`) for the OBSBOT camera and allows consistent exposure tuning under bright hackathon lighting.
+   How: Append a udev rule line for `idVendor=="3564", idProduct=="fefe"` in `scripts/99-normacore-cameras.rules`, copy to `/etc/udev/rules.d/`, reload udevadm, and run `sudo apt-get install -y v4l-utils`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Waiting for confirmation on whether the user wants the OBSBOT camera managed by the Station or kept as a direct V4L2 stream.
+
+3. Add role-specific vision overlays (food-only on Table Cam, face/standoff-only on Person Cam) — Priority 78% (High value) [Professionalism]
+   What: Run table object detection (`grape_bowl`, `spoon`) exclusively on the Table camera and facial/mouth standoff detection exclusively on the Person camera in `CameraHub.get_annotated_frame()`.
+   Why: Eliminates false-positive detections (such as detecting a "bowl" on the person camera or a "mouth" on the table) and doubles frame rate by cutting unnecessary detector work in half.
+   How: Pass `role` into `FeedingVisionDetector.analyze_and_annotate(frame, role=role)` in `src/feeding_vision.py` so each camera only runs and draws the detectors relevant to its viewpoint.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Kept the initial dual-camera dashboard change focused on `src/digital_twin_server.py` and `src/digital_twin.html`.
+
 1. Add a pre-push verification command or `./cli.sh push` helper — Priority 90% (Critical) [Best practices]
    What: Introduce `./cli.sh push` that automatically validates the local branch against tests (`pytest`, `bash -n`) and sync status before prompting and running `git push -u origin <branch>`.
    Why: Reduces friction for developers pushing branches while guaranteeing that broken or unverified builds never reach the remote repository.

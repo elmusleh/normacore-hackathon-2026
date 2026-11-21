@@ -1,35 +1,44 @@
 """
 Unified Mission Control Backend for NormaCore Tabletop Robotics.
 Serves Web Dashboard (port 8080) with real-time controls for:
+  - Dual live camera feeds (Table + Person) with dropdown selectors
+    supporting both NormaCore Station USB queues and local V4L2 cameras
+  - Live FeedingVisionDetector bounding boxes & detection event streaming
   - CLI runner integration (execute any cli.sh command directly from Web UI)
   - Master / Slave Teleop Sync toggle
   - Live hardware telemetry (Buses 5B61034962 and 5B61037051)
-  - Live camera feed with metric grid overlay
   - Waypoints (Home, Clear, Pick, Place)
   - Emergency E-Stop (Torque Off)
   - Automated Testing (pytest) and Judge Perturbation Recovery Demo
 """
 
-import http.server
-import socketserver
-import json
 import base64
+import http.server
 import io
+import json
 import os
-import sys
+import socket
+import socketserver
 import subprocess
+import sys
 import threading
 import time
+import urllib.parse
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import cv2
-from typing import Optional
+import numpy as np
 
 # Ensure src is in sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from elrobot_config import load_config
+from feeding_vision import FeedingVisionDetector, run_camera_feeding_cycle
 from mcp_server import NormaCoreMCPServer
 from vision_homography import TabletopCalibrator
-from feeding_vision import FeedingVisionDetector, run_camera_feeding_cycle
 
 SERVER_PORT = 8080
+STATION_PORT = 8888
 mcp_server = NormaCoreMCPServer()
 calibrator = TabletopCalibrator()
 feeding_detector = FeedingVisionDetector(calibrator=mcp_server.calibrator)
@@ -40,39 +49,322 @@ teleop_lock = threading.Lock()
 latest_feeding_overlay_b64: Optional[str] = None
 
 
-def get_live_camera_feed():
-    """Tries to capture from /dev/video4 or /dev/video2, overlays feeding detections & metric grid."""
-    for cam_idx in [4, 2, 0]:
-        cap = cv2.VideoCapture(cam_idx)
-        if cap.isOpened():
-            ret, frame = cap.read()
-            cap.release()
-            if ret and frame is not None and frame.size > 0:
-                _, annotated_bgr = feeding_detector.analyze_and_annotate(frame)
-                rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
-                from PIL import Image
-                pil_img = Image.fromarray(rgb)
-                try:
-                    annotated = mcp_server.calibrator.overlay_calibrated_grid(pil_img)
-                except Exception:
-                    annotated = pil_img
-                buf = io.BytesIO()
-                annotated.save(buf, format="JPEG", quality=80)
-                return base64.b64encode(buf.getvalue()).decode("utf-8")
+def _station_reachable(timeout_s: float = 0.25) -> bool:
+    try:
+        cfg = load_config()
+        server = os.environ.get("ELROBOT_STATION", cfg["station"]["server"])
+        host, _, port = server.partition(":")
+        with socket.create_connection((host or "localhost", int(port or STATION_PORT)), timeout=timeout_s):
+            return True
+    except OSError:
+        return False
 
+
+class CameraHub:
+    """Discovers and streams frames from Station USB queues, local V4L2 devices, or simulator."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._station_lock = threading.Lock()
+        self._station_tools = None
+        self._station_hw = None
+        self._v4l2_caps: Dict[int, cv2.VideoCapture] = {}
+        self._v4l2_locks: Dict[int, threading.Lock] = {}
+        self._cameras: List[Dict[str, Any]] = []
+        self._last_scan: float = 0.0
+        self.selected: Dict[str, str] = {"table": "mock:sim", "person": "mock:sim"}
+
+    def _get_station_tools(self):
+        """Lazily connect to the NormaCore Station if reachable."""
+        if not _station_reachable():
+            self._close_station()
+            return None
+        if self._station_tools is not None:
+            return self._station_tools
+        try:
+            from elrobot_hardware import ElRobotHardwareSync
+            from robot_tools import RobotTools
+
+            cfg = load_config()
+            server = os.environ.get("ELROBOT_STATION", cfg["station"]["server"])
+            bus = os.environ.get("ELROBOT_BUS", cfg["station"]["bus"])
+            hw = ElRobotHardwareSync(server=server, bus=bus)
+            hw.connect(timeout_s=3.0)
+            self._station_hw = hw
+            self._station_tools = RobotTools(lambda: hw)
+            return self._station_tools
+        except Exception:
+            self._close_station()
+            return None
+
+    def _close_station(self) -> None:
+        if self._station_hw is not None:
+            try:
+                self._station_hw.close()
+            except Exception:
+                pass
+        self._station_hw = None
+        self._station_tools = None
+
+    def discover(self, force: bool = False) -> List[Dict[str, Any]]:
+        """Discover all live Station USB cameras and local V4L2 capture cameras."""
+        now = time.time()
+        with self._lock:
+            if not force and self._cameras and (now - self._last_scan) < 10.0:
+                return list(self._cameras)
+
+        found: List[Dict[str, Any]] = []
+
+        # 1. Station USB cameras (KD-USB Cameras, etc. claimed via libuvc)
+        with self._station_lock:
+            tools = self._get_station_tools()
+            if tools is not None:
+                try:
+                    cam_res = tools.list_cameras()
+                    for cam in cam_res.get("cameras", []):
+                        if not cam.get("live", False):
+                            continue
+                        queue = cam["queue"]
+                        port = cam.get("port") or "unknown"
+                        product = cam.get("product") or "Station Camera"
+                        name_tag = f" [{cam['name']}]" if cam.get("name") else ""
+                        found.append({
+                            "id": f"station:{queue}",
+                            "type": "station",
+                            "label": f"Station: {product} (port {port}){name_tag}",
+                            "port": port,
+                            "queue": queue,
+                        })
+                except Exception:
+                    self._close_station()
+
+        # 2. Local V4L2 cameras (/dev/video*)
+        v4l_root = Path("/sys/class/video4linux")
+        if v4l_root.is_dir():
+            nodes = sorted(
+                v4l_root.glob("video*"),
+                key=lambda p: int(p.name.replace("video", "")) if p.name.replace("video", "").isdigit() else 999,
+            )
+            for node in nodes:
+                idx_str = node.name.replace("video", "")
+                if not idx_str.isdigit():
+                    continue
+                idx = int(idx_str)
+                try:
+                    dev_name = (node / "name").read_text().strip()
+                except OSError:
+                    dev_name = f"Camera {idx}"
+
+                # Probe briefly (reusing open capture if already active)
+                if self._probe_v4l2(idx):
+                    found.append({
+                        "id": f"v4l2:{idx}",
+                        "type": "v4l2",
+                        "label": f"USB/V4L2: /dev/video{idx} — {dev_name}",
+                        "device": f"/dev/video{idx}",
+                    })
+
+        # 3. Always include offline simulator fallback
+        found.append({
+            "id": "mock:sim",
+            "type": "mock",
+            "label": "Offline Simulator (Mock Table)",
+        })
+
+        with self._lock:
+            self._cameras = found
+            self._last_scan = time.time()
+            valid_ids = {c["id"] for c in found}
+            real_cams = [c["id"] for c in found if c["type"] != "mock"]
+
+            # Auto-assign sensible defaults if current selection is missing or still mock
+            if self.selected["table"] not in valid_ids or (self.selected["table"] == "mock:sim" and real_cams):
+                self.selected["table"] = real_cams[0] if real_cams else "mock:sim"
+            if self.selected["person"] not in valid_ids or (self.selected["person"] == "mock:sim" and len(real_cams) >= 2):
+                if len(real_cams) >= 2:
+                    self.selected["person"] = next((c for c in real_cams if c != self.selected["table"]), real_cams[1])
+                elif real_cams:
+                    self.selected["person"] = real_cams[0]
+                else:
+                    self.selected["person"] = "mock:sim"
+
+            return list(self._cameras)
+
+    def _probe_v4l2(self, idx: int) -> bool:
+        lock = self._v4l2_locks.setdefault(idx, threading.Lock())
+        with lock:
+            cap = self._v4l2_caps.get(idx)
+            if cap is not None and cap.isOpened():
+                return True
+            try:
+                cap = cv2.VideoCapture(idx)
+                if not cap.isOpened():
+                    cap.release()
+                    return False
+                ret, frame = cap.read()
+                if ret and frame is not None and frame.size > 0:
+                    self._v4l2_caps[idx] = cap
+                    return True
+                cap.release()
+                return False
+            except Exception:
+                return False
+
+    def select_camera(self, role: str, source_id: str) -> Dict[str, str]:
+        with self._lock:
+            if role in self.selected:
+                self.selected[role] = source_id
+            return dict(self.selected)
+
+    def _read_raw_bgr(self, source_id: str) -> Tuple[Optional[np.ndarray], str]:
+        if source_id.startswith("station:"):
+            queue = source_id[len("station:"):]
+            with self._station_lock:
+                tools = self._get_station_tools()
+                if tools is None:
+                    return None, "Station not reachable"
+                try:
+                    meta, jpeg_bytes = tools.look(camera=queue)
+                    if not meta.get("ok") or not jpeg_bytes:
+                        return None, meta.get("error", "No frame from Station queue")
+                    arr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+                    frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                    if frame is None:
+                        return None, "Failed to decode Station JPEG"
+                    return frame, ""
+                except Exception as exc:
+                    self._close_station()
+                    return None, str(exc)
+
+        if source_id.startswith("v4l2:"):
+            idx = int(source_id[len("v4l2:"):])
+            lock = self._v4l2_locks.setdefault(idx, threading.Lock())
+            with lock:
+                cap = self._v4l2_caps.get(idx)
+                if cap is None or not cap.isOpened():
+                    cap = cv2.VideoCapture(idx)
+                    self._v4l2_caps[idx] = cap
+                if not cap.isOpened():
+                    return None, f"Cannot open /dev/video{idx}"
+                ret, frame = cap.read()
+                if not ret or frame is None or frame.size == 0:
+                    cap.release()
+                    self._v4l2_caps.pop(idx, None)
+                    return None, f"Empty frame from /dev/video{idx}"
+                return frame, ""
+
+        # Offline mock simulator
+        try:
+            view = mcp_server.get_calibrated_view()
+            jpg_bytes = base64.b64decode(view["image_base64"])
+            arr = np.frombuffer(jpg_bytes, dtype=np.uint8)
+            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            return frame, ""
+        except Exception as exc:
+            return None, str(exc)
+
+    def get_annotated_frame(self, role: str = "table", source_id: Optional[str] = None) -> Dict[str, Any]:
+        with self._lock:
+            src = source_id or self.selected.get(role, "mock:sim")
+
+        frame, err = self._read_raw_bgr(src)
+        if frame is None:
+            return {
+                "ok": False,
+                "role": role,
+                "source": src,
+                "error": err or "No frame",
+                "image_base64": "",
+                "detections": {},
+                "summary": f"No signal ({err})",
+            }
+
+        detections_obj, annotated_bgr = feeding_detector.analyze_and_annotate(frame)
+
+        # Build compact human-readable detection summary
+        det_dict: Dict[str, Any] = {}
+        parts: List[str] = []
+        for key, target in (detections_obj or {}).items():
+            if target is None:
+                continue
+            if isinstance(target, dict):
+                label = target.get("label", key)
+                u_px = target.get("u_px", 0)
+                v_px = target.get("v_px", 0)
+                conf = round(float(target.get("confidence", 0.0)), 2)
+                extra = dict(target.get("extra") or {})
+            else:
+                label = getattr(target, "label", key)
+                u_px = getattr(target, "u_px", 0)
+                v_px = getattr(target, "v_px", 0)
+                conf = round(float(getattr(target, "confidence", 0.0)), 2)
+                extra = dict(getattr(target, "extra", None) or {})
+            det_dict[key] = {
+                "label": label,
+                "u_px": u_px,
+                "v_px": v_px,
+                "confidence": conf,
+                "extra": extra,
+            }
+            if key == "mouth":
+                standoff = "SAFE" if extra.get("safe_standoff", True) else "STOP: TOO CLOSE"
+                parts.append(f"mouth ({standoff})")
+            else:
+                parts.append(f"{key} ({int(conf * 100)}%)")
+
+        summary = ", ".join(parts) if parts else "No targets detected"
+
+        ok, buf = cv2.imencode(".jpg", annotated_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+        b64 = base64.b64encode(buf.tobytes()).decode("utf-8") if ok else ""
+
+        return {
+            "ok": True,
+            "role": role,
+            "source": src,
+            "image_base64": b64,
+            "detections": det_dict,
+            "summary": summary,
+        }
+
+
+camera_hub = CameraHub()
+
+
+def get_live_camera_feed():
+    """Backwards-compatible helper returning the active table camera JPEG base64."""
+    res = camera_hub.get_annotated_frame(role="table")
+    if res.get("image_base64"):
+        return res["image_base64"]
     if latest_feeding_overlay_b64:
         return latest_feeding_overlay_b64
+    return ""
 
-    try:
-        view = mcp_server.get_calibrated_view()
-        return view["image_base64"]
-    except Exception:
-        return ""
+
+class ThreadingHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 
 class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args: Any) -> None:
+        # Suppress noisy per-frame GET logs
+        pass
+
+    def _send_json(self, payload: Dict[str, Any], status: int = 200) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
-        if self.path in ["/", "/index.html"]:
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        qs = urllib.parse.parse_qs(parsed.query)
+
+        if path in ["/", "/index.html"]:
             html_path = os.path.join(os.path.dirname(__file__), "digital_twin.html")
             with open(html_path, "rb") as f:
                 content = f.read()
@@ -83,32 +375,44 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(content)
             return
 
-        elif self.path == "/api/state":
+        if path == "/api/cameras":
+            force = qs.get("refresh", ["0"])[0] in ("1", "true", "yes")
+            cams = camera_hub.discover(force=force)
+            self._send_json({
+                "cameras": cams,
+                "selected": dict(camera_hub.selected),
+                "station_reachable": _station_reachable(),
+            })
+            return
+
+        if path == "/api/frame":
+            role = qs.get("role", ["table"])[0]
+            source = qs.get("source", [None])[0]
+            frame_res = camera_hub.get_annotated_frame(role=role, source_id=source)
+            self._send_json(frame_res)
+            return
+
+        if path == "/api/state":
             global teleop_process
             is_teleop_running = teleop_process is not None and teleop_process.poll() is None
 
             station = mcp_server.station
             telemetry = station.get_arm_telemetry()
-            cam_b64 = get_live_camera_feed()
 
             payload = {
                 "teleop_active": is_teleop_running,
-                "master_bus": "5B61034962",
-                "slave_bus": "5B61037051",
+                "station_reachable": _station_reachable(),
+                "master_bus": "5B61037051",
+                "slave_bus": "5B61034962",
                 "arm_pose": telemetry["end_effector"],
                 "gripper_state": telemetry["gripper_state"],
                 "gripper_load": telemetry["gripper_load"],
                 "held_object": telemetry["held_object"],
                 "objects": getattr(station, "objects", {}),
                 "target_zones": getattr(station, "target_zones", {}),
-                "camera_base64": cam_b64,
+                "selected_cameras": dict(camera_hub.selected),
             }
-            body = json.dumps(payload).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._send_json(payload)
             return
 
         super().do_GET()
@@ -121,14 +425,21 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 cmd = json.loads(post_data.decode("utf-8"))
                 action = cmd.get("action")
-                res = {"status": "SUCCESS"}
+                res: Dict[str, Any] = {"status": "SUCCESS"}
+
+                if action == "select_camera":
+                    role = cmd.get("role", "table")
+                    source = cmd.get("source", "mock:sim")
+                    selected = camera_hub.select_camera(role, source)
+                    res = {"status": "CAMERA_UPDATED", "selected": selected}
 
                 # --- 1. CLI Execution Integration ---
-                if action == "run_cli":
+                elif action == "run_cli":
                     cli_cmd = cmd.get("command", "").strip()
-                    allowed_prefixes = ["test", "preflight", "hw", "demo", "view-camera", "apriltags", "sdk-check", "sync", "feed"]
-                    
-                    # Split command arguments
+                    allowed_prefixes = [
+                        "check", "test", "preflight", "hw", "demo",
+                        "view-camera", "apriltags", "sdk-check", "sync", "feed",
+                    ]
                     parts = cli_cmd.split()
                     if not parts or parts[0] not in allowed_prefixes:
                         res = {"status": "ERROR", "output": f"Command '{cli_cmd}' is not allowed or unrecognized."}
@@ -244,12 +555,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 res = {"status": f"ERROR: {str(e)}"}
 
-            body = json.dumps(res).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._send_json(res)
             return
 
         self.send_response(404)
@@ -257,12 +563,12 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def start_server(port=SERVER_PORT):
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", port), MissionControlHandler) as httpd:
-        print(f"============================================================")
-        print(f"  NormaCore Mission Control Running at:")
+    camera_hub.discover(force=True)
+    with ThreadingHTTPServer(("", port), MissionControlHandler) as httpd:
+        print("============================================================")
+        print("  NormaCore Mission Control Running at:")
         print(f"  --> http://localhost:{port}")
-        print(f"============================================================")
+        print("============================================================")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

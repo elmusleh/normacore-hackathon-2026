@@ -1,15 +1,28 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-21T17:25:00Z
-status: commit-and-push-policy-updated
-current_phase: "Phase 1 / Team Workflow: Agent Commit & Push Rules"
-current_task: "Enforce per-implementation commits and proactive push prompts to accelerate development"
-stop_reason: ready-for-review
+timestamp: 2026-11-21T18:24:00Z
+status: dual-camera-dashboard-live
+current_phase: "Phase 3: Dual-Camera Mission Control & Live Hardware Bring-Up"
+current_task: "Dual live camera dropdowns (Station + V4L2) and live detection log in Mission Control"
+stop_reason: ready-for-user-selection
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-21T15:46 — camera-guided assistive feeding
+previous_session: antigravity 2026-11-21T17:25 — commit-and-push-policy-updated
 ---
 
-## Latest session (2026-11-21): Commit & Push Policy Enhancement
+## Latest session (2026-11-21 evening): Dual Live Camera Dropdowns & Hardware Bring-Up
+
+- **What Changed:**
+  - Upgraded `src/digital_twin_server.py` with `CameraHub` (auto-discovers NormaCore Station `usbvideo/*` queues + local V4L2 `/dev/video*` cameras + mock fallback), `ThreadingHTTPServer`, `GET /api/cameras`, `GET /api/frame?role=table|person`, and `select_camera` action.
+  - Upgraded `src/digital_twin.html` with side-by-side **Table Cam** and **Person Cam** live feeds, camera selector dropdowns, refresh button, per-camera live detection bars, and automatic detection-change logging in the Live Terminal & Event Log.
+  - Verified live on hardware: NormaCore Station (`http://localhost:8889`) and Mission Control (`http://localhost:8080`) running; both ElRobot arms (`5B61034962` torque ON, `5B61037051` torque OFF) passed read-only preflight (all 8 motors visible, calibrated, fault-free). All 3 live cameras (`port:3-1.2.4` KD-USB, `port:3-1.2.2` KD-USB, `/dev/video6` OBSBOT Meet SE) confirmed streaming annotated JPEGs. No arm motion was commanded.
+- **Files Changed:** `src/digital_twin_server.py`, `src/digital_twin.html`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
+- **Build Status:** `python3 -m py_compile src/digital_twin_server.py` (OK), `python3 -m pytest tests/` (68 passed, 1 skipped).
+- **Next Steps:**
+  1. User opens `http://localhost:8080` and selects which camera is `Table Cam` and which is `Person Cam` from the dropdowns.
+  2. Save the confirmed camera roles and follower bus serial (`5B61034962`) in `config/elrobot.json`.
+  3. Teach initial safe waypoints (`home`, `table_hover`, `zone_a`, `serve`) and test dry-run -> live AI-guided move.
+
+## Previous session (2026-11-21): Commit & Push Policy Enhancement
 
 - **What Changed:**
   - Updated `AGENTS.md` to strictly mandate committing after each implementation and actively asking the user to push to remote immediately upon completion to accelerate development.

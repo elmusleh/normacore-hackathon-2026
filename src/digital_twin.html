@@ -66,14 +66,16 @@
         }
         .left-viewport {
             display: grid;
-            grid-template-rows: 1fr 240px;
+            grid-template-rows: 1fr 310px;
             border-right: 1px solid var(--border);
             background: #000;
+            min-height: 0;
         }
         #canvas-container {
             position: relative;
             width: 100%;
             height: 100%;
+            min-height: 0;
         }
         .viewport-overlay {
             position: absolute;
@@ -91,24 +93,70 @@
             background: var(--panel-bg);
             border-top: 1px solid var(--border);
             display: grid;
-            grid-template-columns: 320px 1fr;
+            grid-template-columns: 1fr 1fr;
             padding: 10px;
-            gap: 12px;
+            gap: 10px;
+            min-height: 0;
         }
-        .camera-frame {
+        .camera-card {
+            display: flex;
+            flex-direction: column;
+            background: var(--panel-card);
             border: 1px solid var(--border);
             border-radius: 6px;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .camera-card-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border);
+            background: #10131c;
+        }
+        .camera-card-header label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-main);
+            white-space: nowrap;
+        }
+        .camera-card-header select {
+            flex: 1;
+            min-width: 0;
+            background: #0a0c10;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 3px 6px;
+            font-size: 11px;
+            font-family: inherit;
+        }
+        .camera-frame {
+            flex: 1;
             overflow: hidden;
             background: #000;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            min-height: 0;
         }
         .camera-frame img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
+        }
+        .camera-det-bar {
+            padding: 4px 8px;
+            font-size: 11px;
+            color: var(--accent-green);
+            background: #0d1117;
+            border-top: 1px solid var(--border);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .right-sidebar {
             background: var(--panel-bg);
@@ -239,24 +287,26 @@
                 </div>
             </div>
             <div class="camera-panel">
-                <div class="camera-frame">
-                    <img id="camera-feed" src="" alt="Live Tabletop Camera (Calibrated)">
-                    <div style="position: absolute; bottom: 4px; left: 6px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 2px 6px; border-radius: 3px;">
-                        Overhead Camera + Metric Grid
+                <div class="camera-card">
+                    <div class="camera-card-header">
+                        <label for="select-cam-table">Table Cam:</label>
+                        <select id="select-cam-table" onchange="onCameraSelect('table', this.value)"></select>
+                        <button class="btn btn-secondary" style="padding: 3px 7px;" title="Rescan cameras" onclick="loadCameras(true)">↻</button>
                     </div>
+                    <div class="camera-frame">
+                        <img id="camera-feed-table" src="" alt="Live Table Camera">
+                    </div>
+                    <div class="camera-det-bar" id="det-table">Scanning table camera...</div>
                 </div>
-                <div>
-                    <div class="section-title">Quick Arm Waypoints</div>
-                    <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                        <button class="btn btn-secondary" onclick="sendAction('home')">Home Pose</button>
-                        <button class="btn btn-secondary" onclick="sendAction('pick', {x: -60, y: 180})">Pick Object</button>
-                        <button class="btn btn-secondary" onclick="sendAction('place', {x: -130, y: 210})">Place Bin</button>
+                <div class="camera-card">
+                    <div class="camera-card-header">
+                        <label for="select-cam-person">Person Cam:</label>
+                        <select id="select-cam-person" onchange="onCameraSelect('person', this.value)"></select>
                     </div>
-                    <div class="section-title">Teach Current Pose</div>
-                    <div style="display: flex; gap: 6px;">
-                        <input id="teach-name" type="text" placeholder="Waypoint name (e.g. hover)" style="background: #000; border: 1px solid var(--border); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; flex: 1;">
-                        <button class="btn btn-secondary" onclick="teachWaypoint()">Teach</button>
+                    <div class="camera-frame">
+                        <img id="camera-feed-person" src="" alt="Live Person Camera">
                     </div>
+                    <div class="camera-det-bar" id="det-person">Scanning person camera...</div>
                 </div>
             </div>
         </div>
@@ -266,11 +316,15 @@
             <!-- Assistive Feeding (Camera -> Slave Arm) -->
             <div class="panel-section">
                 <div class="section-title">
-                    <span>Assistive Feeding (/dev/video4 -> Slave)</span>
+                    <span>Assistive Feeding &amp; Waypoints</span>
                 </div>
                 <div class="btn-group">
                     <button class="btn btn-green" onclick="sendAction('feed_grapes')">🍇 Feed Grapes (Bowl -> Mouth)</button>
                     <button class="btn btn-amber" onclick="sendAction('feed_spoon')">🥄 Feed with Spoon (Scoop -> Mouth)</button>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 8px;">
+                    <input id="teach-name" type="text" placeholder="Waypoint name (e.g. home, table_hover)" style="background: #000; border: 1px solid var(--border); color: #fff; padding: 5px 8px; border-radius: 4px; font-size: 11px; flex: 1;">
+                    <button class="btn btn-secondary" onclick="teachWaypoint()">Teach Pose</button>
                 </div>
             </div>
 
@@ -461,13 +515,70 @@
                 document.getElementById('val-held').textContent = data.held_object || 'None';
 
                 updateArmGeometry(p.x, p.y, p.z);
-
-                if (data.camera_base64) {
-                    document.getElementById('camera-feed').src = 'data:image/jpeg;base64,' + data.camera_base64;
-                }
             } catch (err) {}
         }
-        setInterval(fetchState, 500);
+        setInterval(fetchState, 600);
+
+        // --- 2b. Dual Live Camera Discovery, Selection & Detection Feed ---
+        const lastDetectionSummary = { table: '', person: '' };
+
+        async function loadCameras(forceRefresh = false) {
+            try {
+                const res = await fetch('/api/cameras' + (forceRefresh ? '?refresh=1' : ''));
+                const data = await res.json();
+                const cams = data.cameras || [];
+                const selected = data.selected || {};
+
+                for (const role of ['table', 'person']) {
+                    const sel = document.getElementById(`select-cam-${role}`);
+                    if (!sel) continue;
+                    sel.innerHTML = '';
+                    for (const cam of cams) {
+                        const opt = document.createElement('option');
+                        opt.value = cam.id;
+                        opt.textContent = cam.label;
+                        if (selected[role] === cam.id) opt.selected = true;
+                        sel.appendChild(opt);
+                    }
+                }
+                appendLog(`Discovered ${cams.length} camera source(s).`, 'info');
+            } catch (err) {
+                appendLog(`Camera discovery error: ${err.message}`, 'danger');
+            }
+        }
+
+        async function onCameraSelect(role, sourceId) {
+            appendLog(`Switched ${role.toUpperCase()} camera -> ${sourceId}`, 'warn');
+            await sendAction('select_camera', { role, source: sourceId });
+        }
+
+        async function pollCamera(role) {
+            try {
+                const res = await fetch(`/api/frame?role=${encodeURIComponent(role)}`);
+                const data = await res.json();
+                const img = document.getElementById(`camera-feed-${role}`);
+                const detBar = document.getElementById(`det-${role}`);
+                if (data.ok && data.image_base64 && img) {
+                    img.src = 'data:image/jpeg;base64,' + data.image_base64;
+                }
+                if (detBar) {
+                    detBar.textContent = data.summary || 'No targets detected';
+                    detBar.style.color = data.ok ? '#34d399' : '#f87171';
+                }
+                if (data.summary && data.summary !== lastDetectionSummary[role]) {
+                    lastDetectionSummary[role] = data.summary;
+                    appendLog(`[${role.toUpperCase()}] ${data.summary}`, data.ok ? 'success' : 'warn');
+                }
+            } catch (err) {
+                // Retry quietly
+            } finally {
+                setTimeout(() => pollCamera(role), 350);
+            }
+        }
+
+        loadCameras(true);
+        pollCamera('table');
+        pollCamera('person');
 
         async function sendAction(action, params = {}) {
             appendLog(`Action: ${action}`, 'info');
