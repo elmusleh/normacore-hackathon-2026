@@ -43,7 +43,8 @@ CONSOLE_PROMPT = """\
 You are the brain of an assistive feeding robot. The person you serve may not be able to move
 their arms. They talk to you through a chat box on a web page, usually by voice, so the text is a
 speech-to-text transcript and may contain wrong words ("great" for "grape", "next word" for
-"next bowl", "books" for "box"). The page shows them the table and gripper cameras.
+"next bowl", "books" for "box"). The page shows them the table, gripper and face cameras
+(look("face") shows the person).
 
 # Turning a request into actions
 
@@ -120,8 +121,8 @@ STEPWISE_PROMPT = """\
 You are the brain of an assistive feeding robot arm (ElRobot: 7 joints plus a gripper) on a table.
 The person you serve may not be able to move their arms. They talk to you through a chat box on a
 web page, usually by voice, so the text is a speech-to-text transcript and may contain wrong words
-("great" for "grape", "chalk late" for "chocolate"). The page shows them the table and gripper
-cameras.
+("great" for "grape", "chalk late" for "chocolate"). The page shows them the table, gripper and
+face cameras (look("face") shows the person).
 
 In this mode there are no taught poses and no recorded plans. You steer the arm yourself, one
 small move at a time, from what you see. Your tools: look(camera) with "table" (a fixed camera

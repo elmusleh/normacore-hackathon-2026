@@ -1,8 +1,8 @@
-"""Web console for the ElRobot MCP: live table and gripper cameras next to a voice chat box.
+"""Web console for the ElRobot MCP: live table, gripper and face cameras next to a voice chat box.
 
     ./cli.sh console            then open http://localhost:8890
 
-Left: the `table` and `gripper` cameras (names from config/elrobot.json -> cameras), read
+Left: the `table`, `gripper` and `face` cameras (names from config/elrobot.json -> cameras), read
 from the Station exactly like the MCP `look` tool. Right: a chat box with a big microphone
 button. Speech is transcribed locally with faster-whisper (offline, plan stage 3); if that is
 not installed the page falls back to the browser's own speech recognition.

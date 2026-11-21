@@ -9,6 +9,13 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-21, ~21:50, claude for Jafer): face camera in the console
+- Request: add the third camera to the console. It is an OBSBOT Meet SE on USB port 3-5.3 (`lsusb` ID 3564:fefe). Jafer said it points at the person being fed, so it is named `face`.
+- Found: the Station was not capturing it. `list_cameras` showed only table and gripper, and the OBSBOT's `/dev/bus/usb` node was root-only because the udev rule only covered the KD-USB cameras (2c7f:4a60).
+- Changed: `scripts/99-normacore-cameras.rules` (+OBSBOT line); `config/elrobot.json` cameras `face: port:3-5.3` (its own commit); `src/web/console.html` (3-camera layout: table on top, gripper + face below; default list); prompts in `src/console_agent.py`; docstring in `src/web_console.py`; `tests/test_web_console.py`.
+- Verified: 116 tests pass. NOT seen live: installing the rule needs sudo (not available to the agent).
+- Next: 1) `sudo cp scripts/99-normacore-cameras.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger`. 2) Unplug and replug the OBSBOT. 3) Restart the Station, then the console. 4) Check `list_cameras` shows `face` live and the tile has a picture. 5) Open a PR for `feat/console-face-camera` (built on `feat/brain-claude-stepwise-control`).
+
 ## Latest session (2026-11-21, ~19:40, claude for Jafer + Christian): ACT pick skill, demo recorder
 - Decision: Claude keeps choosing WHAT to pick from the chat; a learned ACT policy does the moving, one model per skill. First skills: pick grape, pick chocolate. Feeding later. Rejected for now: Claude stepwise nudging (too slow), Cartesian IK and a digital twin (need joint-angle calibration that does not exist). Runbook: docs/act_pick_skill.md.
 - Action space recorded by Jafer: config/envelope.json, 1027 poses, 8 anchors (commit 8c87f4c). Open questions to Jafer: do the table_* anchors touch the table; rename extendextendetable_grep -> above_grape and armgrepper_feed -> face_standoff?
