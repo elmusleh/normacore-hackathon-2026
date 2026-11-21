@@ -1,6 +1,7 @@
 """
 Unified Mission Control Backend for NormaCore Tabletop Robotics.
 Serves Web Dashboard (port 8080) with real-time controls for:
+  - CLI runner integration (execute any cli.sh command directly from Web UI)
   - Master / Slave Teleop Sync toggle
   - Live hardware telemetry (Buses 5B61034962 and 5B61037051)
   - Live camera feed with metric grid overlay
@@ -44,7 +45,6 @@ def get_live_camera_feed():
             ret, frame = cap.read()
             cap.release()
             if ret:
-                # Convert BGR to RGB
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 from PIL import Image
                 pil_img = Image.fromarray(rgb)
@@ -56,7 +56,6 @@ def get_live_camera_feed():
                 annotated.save(buf, format="JPEG", quality=80)
                 return base64.b64encode(buf.getvalue()).decode("utf-8")
     
-    # Fallback to simulated / cached view
     try:
         view = mcp_server.get_calibrated_view()
         return view["image_base64"]
@@ -117,7 +116,31 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                 action = cmd.get("action")
                 res = {"status": "SUCCESS"}
 
-                if action == "teleop_start":
+                # --- 1. CLI Execution Integration ---
+                if action == "run_cli":
+                    cli_cmd = cmd.get("command", "").strip()
+                    allowed_prefixes = ["test", "preflight", "hw", "demo", "view-camera", "apriltags", "sdk-check", "sync"]
+                    
+                    # Split command arguments
+                    parts = cli_cmd.split()
+                    if not parts or parts[0] not in allowed_prefixes:
+                        res = {"status": "ERROR", "output": f"Command '{cli_cmd}' is not allowed or unrecognized."}
+                    else:
+                        full_cmd = ["./cli.sh"] + parts
+                        run_res = subprocess.run(
+                            full_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=60,
+                        )
+                        output = run_res.stdout + ("\n" + run_res.stderr if run_res.stderr else "")
+                        res = {
+                            "status": "SUCCESS" if run_res.returncode == 0 else f"EXIT_{run_res.returncode}",
+                            "output": output[-2000:] if output else "(No output)",
+                            "returncode": run_res.returncode,
+                        }
+
+                elif action == "teleop_start":
                     with teleop_lock:
                         if teleop_process is None or teleop_process.poll() is not None:
                             teleop_process = subprocess.Popen(
@@ -144,9 +167,13 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                         if teleop_process is not None and teleop_process.poll() is None:
                             teleop_process.terminate()
                             teleop_process = None
-                    # Explicit emergency stop script
                     subprocess.run(["python3", "scripts/hw_day.py", "stop"], capture_output=True)
                     res = {"status": "EMERGENCY_STOP_EXECUTED"}
+
+                elif action == "teach":
+                    name = cmd.get("name", "point_1").strip()
+                    run_res = subprocess.run(["python3", "scripts/hw_day.py", "teach", name], capture_output=True, text=True)
+                    res = {"status": "WAYPOINT_TEACH_OK", "output": run_res.stdout}
 
                 elif action == "home":
                     res = mcp_server.reset_home()
@@ -169,7 +196,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                     passed = "passed" in test_run.stdout
                     res = {
                         "status": "TESTS_PASSED" if passed else "TESTS_FAILED",
-                        "output": test_run.stdout[-300:],
+                        "output": test_run.stdout[-1500:],
                     }
 
                 elif action == "run_demo":

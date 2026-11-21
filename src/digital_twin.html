@@ -59,7 +59,7 @@
         }
         .main-layout {
             display: grid;
-            grid-template-columns: 1fr 380px;
+            grid-template-columns: 1fr 400px;
             flex: 1;
             height: calc(100vh - 55px);
             overflow: hidden;
@@ -118,7 +118,7 @@
             border-left: 1px solid var(--border);
         }
         .panel-section {
-            padding: 14px;
+            padding: 12px 14px;
             border-bottom: 1px solid var(--border);
         }
         .section-title {
@@ -127,7 +127,7 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-muted);
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -135,20 +135,20 @@
         .telemetry-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 6px;
         }
         .telemetry-card {
             background: var(--panel-card);
-            padding: 8px 10px;
+            padding: 6px 8px;
             border-radius: 6px;
             border: 1px solid var(--border);
         }
         .telemetry-label {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-muted);
         }
         .telemetry-value {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             margin-top: 2px;
             color: var(--text-main);
@@ -156,16 +156,16 @@
         .btn-group {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-top: 6px;
+            gap: 6px;
+            margin-top: 4px;
         }
         .btn {
             background: #2563eb;
             color: #fff;
             border: none;
-            padding: 9px 12px;
+            padding: 8px 10px;
             border-radius: 6px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s ease;
@@ -180,6 +180,21 @@
         .btn-red:hover { background: #b91c1c; }
         .btn-secondary { background: #334155; }
         .btn-secondary:hover { background: #1e293b; }
+        .cli-input-box {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .cli-input-box input {
+            flex: 1;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: #fff;
+            padding: 6px 10px;
+            font-family: monospace;
+            font-size: 12px;
+        }
         .log-box {
             background: #000;
             border: 1px solid var(--border);
@@ -191,7 +206,7 @@
             font-family: monospace;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
         .log-entry { line-height: 1.3; }
         .log-info { color: #94a3b8; }
@@ -231,20 +246,22 @@
                     </div>
                 </div>
                 <div>
-                    <div class="section-title">Quick Tabletop Action</div>
+                    <div class="section-title">Quick Arm Waypoints</div>
                     <div style="display: flex; gap: 6px; margin-bottom: 8px;">
                         <button class="btn btn-secondary" onclick="sendAction('home')">Home Pose</button>
                         <button class="btn btn-secondary" onclick="sendAction('pick', {x: -60, y: 180})">Pick Object</button>
                         <button class="btn btn-secondary" onclick="sendAction('place', {x: -130, y: 210})">Place Bin</button>
                     </div>
-                    <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-                        Calibrated grid overlays real millimeters relative to ElRobot base. Ground plane protection ($Z \ge 12\text{mm}$) enforced automatically by safety engine.
-                    </p>
+                    <div class="section-title">Teach Current Pose</div>
+                    <div style="display: flex; gap: 6px;">
+                        <input id="teach-name" type="text" placeholder="Waypoint name (e.g. hover)" style="background: #000; border: 1px solid var(--border); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; flex: 1;">
+                        <button class="btn btn-secondary" onclick="teachWaypoint()">Teach</button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right: Hardware & Teleop Controls -->
+        <!-- Right: Hardware, CLI Runner & Testing Controls -->
         <div class="right-sidebar">
             <!-- Teleop Control -->
             <div class="panel-section">
@@ -252,10 +269,37 @@
                     <span>Teleop Sync (Master -> Slave)</span>
                 </div>
                 <div class="btn-group">
-                    <button class="btn btn-green" id="btn-teleop-start" onclick="sendAction('teleop_start')">▶ Start Teleop Sync</button>
+                    <button class="btn btn-green" id="btn-teleop-start" onclick="sendAction('teleop_start')">▶ Start Teleop (50Hz)</button>
                     <button class="btn btn-amber" id="btn-teleop-stop" onclick="sendAction('teleop_stop')">⏹ Stop Teleop</button>
                 </div>
-                <button class="btn btn-red" style="width: 100%; margin-top: 8px;" onclick="sendAction('estop')">⚠️ EMERGENCY STOP (Torque Off)</button>
+                <button class="btn btn-red" style="width: 100%; margin-top: 6px;" onclick="sendAction('estop')">⚠️ EMERGENCY STOP (Torque Off)</button>
+            </div>
+
+            <!-- Integrated CLI Runner -->
+            <div class="panel-section">
+                <div class="section-title">CLI Runner & Hardware Commands</div>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="runCli('preflight')">Preflight Check</button>
+                    <button class="btn btn-secondary" onclick="runCli('hw motors')">Live Motors</button>
+                    <button class="btn btn-secondary" onclick="runCli('hw waypoints')">List Waypoints</button>
+                    <button class="btn btn-secondary" onclick="runCli('sdk-check')">SDK Check</button>
+                </div>
+                <div class="cli-input-box">
+                    <input id="cli-input" type="text" placeholder="e.g. hw identify, hw jog 2 50, test" onkeydown="if(event.key==='Enter') executeCustomCli()">
+                    <button class="btn btn-secondary" onclick="executeCustomCli()">Run</button>
+                </div>
+            </div>
+
+            <!-- Testing & Autonomous Stage Demo -->
+            <div class="panel-section">
+                <div class="section-title">Testing & Autonomous Judge Demos</div>
+                <button class="btn btn-amber" style="width: 100%; margin-bottom: 6px;" onclick="runAutonomousDemo()">
+                    🏆 Run Judge Perturbation Recovery Demo
+                </button>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="sendAction('run_tests')">Run Full Pytest Suite</button>
+                    <button class="btn btn-secondary" onclick="sendAction('perturb')">Simulate Perturbation</button>
+                </div>
             </div>
 
             <!-- Telemetry -->
@@ -281,21 +325,9 @@
                 </div>
             </div>
 
-            <!-- Testing & Autonomous Stage Demo -->
-            <div class="panel-section">
-                <div class="section-title">Hackathon Testing & Demos</div>
-                <button class="btn btn-amber" style="width: 100%; margin-bottom: 6px;" onclick="runAutonomousDemo()">
-                    🏆 Run Judge Perturbation Recovery Demo
-                </button>
-                <div class="btn-group">
-                    <button class="btn btn-secondary" onclick="sendAction('run_tests')">Run Pytest Suite</button>
-                    <button class="btn btn-secondary" onclick="sendAction('perturb')">Simulate Perturbation</button>
-                </div>
-            </div>
-
-            <!-- Event Log -->
+            <!-- Event Stream -->
             <div class="panel-section" style="flex: 1; display: flex; flex-direction: column;">
-                <div class="section-title">Live Event Stream</div>
+                <div class="section-title">Live Terminal & Event Log</div>
                 <div class="log-box" id="log-box"></div>
             </div>
         </div>
@@ -400,7 +432,6 @@
                 const res = await fetch('/api/state');
                 const data = await res.json();
 
-                // Teleop Status Badge
                 const badge = document.getElementById('teleop-status-badge');
                 if (data.teleop_active) {
                     badge.textContent = 'Teleop: ACTIVE (50Hz)';
@@ -412,7 +443,6 @@
                     badge.style.color = '#9ca3af';
                 }
 
-                // Telemetry
                 const p = data.arm_pose;
                 document.getElementById('val-xyz').textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)} mm`;
                 document.getElementById('val-gripper').textContent = data.gripper_state > 0.5 ? 'OPEN' : 'CLOSED';
@@ -429,7 +459,7 @@
         setInterval(fetchState, 500);
 
         async function sendAction(action, params = {}) {
-            appendLog(`Action: ${action} ${JSON.stringify(params)}`, 'info');
+            appendLog(`Action: ${action}`, 'info');
             try {
                 const res = await fetch('/api/command', {
                     method: 'POST',
@@ -439,10 +469,34 @@
                 const data = await res.json();
                 const isErr = data.status && (data.status.includes('ERROR') || data.status.includes('FAILED'));
                 appendLog(`Response: ${data.status}`, isErr ? 'danger' : 'success');
+                if (data.output) {
+                    appendLog(data.output, 'info');
+                }
                 fetchState();
             } catch (err) {
                 appendLog(`Network Error: ${err.message}`, 'danger');
             }
+        }
+
+        async function runCli(commandStr) {
+            appendLog(`$ ./cli.sh ${commandStr}`, 'warn');
+            await sendAction('run_cli', { command: commandStr });
+        }
+
+        async function executeCustomCli() {
+            const input = document.getElementById('cli-input');
+            const cmd = input.value.trim();
+            if (cmd) {
+                await runCli(cmd);
+                input.value = '';
+            }
+        }
+
+        async function teachWaypoint() {
+            const input = document.getElementById('teach-name');
+            const name = input.value.trim() || 'waypoint_1';
+            await sendAction('teach', { name });
+            input.value = '';
         }
 
         async function runAutonomousDemo() {
