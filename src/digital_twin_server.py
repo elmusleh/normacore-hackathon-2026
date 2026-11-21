@@ -66,6 +66,7 @@ class CameraHub:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._station_lock = threading.Lock()
+        self._detect_lock = threading.Lock()
         self._station_tools = None
         self._station_hw = None
         self._v4l2_caps: Dict[int, cv2.VideoCapture] = {}
@@ -177,11 +178,30 @@ class CameraHub:
             valid_ids = {c["id"] for c in found}
             real_cams = [c["id"] for c in found if c["type"] != "mock"]
 
-            # Auto-assign sensible defaults if current selection is missing or still mock
-            if self.selected["table"] not in valid_ids or (self.selected["table"] == "mock:sim" and real_cams):
-                self.selected["table"] = real_cams[0] if real_cams else "mock:sim"
-            if self.selected["person"] not in valid_ids or (self.selected["person"] == "mock:sim" and len(real_cams) >= 2):
-                if len(real_cams) >= 2:
+            # Match configured cameras from config/elrobot.json first
+            cfg_cams = load_config().get("cameras", {})
+
+            def _resolve_cfg(role: str) -> Optional[str]:
+                val = cfg_cams.get(role, "")
+                if not val:
+                    return None
+                if val in valid_ids:
+                    return val
+                if val.startswith("port:"):
+                    want_port = val[len("port:"):]
+                    for c in found:
+                        if c.get("port") == want_port:
+                            return c["id"]
+                return None
+
+            # Auto-assign from config or fallback to first real cameras
+            if self.selected["table"] not in valid_ids or self.selected["table"] == "mock:sim":
+                self.selected["table"] = _resolve_cfg("table") or (real_cams[0] if real_cams else "mock:sim")
+            if self.selected["person"] not in valid_ids or self.selected["person"] == "mock:sim":
+                cfg_person = _resolve_cfg("person")
+                if cfg_person:
+                    self.selected["person"] = cfg_person
+                elif len(real_cams) >= 2:
                     self.selected["person"] = next((c for c in real_cams if c != self.selected["table"]), real_cams[1])
                 elif real_cams:
                     self.selected["person"] = real_cams[0]
@@ -279,7 +299,8 @@ class CameraHub:
                 "summary": f"No signal ({err})",
             }
 
-        detections_obj, annotated_bgr = feeding_detector.analyze_and_annotate(frame)
+        with self._detect_lock:
+            detections_obj, annotated_bgr = feeding_detector.analyze_and_annotate(frame)
 
         # Build compact human-readable detection summary
         det_dict: Dict[str, Any] = {}

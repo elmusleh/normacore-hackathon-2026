@@ -12,6 +12,8 @@ previous_session: antigravity 2026-11-21T17:25 — commit-and-push-policy-update
 ## Latest session (2026-11-21 evening): Dual Live Camera Dropdowns & Hardware Bring-Up
 
 - **What Changed:**
+  - Confirmed physical hardware mapping from hardware owner (`steve`) and saved to `config/elrobot.json`: follower bus `5B61034962`, `table` camera `port:3-1.2.2` (KD-USB), `gripper` camera `port:3-1.2.4` (KD-USB), `person` camera `v4l2:6` (OBSBOT Meet SE).
+  - Updated `CameraHub.discover()` in `src/digital_twin_server.py` to default `Table Cam` and `Person Cam` from `config/elrobot.json`.
   - Upgraded `src/digital_twin_server.py` with `CameraHub` (auto-discovers NormaCore Station `usbvideo/*` queues + local V4L2 `/dev/video*` cameras + mock fallback), `ThreadingHTTPServer`, `GET /api/cameras`, `GET /api/frame?role=table|person`, and `select_camera` action.
   - Upgraded `src/digital_twin.html` with side-by-side **Table Cam** and **Person Cam** live feeds, camera selector dropdowns, refresh button, per-camera live detection bars, and automatic detection-change logging in the Live Terminal & Event Log.
   - Verified live on hardware: NormaCore Station (`http://localhost:8889`) and Mission Control (`http://localhost:8080`) running; both ElRobot arms (`5B61034962` torque ON, `5B61037051` torque OFF) passed read-only preflight (all 8 motors visible, calibrated, fault-free). All 3 live cameras (`port:3-1.2.4` KD-USB, `port:3-1.2.2` KD-USB, `/dev/video6` OBSBOT Meet SE) confirmed streaming annotated JPEGs. No arm motion was commanded.
