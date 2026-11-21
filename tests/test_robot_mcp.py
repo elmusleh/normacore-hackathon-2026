@@ -120,8 +120,10 @@ def test_already_at_clear_skips_the_detour(env):
 
 def test_large_move_refused(env):
     tools, arm, tmp = env
+    for m in arm.readings:  # start near the bottom of the range so the hop exceeds the 1500 cap
+        arm.readings[m] = replace(arm.readings[m], present=1000, goal=1000)
     save_points(tmp, {"far": pose(2900)})
-    res = tools.go_to_waypoint("far")
+    res = tools.go_to_waypoint("far", via_clear=False)
     assert not res["ok"] and "refused" in res["error"]
     assert arm.moves == []
 

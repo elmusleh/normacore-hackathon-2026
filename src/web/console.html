@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ElRobot Console</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1e222b; --line: #2a2f3a;
+    --text: #e7e9ee; --muted: #8a91a0; --accent: #4f8cff; --ok: #3ccf7a; --warn: #f0b429; --bad: #ff5a5a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  main { height: calc(100% - 48px); display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(340px, 1fr); gap: 14px; padding: 14px; }
+
+  /* cameras */
+  .cams { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 0; }
+  .cam { position: relative; background: #000; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-height: 0; }
+  .cam img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .cam .label { position: absolute; top: 10px; left: 10px; display: flex; gap: 8px; align-items: center;
+    background: rgba(0,0,0,.6); padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; text-transform: capitalize; }
+  .cam .meta { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,.6); padding: 3px 9px;
+    border-radius: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cam .msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center;
+    padding: 24px; color: var(--muted); font-size: 14px; }
+  .cam.error .msg { display: flex; }
+  .cam.error img { opacity: .25; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+
+  /* chat */
+  .chat { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-height: 0; }
+  .chat h2 { margin: 0; padding: 12px 16px; font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--line); }
+  .log { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+  .log .empty { color: var(--muted); font-size: 13px; margin: auto; text-align: center; }
+  .bubble { max-width: 85%; padding: 8px 12px; border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; }
+  .bubble.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .bubble.robot { align-self: flex-start; background: var(--panel-2); border-bottom-left-radius: 4px; }
+  .bubble.tool { align-self: flex-start; max-width: 95%; padding: 2px 4px; background: none; color: var(--muted);
+    font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .bubble.tool .t { display: none; }
+  .bubble.error { align-self: stretch; max-width: 100%; background: rgba(255,90,90,.12); color: #ffb3b3;
+    border: 1px solid rgba(255,90,90,.35); font-size: 13px; }
+  .typing { align-self: flex-start; color: var(--muted); font-size: 13px; font-style: italic; }
+  .chat-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 8px 12px 8px 16px; }
+  .chat-head h2 { border: none; padding: 0; }
+  .chat-head .agent { font-size: 12px; color: var(--muted); margin-left: 10px; font-weight: 400; }
+  #stop { background: var(--bad); color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font: inherit;
+    font-weight: 700; letter-spacing: .03em; cursor: pointer; }
+  #stop:hover { filter: brightness(1.1); }
+  #stop:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .bubble .t { display: block; font-size: 11px; opacity: .65; margin-top: 2px; }
+
+  .mic-area { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 16px 10px; border-top: 1px solid var(--line); }
+  #mic { width: 112px; height: 112px; border-radius: 50%; border: none; cursor: pointer; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; transition: transform .1s, background .15s; box-shadow: 0 6px 24px rgba(79,140,255,.35); }
+  #mic:hover { transform: scale(1.04); }
+  #mic:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+  #mic svg { width: 48px; height: 48px; }
+  #mic.recording { background: var(--bad); box-shadow: 0 0 0 0 rgba(255,90,90,.6); animation: pulse 1.3s infinite; }
+  #mic.busy { background: var(--panel-2); cursor: progress; box-shadow: none; }
+  #mic:disabled { background: var(--panel-2); cursor: not-allowed; box-shadow: none; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,90,90,.6); } 70% { box-shadow: 0 0 0 22px rgba(255,90,90,0); } 100% { box-shadow: 0 0 0 0 rgba(255,90,90,0); } }
+  #mic-status { font-size: 13px; color: var(--muted); min-height: 18px; text-align: center; }
+  #mic-status.err { color: var(--bad); }
+
+  form { display: flex; gap: 8px; padding: 10px 16px 6px; }
+  #text { flex: 1; resize: none; height: 44px; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font: inherit; }
+  #text:focus { outline: none; border-color: var(--accent); }
+  form button { padding: 0 16px; border-radius: 8px; border: none; background: var(--panel-2); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+  form button:hover { background: var(--line); }
+  .opts { display: flex; justify-content: space-between; padding: 2px 16px 12px; font-size: 12px; color: var(--muted); }
+  .opts label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; height: auto; }
+    .cams { grid-template-rows: none; grid-auto-rows: 38vh; }
+    .chat { height: 80vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>ElRobot Console</h1>
+  <span class="sub">Live cameras. Talk to Claude, which drives the arm through the elrobot MCP tools. Say or type "stop" to hold the arm.</span>
+</header>
+<main>
+  <section class="cams" id="cams" aria-label="Cameras"></section>
+
+  <section class="chat" aria-label="Chat">
+    <div class="chat-head">
+      <h2>Chat <span class="agent" id="agent-state"></span></h2>
+      <button id="stop" type="button" title="Hold the arm where it is (does not go through Claude)">STOP</button>
+    </div>
+    <div class="log" id="log" aria-live="polite"><div class="empty">Press the microphone and speak, e.g. "look at the table".<br>Claude answers here.</div></div>
+
+    <div class="mic-area">
+      <button id="mic" type="button" aria-label="Start recording" title="Click to talk, click again to stop (or hold Space)">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
+      </button>
+      <div id="mic-status">Checking speech-to-text…</div>
+    </div>
+
+    <form id="form">
+      <textarea id="text" placeholder="Speak or type a message…" aria-label="Message"></textarea>
+      <button type="submit">Send</button>
+    </form>
+    <div class="opts">
+      <label><input type="checkbox" id="autosend"> Send right after speaking</label>
+      <span id="engine"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------- cameras
+const FRAME_INTERVAL_MS = 120;   // ~8 fps per camera
+const RETRY_MS = 1500;
+
+function addCamera(name) {
+  const el = document.createElement("div");
+  el.className = "cam";
+  el.innerHTML = `<img alt="${name} camera"><div class="label"><span class="dot"></span>${name}</div>
+                  <div class="meta"></div><div class="msg"></div>`;
+  $("cams").appendChild(el);
+  const img = el.querySelector("img"), dot = el.querySelector(".dot"),
+        meta = el.querySelector(".meta"), msg = el.querySelector(".msg");
+  let lastUrl = null, frames = 0, fpsStart = performance.now(), fps = 0;
+
+  async function tick() {
+    let delay = FRAME_INTERVAL_MS;
+    try {
+      const r = await fetch(`/api/frame/${encodeURIComponent(name)}`, { cache: "no-store" });
+      if (!r.ok) {
+        const info = await r.json().catch(() => ({}));
+        throw new Error(info.error || `HTTP ${r.status}`);
+      }
+      const age = parseFloat(r.headers.get("X-Frame-Age"));
+      const size = r.headers.get("X-Frame-Size") || "";
+      const url = URL.createObjectURL(await r.blob());
+      img.src = url;
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = url;
+      frames++;
+      const now = performance.now();
+      if (now - fpsStart > 1000) { fps = frames * 1000 / (now - fpsStart); frames = 0; fpsStart = now; }
+      const stale = !isNaN(age) && age > 2;
+      dot.className = "dot " + (stale ? "warn" : "ok");
+      meta.textContent = `${size} · ${fps.toFixed(1)} fps` + (isNaN(age) ? "" : ` · ${age.toFixed(1)} s old`)
+                         + (stale ? " · stalled?" : "");
+      el.classList.remove("error");
+    } catch (e) {
+      dot.className = "dot bad";
+      msg.textContent = `No picture from the ${name} camera: ${e.message}`;
+      el.classList.add("error");
+      delay = RETRY_MS;
+    }
+    setTimeout(tick, delay);
+  }
+  tick();
+}
+
+fetch("/api/cameras").then(r => r.json())
+  .then(d => (d.cameras && d.cameras.length ? d.cameras : ["table", "gripper"]))
+  .catch(() => ["table", "gripper"])
+  .then(names => {
+    // Gripper first is not important; keep table on top as it is the main view.
+    const order = ["table", "gripper"];
+    names.sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+    $("cams").style.gridTemplateRows = `repeat(${names.length}, 1fr)`;
+    names.forEach(addCamera);
+  });
+
+// ---------------------------------------------------------------- chat
+let lastId = 0;
+const log = $("log");
+
+function render(m) {
+  log.querySelector(".empty")?.remove();
+  const b = document.createElement("div");
+  b.className = "bubble " + (["robot", "tool", "error"].includes(m.role) ? m.role : "user");
+  b.textContent = m.text;
+  const t = document.createElement("span");
+  t.className = "t";
+  t.textContent = new Date(m.time * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  b.appendChild(t);
+  log.insertBefore(b, typing.isConnected ? typing : null);
+  log.scrollTop = log.scrollHeight;
+}
+
+const typing = document.createElement("div");
+typing.className = "typing";
+typing.textContent = "Claude is working…";
+const AGENT_LABEL = { ready: "· Claude connected", starting: "· connecting to Claude…",
+                      unavailable: "· Claude not connected", off: "· Claude off" };
+
+function showAgent(d) {
+  const el = $("agent-state");
+  el.textContent = AGENT_LABEL[d.agent] || "";
+  el.title = d.agent_error || "";
+  el.style.color = d.agent === "unavailable" ? "var(--bad)" : "";
+  if (d.busy && !typing.isConnected) { log.appendChild(typing); log.scrollTop = log.scrollHeight; }
+  if (!d.busy && typing.isConnected) typing.remove();
+}
+
+async function poll() {
+  try {
+    const r = await fetch(`/api/messages?after=${lastId}`, { cache: "no-store" });
+    const d = await r.json();
+    for (const m of d.messages) { if (m.id > lastId) { render(m); lastId = m.id; } }
+    showAgent(d);
+  } catch (_) { /* server restarting; try again */ }
+  setTimeout(poll, 700);
+}
+poll();
+
+async function send(text) {
+  text = text.trim();
+  if (!text) return;
+  const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ role: "user", text }) });
+  const d = await r.json();
+  if (d.ok && d.message.id > lastId) { render(d.message); lastId = d.message.id; }
+}
+
+$("stop").addEventListener("click", () => fetch("/api/stop", { method: "POST" }));
+
+$("form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const t = $("text").value;
+  $("text").value = "";
+  send(t);
+});
+$("text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("form").requestSubmit(); }
+});
+
+// ---------------------------------------------------------------- speech to text
+const mic = $("mic"), status = $("mic-status");
+let engine = null;          // "server" (faster-whisper) | "browser" (Web Speech API)
+let recording = false, busy = false;
+let recorder = null, chunks = [], stream = null, recognizer = null;
+
+function setStatus(text, err = false) { status.textContent = text; status.classList.toggle("err", err); }
+
+function setRecording(on) {
+  recording = on;
+  mic.classList.toggle("recording", on);
+  mic.setAttribute("aria-label", on ? "Stop recording" : "Start recording");
+}
+
+function gotText(text) {
+  text = (text || "").trim();
+  if (!text) { setStatus("Heard nothing. Try again, a bit closer to the microphone.", true); return; }
+  if ($("autosend").checked) { send(text); setStatus("Sent."); }
+  else {
+    const box = $("text");
+    box.value = box.value ? box.value.trimEnd() + " " + text : text;
+    box.focus();
+    setStatus("Check the text, then press Send or Enter.");
+  }
+}
+
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+async function chooseEngine() {
+  for (;;) {
+    let s = { state: "unavailable" };
+    try { s = await (await fetch("/api/stt")).json(); } catch (_) {}
+    if (s.state === "ready") {
+      engine = "server"; $("engine").textContent = `Local speech-to-text (${s.model}, ${s.device === "cuda" ? "GPU" : "CPU"})`;
+      mic.disabled = false; setStatus("Click the microphone and speak.");
+      return;
+    }
+    if (s.state === "loading" || s.state === "idle") {
+      mic.disabled = true; setStatus(`Loading speech model ${s.model || ""}… (first run downloads it)`);
+      await new Promise(r => setTimeout(r, 1500));
+      continue;
+    }
+    if (SpeechRec) {
+      engine = "browser"; $("engine").textContent = "Browser speech-to-text (sends audio to the browser vendor)";
+      mic.disabled = false; setStatus("Click the microphone and speak.");
+    } else {
+      engine = null; mic.disabled = true;
+      setStatus("No speech-to-text: install faster-whisper (see docs) or use Chrome.", true);
+    }
+    return;
+  }
+}
+
+async function startServerRecording() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setStatus("This page needs to be opened as http://localhost for the microphone to work.", true);
+    return;
+  }
+  try {
+    // Browser noise suppression tends to garble speech for Whisper; raw audio works better.
+    stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+  } catch (e) {
+    setStatus(`Microphone blocked: ${e.message}`, true);
+    return;
+  }
+  chunks = [];
+  recorder = new MediaRecorder(stream, { audioBitsPerSecond: 128000 });
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  recorder.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+    busy = true; mic.classList.add("busy"); setStatus("Transcribing…");
+    try {
+      const r = await fetch("/api/transcribe", { method: "POST", body: blob, headers: { "Content-Type": blob.type } });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error);
+      gotText(d.text);
+    } catch (e) {
+      setStatus(`Transcription failed: ${e.message}`, true);
+    } finally {
+      busy = false; mic.classList.remove("busy");
+    }
+  };
+  recorder.start();
+  setRecording(true);
+  setStatus("Listening… click again to stop.");
+}
+
+function startBrowserRecording() {
+  recognizer = new SpeechRec();
+  recognizer.lang = "en-US";
+  recognizer.interimResults = true;
+  recognizer.continuous = true;
+  let finalText = "";
+  recognizer.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
+      else interim += e.results[i][0].transcript;
+    }
+    setStatus((finalText + interim).trim() || "Listening…");
+  };
+  recognizer.onerror = (e) => setStatus(`Speech recognition error: ${e.error}`, true);
+  recognizer.onend = () => { setRecording(false); gotText(finalText); };
+  recognizer.start();
+  setRecording(true);
+  setStatus("Listening… click again to stop.");
+}
+
+function toggle() {
+  if (busy || mic.disabled) return;
+  if (!recording) {
+    engine === "server" ? startServerRecording() : startBrowserRecording();
+  } else {
+    setRecording(false);
+    // Keep recording a moment after the click so the last word is not cut off.
+    if (engine === "server" && recorder?.state === "recording") {
+      busy = true; setStatus("Finishing…");
+      const r = recorder;
+      setTimeout(() => r.state === "recording" && r.stop(), 400);
+    }
+    if (engine === "browser" && recognizer) recognizer.stop();
+  }
+}
+mic.addEventListener("click", toggle);
+
+// Hold Space to talk (when not typing in the text box).
+let spaceDown = false;
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "Space" || e.repeat || document.activeElement === $("text")) return;
+  e.preventDefault();
+  if (!recording) { spaceDown = true; toggle(); }
+});
+document.addEventListener("keyup", (e) => {
+  if (e.code !== "Space" || !spaceDown) return;
+  e.preventDefault();
+  spaceDown = false;
+  if (recording) toggle();
+});
+
+chooseEngine();
+</script>
+</body>
+</html>

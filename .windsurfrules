@@ -3,6 +3,7 @@
 This project uses .ai-sync/ for cross-platform AI agent handoff.
 
 ## On Start
+- Read docs/FEEDING_ASSISTANT_PLAN.md FIRST — current team plan, safety rules, your task list (it supersedes PLAN.md)
 - Read .ai-sync/HANDOFF.md — understand current state and next steps
 - Read .ai-sync/PROGRESS.md — know what's done, don't repeat work
 - Read .ai-sync/PLAN.md — follow the plan, no deviations

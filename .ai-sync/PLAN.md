@@ -1,3 +1,7 @@
+> **Current plan (2026-11-21): [docs/FEEDING_ASSISTANT_PLAN.md](../docs/FEEDING_ASSISTANT_PLAN.md).**
+> The team goal changed to an assistive feeding robot. Follow that file. The phases below are the
+> original Cartesian plan, kept for history; do not build new work on pick_at/place_at.
+
 # NormaCore Tabletop Manipulation Implementation Plan
 
 ## Phase 1: Pre-Event Scaffolding & Offline Simulation — COMPLETE

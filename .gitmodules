@@ -1,0 +1,3 @@
+[submodule "external/norma-core"]
+	path = external/norma-core
+	url = https://github.com/norma-core/norma-core

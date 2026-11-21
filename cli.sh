@@ -23,10 +23,15 @@ print_usage() {
     print_header
     echo -e "${C_BOLD}Usage:${C_RESET} ./cli.sh <command> [options]"
     echo ""
+    echo -e "${C_BOLD}Mission Control (Web & Unified):${C_RESET}"
+    echo -e "  ${C_CYAN}start [port]${C_RESET}        Launch unified Mission Control Web Dashboard & daemons (Default: 8080)"
+    echo -e "  ${C_GREEN}feed [grapes|spoon]${C_RESET} Run camera-guided assistive feeding (detects grape bowl -> mouth via /dev/video4)"
+    echo -e "  ${C_GREEN}teleop${C_RESET}              Run Master -> Slave teleoperation loop in terminal"
+    echo -e "  ${C_YELLOW}station${C_RESET}             Launch official NormaCore Station binary (--web --tcp)"
+    echo ""
     echo -e "${C_BOLD}Testing & Simulation Commands:${C_RESET}"
     echo -e "  ${C_GREEN}test [filter]${C_RESET}       Run pytest test suite (e.g. ./cli.sh test test_kinematics)"
     echo -e "  ${C_GREEN}demo${C_RESET}                Run autonomous judge-perturbation recovery demo in terminal"
-    echo -e "  ${C_GREEN}digital-twin [port]${C_RESET} Launch 3D WebGL Digital Twin server (Default: http://localhost:8080)"
     echo -e "  ${C_GREEN}view-camera${C_RESET}         Capture and save fresh calibrated camera image to sample_calibrated_view.png"
     echo -e "  ${C_GREEN}apriltags${C_RESET}           Generate printable/screen-displayable 4-corner AprilTags sheet"
     echo ""
@@ -34,6 +39,7 @@ print_usage() {
     echo -e "  ${C_YELLOW}station${C_RESET}             Launch official pre-compiled Station binary (--web --tcp)"
     echo -e "  ${C_YELLOW}setup-serial${C_RESET}        Configure Linux USB permissions (dialout, udev rules) for ElRobot servos"
     echo -e "  ${C_YELLOW}mcp${C_RESET}                 Run Model Context Protocol (MCP) server for Claude / Codex"
+    echo -e "  ${C_YELLOW}console [port]${C_RESET}      Web console: live cameras + voice chat (Default: http://localhost:8890)"
     echo -e "  ${C_YELLOW}urdf${C_RESET}                Open official NormaCore online 3D URDF interactive viewer"
     echo ""
     echo -e "${C_BOLD}Hardware Day (ElRobot):${C_RESET}"
@@ -48,11 +54,18 @@ print_usage() {
     echo -e "  ${C_GREEN}hw teach <name>${C_RESET}     Save the current pose of all 8 motors as a waypoint"
     echo -e "  ${C_GREEN}hw goto <name>${C_RESET}      Move all motors to a waypoint (shows plan; type MOVE)"
     echo -e "  ${C_GREEN}hw waypoints${C_RESET}        List taught waypoints"
+    echo -e "  ${C_RED}hw demo [motors]${C_RESET}     Follower: sweep each motor, then all together; per-motor report"
+    echo -e "  ${C_GREEN}hw leader${C_RESET}           Leader (master) live view vs follower, range coverage (read only)"
     echo -e "  ${C_RED}hw stop${C_RESET}              Torque OFF on all motors (emergency)"
     echo -e "  ${C_CYAN}hw workspace${C_RESET}         Show workspace limits and whether they were measured"
     echo -e "  ${C_CYAN}hw bundle${C_RESET}            Pack logs, config and state for debugging or sharing"
     echo -e "  ${C_CYAN}logs [-f]${C_RESET}            Show the newest run log (-f follows it live)"
+    echo -e "  ${C_CYAN}cameras${C_RESET}              Apply fixed camera exposure (Station must be stopped)"
     echo -e "  ${C_CYAN}preflight${C_RESET}            Read-only ElRobot readiness check (writes logs/)"
+    echo ""
+    echo -e "${C_BOLD}Team Sync:${C_RESET}"
+    echo -e "  ${C_CYAN}sync${C_RESET}                Fetch, then fast-forward if clean and behind (never stashes or force-pulls)"
+    echo -e "  ${C_CYAN}sdk-check${C_RESET}           Read-only: SDK and Station must both be release 0.1.0-beta.10 (5f4f805)"
     echo ""
     echo -e "${C_BOLD}General Commands:${C_RESET}"
     echo -e "  ${C_CYAN}help${C_RESET}                Display this help menu"
@@ -75,6 +88,25 @@ case "$COMMAND" in
     demo)
         echo -e "${C_GREEN}[+] Running Autonomous Recovery Demo...${C_RESET}"
         python3 src/agent_prompts.py
+        ;;
+
+    start|mission-control)
+        PORT="${1:-8080}"
+        echo -e "${C_CYAN}[+] Launching Unified NormaCore Mission Control (http://localhost:${PORT})...${C_RESET}"
+        
+        # Check if station is already running; if not, launch it
+        if ! ss -tulpn | grep -q ":8888"; then
+            echo -e "${C_YELLOW}[+] Starting background NormaCore Station daemon...${C_RESET}"
+            ./bin/station --web --tcp > /dev/null 2>&1 &
+            sleep 2
+        else
+            echo -e "${C_GREEN}[OK] NormaCore Station daemon already active on port 8888.${C_RESET}"
+        fi
+
+        if command -v xdg-open > /dev/null 2>&1; then
+            (sleep 1 && xdg-open "http://localhost:${PORT}") &
+        fi
+        python3 src/digital_twin_server.py "$PORT"
         ;;
 
     digital-twin)
@@ -124,6 +156,14 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         fi
         ;;
 
+    console)
+        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        # Load secrets such as ANTHROPIC_API_KEY from .env (gitignored) if present.
+        if [ -f .env ]; then set -a; . ./.env; set +a; fi
+        echo -e "${C_GREEN}[+] Starting ElRobot web console (cameras + voice chat)...${C_RESET}"
+        exec "$PY" src/web_console.py --port "${1:-8890}"
+        ;;
+
     mcp)
         # stdout carries the MCP protocol, so messages go to stderr.
         PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
@@ -140,8 +180,35 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         fi
         ;;
 
+    teleop)
+        echo -e "${C_GREEN}[+] Starting Master -> Slave Real-time Sync...${C_RESET}"
+        shift || true
+        python3 scripts/teleop_sync.py "$@"
+        ;;
+
+    feed)
+        MODE="${1:-grapes}"
+        shift || true
+        echo -e "${C_GREEN}[+] Running Camera-Guided Assistive Feeding (${MODE})...${C_RESET}"
+        python3 scripts/camera_feed_arm.py --mode "$MODE" "$@"
+        ;;
+
     hw)
         python3 scripts/hw_day.py "$@"
+        ;;
+
+    cameras)
+        python3 scripts/camera_settings.py "$@"
+        ;;
+
+    sync)
+        # Fetch and fast-forward before implementing. Never stashes or force-pulls.
+        bash scripts/agent_sync.sh "$@"
+        ;;
+
+    sdk-check)
+        # Read-only: SDK version, imports, Station build and archive checksum must match.
+        python3 scripts/sdk_check.py "$@"
         ;;
 
     preflight)

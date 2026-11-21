@@ -18,6 +18,8 @@ Most hackathon teams naively feed raw 2D camera images and raw joint angles into
 
 ---
 
+> **Team plan:** we are building an assistive feeding robot. Start with [docs/FEEDING_ASSISTANT_PLAN.md](docs/FEEDING_ASSISTANT_PLAN.md).
+
 ## ⚡ 5-Minute Team Quickstart
 
 You can test the entire pipeline on your laptop **right now** before touching physical hardware using our master CLI runner (`./cli.sh`):

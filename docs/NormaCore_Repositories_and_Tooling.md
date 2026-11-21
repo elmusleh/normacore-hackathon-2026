@@ -8,7 +8,7 @@ This document breaks down every public repository in the **NormaCore GitHub Orga
 
 | Repository | Tech Stack | What It Does | Do We Need to Clone It? | Action / Status in Our Project |
 | :--- | :--- | :--- | :--- | :--- |
-| **`norma-core/norma-core`** | Go / Python / JS / C++ | **The Main Physical Operations Platform.** Contains Station runtime, Web console, ElRobot CAD/URDF hardware files, Protobuf definitions, and Python SDK (`gremlin_py`). | **YES (100% Essential)** | **Downloaded & unpacked in `external/norma-core/`** |
+| **`norma-core/norma-core`** | Go / Python / JS / C++ | **The Main Physical Operations Platform.** Contains Station runtime, Web console, ElRobot CAD/URDF hardware files, Protobuf definitions, and Python SDK (`gremlin_py`). | **YES (100% Essential)** | **Git submodule in `external/norma-core/`, pinned to `5f4f805`** |
 | **`norma-core/normfs`** | Rust | High-performance persistent write-ahead-log (WAL) queue storage for robotics and sensor streams. | **NO** | Built directly into the compiled `bin/station` binary. No Rust development needed for our track. |
 | **`norma-core/gremlin.zig`** | Zig | Zero-dependency Google Protocol Buffers implementation in pure Zig with single allocation. | **NO** | Embedded firmware tool for microcontrollers. We interact via the Python SDK. |
 | **`norma-core/gremlin.c`** | C | C Protocol Buffers implementation. | **NO** | Internal C driver dependency bundled into Station. |

@@ -109,6 +109,40 @@ def test_digital_twin_html_exists():
         content = f.read()
     assert "Three.js" in content
     assert "NormaCore Digital Twin" in content
+    assert "feed_grapes" in content
+    assert "feed_spoon" in content
+
+
+def test_camera_feeding_vision_and_orchestration():
+    import cv2
+    from src.feeding_vision import FeedingVisionDetector, run_camera_feeding_cycle
+
+    # Build a synthetic camera frame with a purple grape bowl, green spoon, and skin-toned face/mouth region
+    frame = np.full((480, 640, 3), (230, 235, 240), dtype=np.uint8)
+    cv2.circle(frame, (220, 260), 25, (180, 50, 160), -1)   # Purple grape cluster in bowl
+    cv2.circle(frame, (420, 190), 20, (50, 200, 60), -1)    # Green spoon holder
+    cv2.ellipse(frame, (320, 100), (40, 50), 0, 0, 360, (140, 175, 225), -1)  # Person face/mouth region
+
+    detector = FeedingVisionDetector()
+    summary, annotated = detector.analyze_and_annotate(frame)
+    assert annotated.shape == frame.shape
+    assert summary["grape_bowl"] is not None
+    assert summary["spoon"] is not None
+    assert summary["mouth"] is not None
+    assert summary["mouth"]["extra"]["standoff_cm"] >= 5.0
+
+    # Run full feeding cycles (grapes and spoon) with NormaCoreMCPServer
+    server = NormaCoreMCPServer()
+    res_grapes = run_camera_feeding_cycle(mode="grapes", mcp_server=server, preferred_camera=99)
+    assert res_grapes["status"] == "FEEDING_CYCLE_COMPLETED"
+    assert res_grapes["mode"] == "grapes"
+    assert res_grapes["cartesian"]["standoff_pose"]["z"] == 110.0
+
+    res_spoon = run_camera_feeding_cycle(mode="spoon", mcp_server=server, preferred_camera=99)
+    assert res_spoon["status"] == "FEEDING_CYCLE_COMPLETED"
+    assert res_spoon["mode"] == "spoon"
+    assert res_spoon["cartesian"]["standoff_pose"]["z"] == 110.0
+
 
 
 if __name__ == "__main__":

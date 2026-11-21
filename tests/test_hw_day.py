@@ -193,13 +193,13 @@ def test_teach_then_goto_round_trip(env, monkeypatch, capsys):
     assert goals == {m: 2000 for m in hw_day.MOTORS}
 
 
-def test_goto_refuses_large_move_without_flag(env, monkeypatch, capsys):
+def test_goto_large_move_warns_and_moves(env, monkeypatch, capsys):
     env["waypoints"]["far"] = {str(m): 3000 for m in hw_day.MOTORS}
     FakeBus.readings = {m: _fresh_reading(m, present=500) for m in hw_day.MOTORS}
     _answers(monkeypatch, "MOVE")
-    assert _run("goto", "far") == 1
-    assert FakeBus.moves == []
-    assert "allow-large" in capsys.readouterr().out
+    assert _run("goto", "far") == 0
+    assert FakeBus.moves[-1][0] == {m: 3000 for m in hw_day.MOTORS}
+    assert "LARGE MOVE" in capsys.readouterr().out
 
 
 def test_goto_allow_large_moves(env, monkeypatch):
@@ -237,3 +237,100 @@ def test_torque_on_sets_torque_back(env, capsys):
     FakeBus.readings = {m: replace(_fresh_reading(m), torque_on=False) for m in hw_day.MOTORS}
     assert _run("torque", "on") == 0
     assert all(FakeBus.readings[m].torque_on for m in hw_day.MOTORS)
+
+
+# ------------------------------------------------------------- demo ----
+
+def test_plan_demo_sweeps_each_motor_and_returns_to_start():
+    readings = {m: _fresh_reading(m) for m in hw_day.MOTORS}
+    plan = dict(hw_day.plan_demo(readings, [1, 8], amplitude=200))
+    assert plan[1] == [2200, 1800, 2000]
+    # Gripper does its full calibrated travel (range 500..3500, margin 20).
+    assert plan[8] == [3480, 520, 2000]
+
+
+def test_plan_demo_clamps_near_a_limit_and_full_mode():
+    readings = {1: _fresh_reading(1, present=3450)}
+    assert hw_day.plan_demo(readings, [1], amplitude=200) == [(1, [3480, 3250, 3450])]
+    assert hw_day.plan_demo(readings, [1], amplitude=200, full=True) == [(1, [3480, 520, 3450])]
+
+
+def test_plan_demo_refuses_missing_motor():
+    with pytest.raises(ValueError):
+        hw_day.plan_demo({}, [3], amplitude=100)
+
+
+def test_demo_runs_every_motor_then_together_and_ends_at_start(env, monkeypatch, capsys):
+    monkeypatch.setattr(hw_day, "TELEOP_WATCH_S", 0)
+    monkeypatch.setattr(hw_day.time, "sleep", lambda s: None)
+    _answers(monkeypatch, "MOVE")
+    rc = _run("demo")
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    single = [g for g, _ in FakeBus.moves if len(g) == 1]
+    assert len(single) == 8 * 3
+    together = [g for g, _ in FakeBus.moves if len(g) > 1]
+    assert [g[1] for g in together] == [2100, 1900, 2000]
+    assert all(r.present == 2000 for r in FakeBus.readings.values())
+    assert "Follower demo summary" in out
+
+
+def test_demo_cancel_moves_nothing(env, monkeypatch):
+    monkeypatch.setattr(hw_day, "TELEOP_WATCH_S", 0)
+    _answers(monkeypatch, "no")
+    assert _run("demo") == 0
+    assert FakeBus.moves == []
+
+
+def test_demo_refuses_when_teleop_is_writing_goals(env, monkeypatch, capsys):
+    monkeypatch.setattr(hw_day, "TELEOP_WATCH_S", 0)
+    calls = {"n": 0}
+    original = FakeBus.snapshot
+
+    def drifting(self):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            FakeBus.readings[2] = replace(FakeBus.readings[2], goal=2300)
+        return original(self)
+    monkeypatch.setattr(FakeBus, "snapshot", drifting)
+    assert _run("demo") == 1
+    assert "Teleop" in capsys.readouterr().out
+    assert FakeBus.moves == []
+
+
+def test_demo_stall_is_reported_as_problem(env, monkeypatch, capsys):
+    monkeypatch.setattr(hw_day, "TELEOP_WATCH_S", 0)
+    monkeypatch.setattr(hw_day.time, "sleep", lambda s: None)
+    FakeBus.stall = True
+    _answers(monkeypatch, "MOVE")
+    assert _run("demo", "3", "--no-combined") == 1
+    out = capsys.readouterr().out
+    assert "PROBLEM: ended 200 steps off target" in out
+    assert "<-- CHECK" in out
+
+
+def test_demo_rejects_large_amplitude_without_full(env):
+    assert _run("demo", "--amplitude", "900") == 2
+
+
+# ----------------------------------------------------------- leader ----
+
+def test_coverage_tracker_and_leader_issues():
+    t = hw_day.CoverageTracker()
+    for p in (1000, 1500, 2500):
+        t.update({1: _fresh_reading(1, present=p)})
+    assert t.coverage(1, 500, 3500) == pytest.approx(50.0)
+    assert any("jumped" in i for i in hw_day.leader_issues(1, _fresh_reading(1, present=2500), t))
+    limp = replace(_fresh_reading(2), torque_on=False)
+    t.update({2: limp})
+    assert hw_day.leader_issues(2, limp, t) == []
+    assert hw_day.leader_issues(3, None, t) == ["MISSING from bus"]
+
+
+def test_leader_summary_flags_unmoved_joints(env, monkeypatch, capsys):
+    monkeypatch.setattr(hw_day.time, "sleep", lambda s: None)
+    env["cfg"]["station"]["leader_bus"] = "LEADER"
+    FakeBus.readings = {m: replace(_fresh_reading(m), torque_on=False) for m in hw_day.MOTORS}
+    assert _run("leader", "--seconds", "0.01", "--no-follower") == 1
+    out = capsys.readouterr().out
+    assert "Leader summary" in out and "move it end to end" in out

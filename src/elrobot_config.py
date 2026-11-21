@@ -30,7 +30,8 @@ STATE_FILE = DATA_DIR / "hw_day_state.json"
 DEFAULT_CURRENT_THRESHOLD = 100
 
 DEFAULTS: Dict[str, Any] = {
-    "station": {"server": "localhost", "bus": "auto"},
+    # leader_bus: serial of the leader (master) arm's bus, read by ./cli.sh hw leader. Never written to.
+    "station": {"server": "localhost", "bus": "auto", "leader_bus": ""},
     # motor id (string) -> {"joint": ..., "direction": ..., "note": ...}; filled by ./cli.sh hw identify
     "joint_map": {},
     # motor id (string) -> current threshold; missing motors use the default
@@ -41,10 +42,12 @@ DEFAULTS: Dict[str, Any] = {
     "gripper": {"motor": 8, "open_at": "max", "verified": False, "squeeze_steps": 10},
     # Friendly camera names for the MCP server, e.g. {"table": "usbvideo/<hash>"}.
     "cameras": {},
+    # Fixed exposure per named camera, applied by ./cli.sh cameras (auto exposure washes out under the Station).
+    "camera_settings": {},
     # Limits for moves requested by Claude through the MCP server (src/robot_mcp_server.py).
     "agent": {
         "max_speed": 500,
-        "max_waypoint_delta_steps": 600,
+        "max_waypoint_delta_steps": 1500,
         "max_nudge_percent": 5.0,
         "clear_waypoint": "clear",
     },
