@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.mcp.json`: `ELROBOT_ALLOW_MOTION` set to `"1"`, so Claude's MCP tools move the real arm (was dry-run).
 
 ### Fixed
-- `scripts/generate_apriltags.py` (`./cli.sh apriltags`) printed hand-typed patterns that are not AprilTags (8x8 inner grid; real 36h11 is 6x6), so no detector could read them. This includes `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`. The generator now takes the bits from OpenCV's 36h11 dictionary, defaults to an 80 mm black square (`--size-mm`) so tags stay readable in the Station's 299x224 frames, and keeps a white margin. Reprint the tags. One tag per row, two per A4 page (80 mm tags do not fit two across). Test: `tests/test_apriltags.py`.
+- `scripts/generate_apriltags.py` (`./cli.sh apriltags`) printed hand-typed patterns that are not AprilTags (8x8 inner grid; real 36h11 is 6x6), so no detector could read them. This includes `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`. The generator now takes the bits from OpenCV's 36h11 dictionary, defaults to an 80 mm black square (`--size-mm`) so tags stay readable in the Station's 299x224 frames, and keeps a white margin. The old printed sheet still works: `detect_tags` also reads its patterns as the custom family `printed-v1` (needs 480 px Station frames at 45 mm). One tag per row, two per A4 page (80 mm tags do not fit two across). Test: `tests/test_apriltags.py`.
 - Leader/follower serial roles were swapped in `scripts/teleop_sync.py` (it drove the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` and `docs/team_setup.md`. Confirmed on the arm 2026-11-21: follower `5B61034962`, leader `5B61037051`.
 
 ### Added

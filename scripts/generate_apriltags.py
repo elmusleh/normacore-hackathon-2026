@@ -5,7 +5,8 @@ Printable HTML sheet with the 4 table-corner AprilTags (family 36h11, IDs 0-3).
 
 The bit patterns come from OpenCV's own 36h11 dictionary (cv2.aruco), so every
 AprilTag detector reads them. The sheet this script made before 2026-11-21 used
-hand-typed patterns that were NOT real tags; nothing could detect them. Reprint.
+hand-typed patterns that are NOT real tags; src/tag_calibration.py still reads that
+sheet as the custom family "printed-v1", so it does not have to be reprinted.
 
 Usage:
     python3 scripts/generate_apriltags.py [--size-mm 80] [--out docs/apriltags_printable.html]

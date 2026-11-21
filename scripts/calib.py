@@ -168,7 +168,11 @@ def cmd_camera(args, cal):
         raise SystemExit(f"ERROR: cannot read image {args.image}")
     h, w = img.shape[:2]
     dets = detect_tags(img)
-    print(f"Frame {w}x{h}; tags found: {sorted(dets) or 'none'}")
+    fams = sorted({d.family for d in dets.values()})
+    print(f"Frame {w}x{h}; tags found: {sorted(dets) or 'none'}" + (f" (family {', '.join(fams)})" if fams else ""))
+    if "printed-v1" in fams:
+        print("  Using the 2026-11-21 printed sheet (45 mm tags, not real AprilTags but readable). "
+              "Pass the measured black-square size to calib layout --tag-size-mm (about 45).")
     for i in sorted(dets):
         print(f"  tag {i}: centre px {_fmt(dets[i].center)}, about {dets[i].side_px:.0f} px wide")
     OUT_DIR.mkdir(parents=True, exist_ok=True)

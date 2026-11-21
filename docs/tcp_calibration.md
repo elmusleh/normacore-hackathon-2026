@@ -26,9 +26,14 @@ Origin = centre of tag 0, +x toward tag 1, +y toward tag 3, z up from the table 
 
 ## Steps (about 45 minutes with the arm)
 
-1. **Print real tags** (5 min). `./cli.sh apriltags`, print `docs/apriltags_printable.html` at 100 %.
-   The older sheet and `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf` are NOT AprilTags and
-   cannot be detected. Measure the black square with a ruler.
+1. **Tags** (5 min). Either sheet works; `calib camera` detects which one is on the table:
+   - The 45 mm sheet printed on 2026-11-21 (`docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`).
+     Its patterns are not real AprilTags, so the code reads them as a custom family `printed-v1`.
+     At 45 mm they need the 480 px Station frames (`resize_target: 480`); at 299x224 they are
+     missed. Use `--tag-size-mm` with the measured black square (about 45).
+   - Or new real 36h11 tags, 80 mm: `./cli.sh apriltags`, print at 100 %.
+   Measure the black square with a ruler. Use the new placement below (0 front-left), not the
+   corner names printed on the old sheet.
 2. **Tape the tags flat**, one per corner as labelled, all fully in the table camera's view,
    with nothing on top of them. Keep the camera fixed from now on: moving it means redoing step 4.
 3. **Measure the layout** (5 min). Tape-measure centre to centre: 0→1 (width), 0→3 (depth), and

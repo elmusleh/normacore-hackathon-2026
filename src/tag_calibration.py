@@ -78,6 +78,7 @@ class TagDetection:
     tag_id: int
     center: Tuple[float, float]
     corners: np.ndarray          # 4x2 pixels, the tag's own order (its top-left first, clockwise)
+    family: str = "36h11"
 
     @property
     def side_px(self) -> float:
@@ -85,20 +86,36 @@ class TagDetection:
         return float(np.mean([np.linalg.norm(c[i] - c[(i + 1) % 4]) for i in range(4)]))
 
 
-def _detector() -> "cv2.aruco.ArucoDetector":
+# The 45 mm sheet printed on 2026-11-21 ("printed-v1", docs/NormaCore Hackathon - 4-Corner AprilTags.pdf)
+# is NOT real AprilTag 36h11: a hand-typed 8x8 grid inside the black border. OpenCV reads it fine as a
+# custom dictionary. Rows of the 8x8 grid inside the black border, 1 = white. Patterns differ by >= 8
+# bits between IDs (any rotation). Tag 1 is close to symmetric under rotation; only centres are used.
+PRINTED_V1_BITS = {
+    0: ("11111111", "10010101", "10110011", "11001001", "10100111", "11101001", "10011101", "11111111"),
+    1: ("11111111", "11001101", "10100111", "10010011", "11011001", "11100101", "10110011", "11111111"),
+    2: ("11111111", "10110011", "11001001", "10011101", "11100011", "10101101", "11010111", "11111111"),
+    3: ("11111111", "11100101", "10010011", "11011001", "10110111", "10001011", "11010001", "11111111"),
+}
+FAMILIES = ("36h11", "printed-v1")
+
+
+def _dictionary(family: str) -> "cv2.aruco.Dictionary":
+    if family == "36h11":
+        return cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11)
+    if family == "printed-v1":
+        rows = [np.array([[int(ch) for ch in r] for r in PRINTED_V1_BITS[i]], np.uint8) for i in TAG_IDS]
+        return cv2.aruco.Dictionary(np.vstack([cv2.aruco.Dictionary.getByteListFromBits(b) for b in rows]), 8, 3)
+    raise ValueError(f"unknown tag family {family!r}; use one of {FAMILIES}")
+
+
+def _detector(family: str = "36h11") -> "cv2.aruco.ArucoDetector":
     params = cv2.aruco.DetectorParameters()
     params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
-    return cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11), params)
+    return cv2.aruco.ArucoDetector(_dictionary(family), params)
 
 
-def detect_tags(image: np.ndarray, upscale_below_px: int = 640) -> Dict[int, TagDetection]:
-    """Find 36h11 tags 0-3. Small frames are upscaled first (the Station sends 299x224)."""
-    gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    scale = 1.0
-    if max(gray.shape) < upscale_below_px:
-        scale = upscale_below_px / max(gray.shape)
-        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    corners, ids, _ = _detector().detectMarkers(gray)
+def _detect_family(gray: np.ndarray, scale: float, family: str) -> Dict[int, TagDetection]:
+    corners, ids, _ = _detector(family).detectMarkers(gray)
     found: Dict[int, TagDetection] = {}
     if ids is None:
         return found
@@ -107,8 +124,28 @@ def detect_tags(image: np.ndarray, upscale_below_px: int = 640) -> Dict[int, Tag
         if i not in TAG_IDS or i in found:
             continue
         pts = c.reshape(4, 2).astype(float) / scale
-        found[i] = TagDetection(i, (float(pts[:, 0].mean()), float(pts[:, 1].mean())), pts)
+        found[i] = TagDetection(i, (float(pts[:, 0].mean()), float(pts[:, 1].mean())), pts, family)
     return found
+
+
+def detect_tags(image: np.ndarray, upscale_below_px: int = 640, families: Sequence[str] = FAMILIES
+                ) -> Dict[int, TagDetection]:
+    """Find tags 0-3. Tries each family (real 36h11, then the printed-v1 sheet) and keeps the one that
+    finds the most tags; mixing families on one table is not supported. Small frames are upscaled
+    first (the Station sends 299x224)."""
+    gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    scale = 1.0
+    if max(gray.shape) < upscale_below_px:
+        scale = upscale_below_px / max(gray.shape)
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    best: Dict[int, TagDetection] = {}
+    for family in families:
+        found = _detect_family(gray, scale, family)
+        if len(found) > len(best):
+            best = found
+        if len(best) == len(TAG_IDS):
+            break
+    return best
 
 
 # -- camera fit -------------------------------------------------------------------------------
@@ -175,14 +212,16 @@ def fit_camera(dets: Dict[int, TagDetection], tags_mm: Dict[str, Sequence[float]
     min_side_px = min(d.side_px for d in dets.values())
     if min_side_px < 24:
         warnings.append(f"smallest tag is only {min_side_px:.0f} px wide: use bigger tags or a larger frame")
-    report = {"tag_square_rms_mm": round(rms, 2), "tag_side_px_min": round(min_side_px, 1),
+    families = sorted({d.family for d in dets.values()})
+    report = {"tag_family": families[0] if len(families) == 1 else families,
+              "tag_square_rms_mm": round(rms, 2), "tag_side_px_min": round(min_side_px, 1),
               "centers_px": {str(i): [round(v, 2) for v in dets[i].center] for i in TAG_IDS},
               "warnings": warnings}
     return cam, report
 
 
 def camera_config(cam: TableCamera, report: dict, camera_name: str) -> dict:
-    return {"name": camera_name, "image_size": list(cam.image_size),
+    return {"name": camera_name, "tag_family": report.get("tag_family"), "image_size": list(cam.image_size),
             "pixel_to_table": [[round(float(v), 9) for v in row] for row in cam.H],
             "tag_square_rms_mm": report["tag_square_rms_mm"], "centers_px": report["centers_px"],
             "calibrated_at": now_iso()}

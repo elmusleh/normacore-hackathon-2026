@@ -184,3 +184,35 @@ def test_calib_cli_offline_flow(tmp_path):
     out = run("reach", "0", "0", "200", "--offline")
     assert "IK error" in out and "Nothing moved" in out
     assert "camera:" in run("show")
+
+
+def _printed_v1_view(size):
+    """The 45 mm 2026-11-21 printed sheet (not real AprilTags) at the corners of a 520x360 mm table."""
+    s, m = 2.0, 80
+    canvas = np.full((int((360 + 2 * m) * s), int((520 + 2 * m) * s)), 255, np.uint8)
+    side = int(45 * s)
+    for tid, (x, y) in TAGS_MM.items():
+        full = np.zeros((10, 10), np.uint8)
+        full[1:9, 1:9] = [[int(ch) for ch in row] for row in tc.PRINTED_V1_BITS[int(tid)]]
+        tag = np.flipud(cv2.resize(full * 255, (side, side), interpolation=cv2.INTER_NEAREST))
+        cx, cy = int((x + m) * s), int((y + m) * s)
+        canvas[cy - side // 2:cy - side // 2 + side, cx - side // 2:cx - side // 2 + side] = tag
+    S = np.array([[s, 0, m * s], [0, s, m * s], [0, 0, 1]])
+    H = np.array([[0.62, 0.05, 60], [0.02, 0.55, 300], [0.0001, -0.0003, 1]]) @ np.diag([1.0, -1.0, 1.0])
+    img = cv2.warpPerspective(canvas, H @ np.linalg.inv(S), (480, 360), borderValue=255)
+    return cv2.resize(img, size, interpolation=cv2.INTER_AREA)
+
+
+def test_printed_v1_sheet_is_detected_and_fits():
+    img = _printed_v1_view((480, 360))
+    dets = tc.detect_tags(img)
+    assert sorted(dets) == [0, 1, 2, 3]
+    assert {d.family for d in dets.values()} == {"printed-v1"}
+    _, report = tc.fit_camera(dets, TAGS_MM, 45.0, (480, 360))
+    assert report["tag_family"] == "printed-v1"
+    assert report["tag_square_rms_mm"] < 3.0
+
+
+def test_real_36h11_is_not_read_as_printed_v1():
+    img, _ = _render()
+    assert {d.family for d in tc.detect_tags(img).values()} == {"36h11"}

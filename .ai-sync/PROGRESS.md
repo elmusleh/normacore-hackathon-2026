@@ -17,7 +17,7 @@
 - [x] Connect ElRobot USB serial cable and execute `./scripts/setup_usb_serial.sh`
 - [x] Launch NormaCore Station Web console and verify joint zero positions
 - [x] First physical hardware move to safe clearance height / live teleoperation
-- [ ] Place 4 AprilTag markers at workspace corners and calibrate camera (code ready: `./cli.sh calib`, docs/tcp_calibration.md; reprint the tags first, the old sheet was not real AprilTags)
+- [ ] Place 4 AprilTag markers at workspace corners and calibrate camera (code ready: `./cli.sh calib`, docs/tcp_calibration.md; the old printed 45 mm sheet works as family printed-v1 with 480 px frames)
 
 ## Phase 3: Agent Integration & Tabletop Primitives — IN PROGRESS
 - [x] Joint-level hardware bridge to the Station SDK written (`src/elrobot_hardware.py`), unit-tested offline (44 tests pass in total).
