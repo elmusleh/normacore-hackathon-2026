@@ -52,11 +52,25 @@ Upgrades `FeedingVisionDetector.detect_mouth()` in `src/feeding_vision.py`:
 
 ---
 
-## 4. Implementation & Test Checklist
+## 4. Per-User Calibration (Re-Calibrating Anytime for a New User)
+
+Each person can calibrate their own open-mouth threshold (`mar_open_threshold`) and eating standoff distance (`standoff_mouth_width_px`) in 5 seconds from Mission Control (`http://localhost:8080`):
+
+1. Start Mission Control: `.venv/bin/python src/digital_twin_server.py 8080` (or `./cli.sh start`) and open **http://localhost:8080**.
+2. Confirm your face is visible in **Person Cam** with the 4 yellow lip dots (`[mediapipe]`).
+3. In the right sidebar under **User Mouth & Distance Calibration**:
+   - **Step 1 (Closed):** Keep your mouth closed and click **`1. Capture Closed`**.
+   - **Step 2 (Open):** Open your mouth comfortably as if taking a bite and click **`2. Capture Open`** — computes `closed + 0.55 * (open - closed)` automatically and saves to `config/elrobot.json` under `feeding_vision`.
+   - **Step 3 (Distance):** Sit in your normal eating position and click **`📏 Set Eating Distance`** — saves `1.25 × current_mouth_width_px` as your standoff limit.
+   - **Manual Override / Reset:** Type exact numbers into the `MAR` / `Standoff px` boxes and click **`Save`**, or click **`↺ Reset Defaults`** (`MAR=0.26`, `95px`).
+
+---
+
+## 5. Implementation & Test Checklist
 
 - [x] **Step 1:** Install `mediapipe` in `.venv` and verify live lip landmarks on Person Cam (`OBSBOT`).
 - [x] **Step 2:** Implement `MouthStateTracker` (MediaPipe + MAR + EMA + 3-frame debounce + watchdog) and `FeedingSafetyFSM` in `src/feeding_vision.py`.
-- [x] **Step 3:** Surface live `MAR`, `mouth_open_confirmed`, and `FSM state` in Mission Control (`src/digital_twin_server.py` -> `http://localhost:8080`).
-- [x] **Step 4:** Add unit tests in `tests/test_pipeline.py` covering MAR calculation, 3-frame debounce, face-loss watchdog, and FSM transitions.
-- [ ] **Step 5 (Bench Test):** Start `./cli.sh reset && ./cli.sh start`, sit in front of OBSBOT Person Cam, verify `OPEN` / `CLOSED` mouth & standoff live on `http://localhost:8080`.
+- [x] **Step 3:** Surface live `MAR`, `mouth_open_confirmed`, and per-user calibration controls in Mission Control (`src/digital_twin_server.py`, `src/digital_twin.html` -> `http://localhost:8080`).
+- [x] **Step 4:** Add unit tests in `tests/test_pipeline.py` covering MAR calculation, 3-frame debounce, face-loss watchdog, FSM transitions, and live user calibration.
+- [x] **Step 5 (Bench Test — OBSBOT):** Verified live on OBSBOT (`closed: 0.00–0.02`, `open: 0.30–0.50`, clean no-face watchdog when turning away).
 - [ ] **Step 6 (Live Demo):** Teach `grape_pick` & `serve` waypoints, verify gripper direction, run Claude MCP dry-run (`ELROBOT_ALLOW_MOTION=0`) $\rightarrow$ live run (`ELROBOT_ALLOW_MOTION=1`).
