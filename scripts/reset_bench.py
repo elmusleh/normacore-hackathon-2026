@@ -97,8 +97,16 @@ def main() -> int:
     args = parser.parse_args()
 
     if not any([args.status, args.relax_leader, args.swap_arms, args.set_arms, args.clean_cameras]):
+        # Default quick reset (no arguments needed):
+        # 1. Show current bench config & daemons
+        # 2. If Station is running, relax Leader torque; otherwise apply manual camera exposure
         show_status()
-        return 0
+        procs = subprocess.run(["pgrep", "-f", "bin/station"], capture_output=True)
+        if procs.returncode == 0:
+            print("\nStation is running -> ensuring Leader (Master) torque is OFF...")
+            return relax_leader()
+        print("\nStation is stopped -> applying manual camera exposure...")
+        return clean_cameras()
 
     if args.set_arms:
         set_arms(args.set_arms[0], args.set_arms[1])

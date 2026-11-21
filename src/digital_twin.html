@@ -322,7 +322,7 @@
                 </div>
                 <div class="btn-group" style="margin-top: 6px;">
                     <button class="btn btn-secondary" onclick="sendAction('relax_leader')">🔓 Relax Leader (Torque Off)</button>
-                    <button class="btn btn-secondary" onclick="sendAction('swap_arms')">⇄ Swap Master / Slave</button>
+                    <button class="btn btn-secondary" onclick="refreshBench()">🔄 Refresh Bench</button>
                 </div>
                 <button class="btn btn-red" style="width: 100%; margin-top: 6px;" onclick="sendAction('estop')">⚠️ EMERGENCY STOP (Torque Off)</button>
             </div>
@@ -439,6 +439,12 @@
             const tableSrc = document.getElementById('select-cam-table')?.value;
             const personSrc = document.getElementById('select-cam-person')?.value;
             await sendAction('save_camera_defaults', { table: tableSrc, person: personSrc });
+        }
+
+        async function refreshBench() {
+            appendLog('Refreshing cameras, config & saved waypoints...', 'info');
+            await Promise.all([loadCameras(true), fetchState()]);
+            appendLog('Bench refresh complete.', 'success');
         }
 
         async function pollCamera(role) {

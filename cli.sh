@@ -23,6 +23,10 @@ print_usage() {
     print_header
     echo -e "${C_BOLD}Usage:${C_RESET} ./cli.sh <command> [options]"
     echo ""
+    echo -e "${C_BOLD}System Health & Diagnostics:${C_RESET}"
+    echo -e "  ${C_CYAN}check${C_RESET}               Diagnostic check of cameras, serial arms, Station, and rules"
+    echo -e "  ${C_CYAN}reset [opts]${C_RESET}        Quick bench reset (relax leader torque / apply camera exposure)"
+    echo ""
     echo -e "${C_BOLD}Mission Control (Web & Unified):${C_RESET}"
     echo -e "  ${C_CYAN}start [port]${C_RESET}        Launch unified Mission Control Web Dashboard & daemons (Default: 8080)"
     echo -e "  ${C_GREEN}feed [grapes|spoon]${C_RESET} Run camera-guided assistive feeding (detects grape bowl -> mouth via /dev/video4)"
@@ -76,6 +80,26 @@ COMMAND="${1:-help}"
 shift || true
 
 case "$COMMAND" in
+    check|status|health)
+        python3 scripts/system_health.py "$@"
+        ;;
+
+    reset)
+        python3 scripts/reset_bench.py "$@"
+        ;;
+
+    setup-cameras)
+        echo -e "${C_YELLOW}[+] Installing udev rule for USB cameras (Station libuvc access)...${C_RESET}"
+        if [ -f "scripts/99-normacore-cameras.rules" ]; then
+            sudo cp scripts/99-normacore-cameras.rules /etc/udev/rules.d/
+            sudo udevadm control --reload-rules
+            sudo udevadm trigger
+            echo -e "${C_GREEN}[OK] Camera udev rules installed. Unplug and replug the cameras if needed.${C_RESET}"
+        else
+            echo -e "${C_RED}[ERROR] scripts/99-normacore-cameras.rules not found.${C_RESET}"
+        fi
+        ;;
+
     test)
         echo -e "${C_GREEN}[+] Running pytest test suite...${C_RESET}"
         if [ -n "$1" ]; then
@@ -94,11 +118,19 @@ case "$COMMAND" in
         PORT="${1:-8080}"
         echo -e "${C_CYAN}[+] Launching Unified NormaCore Mission Control (http://localhost:${PORT})...${C_RESET}"
         
-        # Check if station is already running; if not, launch it
+        # Check if station is already running; if not, launch it in a new terminal window
         if ! ss -tulpn | grep -q ":8888"; then
-            echo -e "${C_YELLOW}[+] Starting background NormaCore Station daemon...${C_RESET}"
-            ./bin/station --web --tcp > /dev/null 2>&1 &
-            sleep 2
+            echo -e "${C_YELLOW}[+] Launching NormaCore Station daemon in a new terminal...${C_RESET}"
+            if command -v gnome-terminal > /dev/null 2>&1; then
+                gnome-terminal --title="NormaCore Station (TCP: 8888, Web: 8889)" -- bash -c "./bin/station --web --tcp; exec bash" &
+            elif command -v xfce4-terminal > /dev/null 2>&1; then
+                xfce4-terminal --title="NormaCore Station (TCP: 8888, Web: 8889)" -e "./bin/station --web --tcp" &
+            elif command -v xterm > /dev/null 2>&1; then
+                xterm -title "NormaCore Station" -e "./bin/station --web --tcp" &
+            else
+                ./bin/station --web --tcp > /dev/null 2>&1 &
+            fi
+            sleep 3
         else
             echo -e "${C_GREEN}[OK] NormaCore Station daemon already active on port 8888.${C_RESET}"
         fi
