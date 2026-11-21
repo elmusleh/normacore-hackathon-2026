@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `scripts/generate_apriltags.py` (`./cli.sh apriltags`) printed hand-typed patterns that are not AprilTags (8x8 inner grid; real 36h11 is 6x6), so no detector could read them. This includes `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`. The generator now takes the bits from OpenCV's 36h11 dictionary, defaults to an 80 mm black square (`--size-mm`) so tags stay readable in the Station's 299x224 frames, and keeps a white margin. Reprint the tags. Test: `tests/test_apriltags.py`.
+
 ### Added
 - Camera picture enhancement for food detection (`src/frame_enhance.py`): `look()` (MCP tool and console tiles) now denoises, white-balances against the table, applies auto gamma, CLAHE local contrast and light sharpening (~9 ms per 299x224 frame). Settings in `config/elrobot.json` → `camera_enhance` (defaults in `src/elrobot_config.py`, per-camera overrides). `look(raw=True)` / `/frame/<cam>?raw=1` return the untouched frame. Each look reports `exposure` (mean, pure-white and black share) and an `exposure_warning` when the camera is over- or underexposed. ACT demo recordings stay raw.
 - `./cli.sh cameras --tune [name] [--write]`: sweeps exposure on a camera (Station stopped), measures each picture and recommends (or saves) the best exposure. `camera_settings.<name>.controls` applies any other V4L2 control (gain, white balance, backlight compensation); controls a camera lacks are skipped.
