@@ -335,16 +335,27 @@ class CameraHub:
                 # Only run real face/mouth detection on the Person camera (skip fake fallback boxes)
                 mouth = feeding_detector.detect_mouth(frame)
                 if mouth and not (mouth.extra or {}).get("fallback", False):
+                    extra = dict(mouth.extra or {})
                     u, v, w, h = mouth.u_px, mouth.v_px, mouth.width_px, mouth.height_px
-                    at_standoff = bool((mouth.extra or {}).get("at_standoff", False))
+                    at_standoff = bool(extra.get("at_standoff", False))
+                    mouth_open = bool(extra.get("mouth_open", False))
+                    confirmed = bool(extra.get("mouth_open_confirmed", False))
+                    mar = extra.get("mar")
+                    detector_name = extra.get("detector", "opencv")
+
                     color = (0, 220, 120) if not at_standoff else (0, 165, 255)
                     cv2.rectangle(annotated_bgr, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), color, 2)
+                    for pt in extra.get("lip_points") or []:
+                        cv2.circle(annotated_bgr, (int(pt[0]), int(pt[1])), 3, (0, 255, 255), -1)
+
+                    mouth_tag = "OPEN!" if confirmed else ("opening" if mouth_open else "closed")
+                    mar_tag = f" MAR={mar:.2f}" if mar is not None else ""
                     cv2.putText(
                         annotated_bgr,
-                        f"MOUTH ({mouth.extra.get('standoff_cm', '?')}cm)",
-                        (max(8, u - 55), max(22, v - h // 2 - 8)),
+                        f"MOUTH {mouth_tag}{mar_tag} ({extra.get('standoff_cm', '?')}cm)",
+                        (max(8, u - 75), max(22, v - h // 2 - 8)),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
+                        0.48,
                         color,
                         2,
                     )
@@ -353,10 +364,10 @@ class CameraHub:
                         "u_px": u,
                         "v_px": v,
                         "confidence": round(float(mouth.confidence), 2),
-                        "extra": dict(mouth.extra or {}),
+                        "extra": extra,
                     }
-                    standoff_txt = "STOP: AT STANDOFF" if at_standoff else f"{mouth.extra.get('standoff_cm', '?')}cm (SAFE)"
-                    parts.append(f"Face/Mouth detected — {standoff_txt}")
+                    standoff_txt = "STOP: AT STANDOFF" if at_standoff else f"{extra.get('standoff_cm', '?')}cm (SAFE)"
+                    parts.append(f"[{detector_name}] Mouth {mouth_tag}{mar_tag} — {standoff_txt}")
             else:
                 # Table camera: only draw real detections (never fake fallback placeholders)
                 bowl = feeding_detector.detect_grape_bowl(frame)

@@ -19,7 +19,10 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import math
+import time
 from dataclasses import dataclass, asdict
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
@@ -40,6 +43,172 @@ log = logging.getLogger("elrobot.feeding")
 STANDOFF_MOUTH_WIDTH_PX = 95
 DEFAULT_FRAME_W = 640
 DEFAULT_FRAME_H = 480
+MAR_OPEN_THRESHOLD = 0.25
+MOUTH_OPEN_DEBOUNCE_FRAMES = 3
+FACE_WATCHDOG_TIMEOUT_S = 0.5
+DEFAULT_FACE_LANDMARKER_MODEL = Path(__file__).resolve().parent.parent / "data" / "face_landmarker.task"
+
+# MediaPipe FaceLandmarker lip landmark indices
+LM_UPPER_INNER_LIP = 13
+LM_LOWER_INNER_LIP = 14
+LM_LEFT_MOUTH_CORNER = 61
+LM_RIGHT_MOUTH_CORNER = 291
+
+
+class MouthStateTracker:
+    """EMA-smoothed lip tracker with 3-frame mouth-open debounce and face-loss watchdog."""
+
+    def __init__(
+        self,
+        alpha: float = 0.35,
+        mar_threshold: float = MAR_OPEN_THRESHOLD,
+        debounce_frames: int = MOUTH_OPEN_DEBOUNCE_FRAMES,
+        watchdog_timeout_s: float = FACE_WATCHDOG_TIMEOUT_S,
+    ) -> None:
+        self.alpha = alpha
+        self.mar_threshold = mar_threshold
+        self.debounce_frames = debounce_frames
+        self.watchdog_timeout_s = watchdog_timeout_s
+        self._ema_u: Optional[float] = None
+        self._ema_v: Optional[float] = None
+        self._ema_w: Optional[float] = None
+        self._ema_mar: Optional[float] = None
+        self.open_streak: int = 0
+        self.last_face_seen_t: Optional[float] = None
+
+    @staticmethod
+    def compute_mar(
+        upper: Tuple[float, float],
+        lower: Tuple[float, float],
+        left: Tuple[float, float],
+        right: Tuple[float, float],
+    ) -> float:
+        """Compute Mouth Aspect Ratio (vertical lip gap / horizontal mouth width)."""
+        horiz = math.hypot(right[0] - left[0], right[1] - left[1])
+        if horiz <= 1e-6:
+            return 0.0
+        vert = math.hypot(lower[0] - upper[0], lower[1] - upper[1])
+        return round(vert / horiz, 3)
+
+    def _ema(self, prev: Optional[float], val: float) -> float:
+        if prev is None:
+            return val
+        return self.alpha * val + (1.0 - self.alpha) * prev
+
+    def update(
+        self,
+        u: float,
+        v: float,
+        width_px: float,
+        mar: float,
+        now: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        ts = time.monotonic() if now is None else now
+        self.last_face_seen_t = ts
+        self._ema_u = self._ema(self._ema_u, float(u))
+        self._ema_v = self._ema(self._ema_v, float(v))
+        self._ema_w = self._ema(self._ema_w, float(width_px))
+        self._ema_mar = self._ema(self._ema_mar, float(mar))
+
+        mouth_open = self._ema_mar >= self.mar_threshold
+        self.open_streak = (self.open_streak + 1) if mouth_open else 0
+        confirmed = self.open_streak >= self.debounce_frames
+
+        return {
+            "u_px": int(round(self._ema_u)),
+            "v_px": int(round(self._ema_v)),
+            "width_px": int(round(self._ema_w)),
+            "mar": round(self._ema_mar, 3),
+            "mouth_open": mouth_open,
+            "mouth_open_confirmed": confirmed,
+            "open_streak": self.open_streak,
+            "face_lost": False,
+        }
+
+    def check_watchdog(self, now: Optional[float] = None) -> bool:
+        """Return True if a previously tracked face has been missing longer than watchdog_timeout_s."""
+        if self.last_face_seen_t is None:
+            return False
+        ts = time.monotonic() if now is None else now
+        if (ts - self.last_face_seen_t) > self.watchdog_timeout_s:
+            self.open_streak = 0
+            return True
+        return False
+
+
+class FeedingSafetyFSM:
+    """Deterministic safety state machine for assistive facial feeding (ada_feeding pattern)."""
+
+    STATES = (
+        "IDLE",
+        "APPROACH",
+        "HOLD_STANDOFF",
+        "WAIT_MOUTH_OPEN",
+        "RELEASE",
+        "RETRACT",
+        "EMERGENCY_HOLD",
+    )
+
+    def __init__(self) -> None:
+        self.state: str = "IDLE"
+        self.reason: str = "ready"
+
+    def reset(self) -> str:
+        self.state = "IDLE"
+        self.reason = "reset"
+        return self.state
+
+    def step(
+        self,
+        *,
+        face_detected: bool,
+        mouth_open_confirmed: bool = False,
+        at_standoff: bool = False,
+        too_close: bool = False,
+        holding_object: bool = False,
+        face_lost: bool = False,
+        stop_requested: bool = False,
+    ) -> str:
+        """Advance one FSM step with hard safety overrides."""
+        if stop_requested:
+            self.state = "EMERGENCY_HOLD"
+            self.reason = "stop_requested"
+            return self.state
+
+        if too_close and self.state in ("APPROACH", "HOLD_STANDOFF", "WAIT_MOUTH_OPEN"):
+            self.state = "EMERGENCY_HOLD"
+            self.reason = "too_close_to_face"
+            return self.state
+
+        if (face_lost or not face_detected) and self.state in ("APPROACH", "HOLD_STANDOFF", "WAIT_MOUTH_OPEN"):
+            self.state = "EMERGENCY_HOLD"
+            self.reason = "face_lost_watchdog"
+            return self.state
+
+        if self.state == "IDLE":
+            if holding_object and face_detected:
+                self.state = "APPROACH"
+                self.reason = "food_ready_and_face_visible"
+        elif self.state == "APPROACH":
+            if at_standoff:
+                self.state = "HOLD_STANDOFF"
+                self.reason = "standoff_reached"
+        elif self.state == "HOLD_STANDOFF":
+            self.state = "WAIT_MOUTH_OPEN"
+            self.reason = "awaiting_mouth_open_confirmation"
+        elif self.state == "WAIT_MOUTH_OPEN":
+            if mouth_open_confirmed:
+                self.state = "RELEASE"
+                self.reason = "mouth_open_confirmed_3_frames"
+        elif self.state == "RELEASE":
+            self.state = "RETRACT"
+            self.reason = "bite_delivered"
+        elif self.state == "RETRACT":
+            if not holding_object:
+                self.state = "IDLE"
+                self.reason = "returned_to_clear"
+
+        return self.state
 
 
 @dataclass
@@ -62,6 +231,27 @@ class FeedingVisionDetector:
         self.calibrator = calibrator or self._default_calibrator()
         self._face_cascade = self._load_cascade("haarcascade_frontalface_default.xml")
         self._smile_cascade = self._load_cascade("haarcascade_smile.xml")
+        self.mouth_tracker = MouthStateTracker()
+        self.safety_fsm = FeedingSafetyFSM()
+        self._landmarker = self._load_mediapipe_landmarker()
+
+    @staticmethod
+    def _load_mediapipe_landmarker():
+        """Load MediaPipe FaceLandmarker if mediapipe and data/face_landmarker.task are available."""
+        if not DEFAULT_FACE_LANDMARKER_MODEL.is_file():
+            return None
+        try:
+            from mediapipe.tasks import python as mp_python
+            from mediapipe.tasks.python import vision as mp_vision
+
+            opts = mp_vision.FaceLandmarkerOptions(
+                base_options=mp_python.BaseOptions(model_asset_path=str(DEFAULT_FACE_LANDMARKER_MODEL)),
+                num_faces=1,
+            )
+            return mp_vision.FaceLandmarker.create_from_options(opts)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("MediaPipe FaceLandmarker unavailable, using OpenCV fallback: %s", exc)
+            return None
 
     @staticmethod
     def _default_calibrator() -> TabletopCalibrator:
@@ -189,7 +379,69 @@ class FeedingVisionDetector:
         )
 
     def detect_mouth(self, bgr: np.ndarray) -> DetectedTarget:
-        """Detect person's face and mouth location in the frame, with distance standoff check."""
+        """Detect person's face and mouth via MediaPipe FaceLandmarker (with OpenCV fallback)."""
+        h_img, w_img = bgr.shape[:2]
+
+        # 1. Preferred: MediaPipe FaceLandmarker (3D lip landmarks + MAR + EMA + 3-frame debounce)
+        if self._landmarker is not None:
+            try:
+                import mediapipe as mp
+
+                rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+                mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+                result = self._landmarker.detect(mp_img)
+                if result.face_landmarks:
+                    lms = result.face_landmarks[0]
+                    upper = (lms[LM_UPPER_INNER_LIP].x * w_img, lms[LM_UPPER_INNER_LIP].y * h_img)
+                    lower = (lms[LM_LOWER_INNER_LIP].x * w_img, lms[LM_LOWER_INNER_LIP].y * h_img)
+                    left = (lms[LM_LEFT_MOUTH_CORNER].x * w_img, lms[LM_LEFT_MOUTH_CORNER].y * h_img)
+                    right = (lms[LM_RIGHT_MOUTH_CORNER].x * w_img, lms[LM_RIGHT_MOUTH_CORNER].y * h_img)
+
+                    raw_u = (left[0] + right[0]) * 0.5
+                    raw_v = (upper[1] + lower[1]) * 0.5
+                    raw_w = max(20.0, math.hypot(right[0] - left[0], right[1] - left[1]))
+                    raw_h = max(12.0, math.hypot(lower[0] - upper[0], lower[1] - upper[1]) + 10.0)
+                    mar = MouthStateTracker.compute_mar(upper, lower, left, right)
+
+                    tracked = self.mouth_tracker.update(raw_u, raw_v, raw_w, mar)
+                    mu, mv, mw = tracked["u_px"], tracked["v_px"], tracked["width_px"]
+                    mh = int(round(raw_h))
+                    at_standoff = mw >= STANDOFF_MOUTH_WIDTH_PX
+                    x_mm, y_mm = self.pixel_to_mm(mu, mv)
+                    x_mm = max(-160.0, min(160.0, x_mm))
+                    y_mm = max(110.0, min(260.0, y_mm))
+
+                    return DetectedTarget(
+                        label="person_mouth",
+                        u_px=mu,
+                        v_px=mv,
+                        x_mm=x_mm,
+                        y_mm=y_mm,
+                        width_px=mw,
+                        height_px=mh,
+                        confidence=0.96,
+                        extra={
+                            "detector": "mediapipe",
+                            "face_detected": True,
+                            "mar": tracked["mar"],
+                            "mouth_open": tracked["mouth_open"],
+                            "mouth_open_confirmed": tracked["mouth_open_confirmed"],
+                            "open_streak": tracked["open_streak"],
+                            "at_standoff": at_standoff,
+                            "standoff_cm": round(max(5.0, 15.0 * (60.0 / max(mw, 25))), 1),
+                            "waypoint": "serve",
+                            "lip_points": [
+                                (int(upper[0]), int(upper[1])),
+                                (int(lower[0]), int(lower[1])),
+                                (int(left[0]), int(left[1])),
+                                (int(right[0]), int(right[1])),
+                            ],
+                        },
+                    )
+            except Exception as exc:  # noqa: BLE001
+                log.debug("MediaPipe detect_mouth failed, falling back to OpenCV: %s", exc)
+
+        # 2. Fallback: OpenCV Haar cascade face detection
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
         faces = []
         if self._face_cascade is not None:

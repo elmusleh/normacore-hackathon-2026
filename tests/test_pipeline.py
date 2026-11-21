@@ -145,6 +145,48 @@ def test_camera_feeding_vision_and_orchestration():
     assert res_spoon["cartesian"]["standoff_pose"]["z"] == 110.0
 
 
+def test_mouth_state_tracker_and_feeding_safety_fsm():
+    from src.feeding_vision import FeedingSafetyFSM, MouthStateTracker
+
+    # 1. MAR calculation
+    mar_closed = MouthStateTracker.compute_mar((100, 100), (100, 104), (80, 102), (120, 102))
+    mar_open = MouthStateTracker.compute_mar((100, 92), (100, 112), (80, 102), (120, 102))
+    assert mar_closed < 0.2
+    assert mar_open >= 0.45
+
+    # 2. EMA smoothing + 3-frame mouth-open debounce + watchdog
+    tracker = MouthStateTracker(alpha=0.5, mar_threshold=0.25, debounce_frames=3, watchdog_timeout_s=0.5)
+    r1 = tracker.update(320, 200, 60, mar_open, now=10.0)
+    assert r1["mouth_open"] is True and r1["mouth_open_confirmed"] is False
+    r2 = tracker.update(322, 200, 60, mar_open, now=10.1)
+    assert r2["mouth_open_confirmed"] is False
+    r3 = tracker.update(320, 200, 60, mar_open, now=10.2)
+    assert r3["mouth_open_confirmed"] is True and r3["open_streak"] == 3
+    assert tracker.check_watchdog(now=10.4) is False
+    assert tracker.check_watchdog(now=10.8) is True
+    assert tracker.open_streak == 0
+
+    # 3. FeedingSafetyFSM happy path & emergency hold overrides
+    fsm = FeedingSafetyFSM()
+    assert fsm.state == "IDLE"
+    assert fsm.step(face_detected=True, holding_object=True) == "APPROACH"
+    assert fsm.step(face_detected=True, at_standoff=True, holding_object=True) == "HOLD_STANDOFF"
+    assert fsm.step(face_detected=True, at_standoff=True, holding_object=True) == "WAIT_MOUTH_OPEN"
+    assert fsm.step(face_detected=True, mouth_open_confirmed=False, holding_object=True) == "WAIT_MOUTH_OPEN"
+    assert fsm.step(face_detected=True, mouth_open_confirmed=True, holding_object=True) == "RELEASE"
+    assert fsm.step(face_detected=True, holding_object=True) == "RETRACT"
+    assert fsm.step(face_detected=True, holding_object=False) == "IDLE"
+
+    # Face lost during approach -> EMERGENCY_HOLD
+    fsm.step(face_detected=True, holding_object=True)
+    assert fsm.step(face_detected=False, face_lost=True, holding_object=True) == "EMERGENCY_HOLD"
+    assert fsm.reason == "face_lost_watchdog"
+
+    # Explicit stop -> EMERGENCY_HOLD
+    fsm.reset()
+    assert fsm.step(face_detected=True, stop_requested=True) == "EMERGENCY_HOLD"
+    assert fsm.reason == "stop_requested"
+
 
 if __name__ == "__main__":
     pytest.main(["-v", "tests/test_pipeline.py"])

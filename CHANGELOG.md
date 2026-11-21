@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Implemented MediaPipe `FaceLandmarker` lip-landmark mouth tracking (`MouthStateTracker` with MAR, EMA smoothing, 3-frame mouth-open debounce, and 0.5 s face-loss watchdog) and deterministic `FeedingSafetyFSM` in `src/feeding_vision.py`, wired live MAR/lip overlays into Mission Control (`src/digital_twin_server.py`), documented the plan in `docs/FEEDING_FSM_MEDIAPIPE_PLAN.md`, and added unit tests in `tests/test_pipeline.py`.
 - Added readback verification and automatic retries (up to 4×) to `ElRobotHardware.set_torque` (`src/elrobot_hardware.py`) so `./cli.sh hw stop` and `torque off` never leave individual ST3215 motors stuck ON if a broadcast sync-write packet is dropped.
 - Fixed `hw_day.py` bus selection in `scripts/reset_bench.py` and `src/digital_twin_server.py` to pass `ELROBOT_BUS` via environment variable instead of a pre-subcommand `--bus` flag.
 - Wired `./cli.sh reset` (zero-arg quick bench reset: relaxes leader torque when Station is running or applies manual camera exposure when stopped), replaced Mission Control's Swap button with a safe **Refresh Bench** button (`src/digital_twin.html`, `scripts/reset_bench.py`, `cli.sh`), and included `./cli.sh check` (`scripts/system_health.py`).
