@@ -1,6 +1,6 @@
 ---
-last_agent: antigravity
-timestamp: 2026-11-21T15:46:00Z
+last_agent: claude
+timestamp: 2026-11-21T17:30:00Z
 status: camera-feeding-pipeline-ready
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (Assistive Feeding)"
 current_task: "Camera-guided assistive feeding (grapes & spoon -> mouth) implemented and verified"
@@ -9,7 +9,26 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
-## Latest session (2026-11-21 afternoon): Camera-Guided Assistive Feeding (`./cli.sh feed`)
+## Latest session (2026-11-21, ~18:00): Claude picks the recorded plan from the request
+- User request: "I want grapes" -> Claude decides which recorded plan to run and runs it.
+- `config/elrobot.json` `foods`: grapes -> sequence `grapes`, chocolate -> sequence `choc` (`feed` is an older grapes plan, not mapped). Plan task 4.1/4.3.
+- New `src/sequence_player.py`: plan_legs / wait_settled / run_legs (moved out of `hw_day.cmd_play`, which now uses it). Default tolerance 60 (CLI and agent).
+- MCP tools `list_sequences`, `play_sequence(name)` (`src/robot_tools.py`, `src/robot_mcp_server.py`); `stop` now calls `RobotTools.stop_now()` which skips the tool lock and sets an abort event checked between legs and during the pause. Agent settings `agent.sequence_speed/sequence_pause_s/sequence_tolerance_steps`.
+- Prompts: MCP INSTRUCTIONS and `CONSOLE_PROMPT` say recorded plans come first; one play_sequence call, no extra moves; unknown food -> say what's available.
+- Tests: 104 pass. Committed on branch `jafer` (the old remote `jafer` was merged into main and deleted; pushed again as a new branch). Live check: foods/plans load and are ready; dry-run against the arm not possible (Station sent no motor frames at the time).
+- `.mcp.json` now has ELROBOT_ALLOW_MOTION "1" (committed by Jafer: Claude moves the real arm). NOT verified: a real play_sequence via Claude, and stop() interrupting it over MCP (unit-tested only).
+
+## Latest session (2026-11-21, 17:30): waypoint sequences `hw record` / `hw play`
+- User request: record feeding waypoints, combine them into one run, ONE MOVE prompt for the whole run, pause 1-2 s per waypoint and wait until the arm has fully stopped.
+- `./cli.sh hw record <seq>`: interactive, moves nothing. Each step saves the current pose as a waypoint (Enter = `<seq>_<n>`, existing name -> use saved pose / overwrite / cancel) and saves the order to `config/sequences.json` after every step.
+- `./cli.sh hw play <seq>` (or `hw play wp1 wp2 ...`): plans every leg up front (clamped goals, biggest move, LARGE MOVE), teleop drift check, ONE MOVE prompt. Per leg: `move_and_watch`, then `_wait_settled` (no motor moves > 2 steps for 0.5 s, timeout 5 s), then target check (<= 12 steps), then `--pause` (default 1.5 s, not after the last leg). Any failure or Ctrl-C -> `hw.hold(all)` and stop. `hw sequences` lists them.
+- Files: `scripts/hw_day.py`, `src/elrobot_config.py` (`SEQUENCES_FILE`, `load/save_sequences`), `cli.sh` (help), `docs/elrobot_hardware_bridge.md` (Sequences section), `tests/test_hw_day.py` (8 new tests).
+- Build: 93 passed, 1 failed (`test_camera_feeding_vision_and_orchestration` needs `cv2`, not installed on this laptop; unrelated). `bash -n cli.sh` OK.
+- NOT verified on the real arm. Next: `./cli.sh hw record feed` (e.g. clear, grape_hover, grape, grape_grip, grape_lift, serve, serve_release, clear), teleop off, `hw torque on`, `hw play feed --speed 200`.
+- First live runs (17:19, 17:21): legs stopped with `timeout` because motors 3/4 settle 22-32 steps short of the goal with low current (gravity; mid-range, not a limit), and the 12-step check then waited for the timeout. Fix: `move_and_watch(near_tolerance=..., stall_s=0.8)` in `src/elrobot_hardware.py` returns "near" for a motor that stopped within near_tolerance (no overload); `hw play --tolerance` (default 40) uses it and prints "stopped short". MCP/goto unchanged (still 12). Restored user's `start` waypoint (agent accidentally re-taught it from a stopped pose).
+- Arms CONFIRMED by the user: follower 5B61034962, leader 5B61037051 (as in `config/elrobot.json`). Older notes below that say the opposite are wrong. Fixed the swapped roles in `scripts/teleop_sync.py` (auto-detect and `--swap`; it used to drive the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` (comment), `docs/team_setup.md`, PROGRESS.md.
+
+## Earlier session (2026-11-21 afternoon): Camera-Guided Assistive Feeding (`./cli.sh feed`)
 
 - **What Changed:**
   - Implemented `src/feeding_vision.py` (`FeedingVisionDetector` and `run_camera_feeding_cycle`): captures frames from `/dev/video4` (overhead tabletop camera, with fallback to `/dev/video2` or `MockStation`), detects the **bowl with grapes**, **spoon holder**, and **person's mouth** (with 5–10 cm standoff protection), draws live bounding boxes and feeding vector overlays, and orchestrates slave arm motions via `RobotTools` and `KinematicsSafetyEngine`.
