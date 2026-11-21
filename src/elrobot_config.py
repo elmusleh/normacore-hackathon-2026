@@ -36,6 +36,20 @@ DEFAULTS: Dict[str, Any] = {
     # motor id (string) -> current threshold; missing motors use the default
     "current_threshold": {},
     "default_current_threshold": DEFAULT_CURRENT_THRESHOLD,
+    # Gripper (motor 8). open_at: which end of the calibrated range is OPEN ("max" or "min").
+    # Not checked on the arm yet: run ./cli.sh hw identify and set verified to true.
+    "gripper": {"motor": 8, "open_at": "max", "verified": False, "squeeze_steps": 10},
+    # Friendly camera names for the MCP server, e.g. {"table": "usbvideo/<hash>"}.
+    "cameras": {},
+    # Fixed exposure per named camera, applied by ./cli.sh cameras (auto exposure washes out under the Station).
+    "camera_settings": {},
+    # Limits for moves requested by Claude through the MCP server (src/robot_mcp_server.py).
+    "agent": {
+        "max_speed": 500,
+        "max_waypoint_delta_steps": 600,
+        "max_nudge_percent": 5.0,
+        "clear_waypoint": "clear",
+    },
     "workspace": {
         # Measured on the real table with a tape measure. Relative to the arm base, in mm.
         "x_min_mm": -180.0,

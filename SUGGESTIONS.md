@@ -1,6 +1,27 @@
 ### Post-Implementation Suggestions
 
-1. Calibrate tabletop homography with printed AprilTags — Priority 95% (Critical) [Best practices]
+1. Teach and lock the 6 assistive feeding waypoints on the follower arm (`zone_a_hover`, `zone_a`, `serve`, `spoon_holder`, `bowl_scoop`, `serve_spoon`) — Priority 94% (Critical) [Best practices]
+   What: Pose the physical follower arm by hand (with torque off) at the grape bowl, spoon holder, and a 7 cm standoff in front of the diner's mouth, and save each pose with `./cli.sh hw teach <name>`.
+   Why: The camera-guided feeding controller (`./cli.sh feed`) maps detected food and mouth targets directly to these verified joint waypoints so the arm moves smoothly without inverse-kinematics guesswork near a person's face.
+   How: With the Station running and torque off, guide the gripper to each position and run `./cli.sh hw teach clear`, `./cli.sh hw teach zone_a_hover`, `./cli.sh hw teach zone_a`, and `./cli.sh hw teach serve`, then commit `config/waypoints.json`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Requires the physical USB hub to be re-seated and the hardware owner to position the arm at the bench.
+
+2. Add a live mouth-open trigger confirmation before releasing a grape at the facial standoff — Priority 86% (High value) [Security]
+   What: Require the camera detector to see the diner's mouth stay open for 3 consecutive frames at the `serve` standoff pose before opening the gripper to release the grape.
+   Why: Prevents dropping a grape prematurely while the diner is still leaning in or speaking, making the feeding handover safe and comfortable.
+   How: In `src/feeding_vision.py`, poll `detect_mouth()` 3 times at 0.2 s intervals after reaching the `serve` waypoint and only call `set_gripper(60)` once `mouth_open` is true in all 3 frames.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Best tuned with a teammate sitting in front of the live camera during the Stage 2 bench rehearsal.
+
+3. Add an automatic USB hub health banner to `./cli.sh feed` and Mission Control — Priority 76% (High value) [Professionalism]
+   What: Check whether `/dev/video4` and `/dev/ttyACM0`–`1` are present before starting a feeding cycle, and print a clear warning if the USB hub has dropped them.
+   Why: We observed the bus-3 port-4 USB hub drop both cameras and serial adapters mid-session; an immediate visual alert saves debugging time during live demos.
+   How: Check `Path("/dev/video4").exists()` and `list(Path("/dev").glob("ttyACM*"))` in `scripts/camera_feed_arm.py` and include a `"usb_hub_healthy"` flag in `/api/state` in `src/digital_twin_server.py`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Keep the current change focused on the camera-to-slave-arm feeding pipeline.
+
+4. Calibrate tabletop homography with printed AprilTags — Priority 95% (Critical) [Best practices]
    What: Place the printed 4-corner AprilTags on the workspace table under `/dev/video2` or `/dev/video4` and run `python3 scripts/calibrate_camera.py`.
    Why: Transforms 2D image coordinates into exact millimeter $(X, Y)$ coordinates relative to the arm base, allowing autonomous agents to see objects on the table without coordinate hallucinations.
    How: Print `docs/apriltags_printable.html` or display on a smartphone, place at table corners, and execute `python3 scripts/calibrate_camera.py`.

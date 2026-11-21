@@ -14,7 +14,8 @@ This project uses `.ai-sync/` for cross-platform AI agent synchronization.
 2. Note any modified files you did not touch; they belong to someone else.
 3. Read `.ai-sync/HANDOFF.md` — current state, what was done, what's next, who owns the hardware
 4. Read `.ai-sync/PROGRESS.md` — completed vs pending tasks
-5. Read `.ai-sync/PLAN.md` — the implementation plan (do not deviate)
+5. Read `docs/FEEDING_ASSISTANT_PLAN.md` — the current team plan, safety rules and task list (do not deviate)
+6. Read `.ai-sync/PLAN.md` only for history
 
 ## During Work
 - Check off completed tasks in PROGRESS.md

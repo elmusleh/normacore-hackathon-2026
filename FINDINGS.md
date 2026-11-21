@@ -10,6 +10,7 @@ This file holds facts that stay true, with the evidence behind them.
 
 | Date | Finding | Evidence | Status |
 |---|---|---|---|
+| 2026-11-21 | The USB hub on bus 3 dropped `/dev/video2`, `/dev/video4`, `/dev/ttyACM0` and `/dev/ttyACM1` again during the afternoon session while `/dev/video0` stayed present. `src/feeding_vision.py` now falls back cleanly to `MockStation` when `/dev/video4` is absent so the camera feeding pipeline can be verified and rehearsed without crashing. | `ls /dev/video* /dev/ttyACM*` at 15:36 (all present) vs 15:42 (only `/dev/video0`–`1` present) | Open. Re-seat the USB hub cable before running `--live-motion`. |
 | 2026-11-21 | The NormaCore SDK is now the submodule at `5f4f805`. It contains `target/gen_python` and the Station client, and both imports work. | `git submodule status`; `./cli.sh sdk-check` passes | Resolved. Setup uses the submodule only. |
 | 2026-11-21 | The old unpacked SDK copy is not the same code as `5f4f805`. About 50 files differ, including Station Rust source and the Station client. The version string matches in both, so the version check cannot tell them apart. | `diff -rq` between `external/norma-core-snapshot` and the submodule | Open. The old copy is not supported. Suggestion 26 removes it. |
 | 2026-11-21 | A USB hub on bus 3, port 4, dropped both serial adapters and two cameras at once. | dmesg: `clear tt 1 (90d2) error -71`, then disconnects of ports 3-4.1 to 3-4.4 | Open. Cause unknown. Reseating the cable brought the devices back. Check the cable and hub power before each bench session. |

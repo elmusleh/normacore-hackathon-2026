@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Camera-guided assistive feeding pipeline (`src/feeding_vision.py`, `scripts/camera_feed_arm.py`, and `./cli.sh feed [grapes|spoon]`): uses the overhead tabletop camera (`/dev/video4` with automatic Station/mock fallback) to detect the grape bowl, spoon holder, and person's mouth, and plans/executes safe slave arm motions stopping at a 5–10 cm facial standoff.
+- Mission Control Web Dashboard (`src/digital_twin.html` & `src/digital_twin_server.py`) integration for one-click `Feed Grapes (Bowl -> Mouth)` and `Feed with Spoon (Scoop -> Mouth)` actions with live annotated camera overlays.
+- Unit tests for `FeedingVisionDetector` and `run_camera_feeding_cycle` in `tests/test_pipeline.py`.
+- Real MCP server for the physical arm, `src/robot_mcp_server.py` (mcp 2.x `MCPServer`, stdio), with tool logic in `src/robot_tools.py`: `look`, `list_cameras`, `get_robot_state`, `list_waypoints`, `go_to_waypoint`, `nudge_joint`, `set_gripper`, `stop`, `enable_torque`, `teach_waypoint`. Motion is off unless `ELROBOT_ALLOW_MOTION=1`; waypoint moves route through `clear`; nudges capped at 5%; Claude cannot turn torque off. Gripper stall while closing is reported as `holding_object`.
+- Camera frames from Station `usbvideo/<hash>` queues (`src/elrobot_camera.py`), and `read_recent`/`read_first` queue reads in the hardware bridge.
+- `gripper`, `cameras` and `agent` sections in `config/elrobot.json` defaults.
+- `tests/test_robot_mcp.py` (14 tests: fake arm, camera decode against the SDK, tool registration). Guide `docs/mcp_server.md`.
 - `./cli.sh start`: single-command unified launcher that boots the Station daemon and serves the Mission Control Web UI at `http://localhost:8080`.
 - Web Mission Control Dashboard (`src/digital_twin.html` & `src/digital_twin_server.py`):
   * Real-time Master/Slave teleop toggle (50Hz)
@@ -19,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`: printable PDF containing standard 36h11 fiducial markers for overhead camera homography calibration.
 
 ### Changed
+- `.mcp.json` and `./cli.sh mcp` now run the real-arm server from `.venv`. Previously `.mcp.json` pointed at `src/mcp_server.py`, which is not an MCP server, so no tools registered.
+- `requirements.txt`: `mcp>=2.0.0`, numpy no longer capped below 2 (no 1.x wheels for Python 3.13).
 - `config/elrobot.json`: set default follower serial bus to `5B61037051`.
 - `cli.sh`: integrated `teleop` command.
 - Downgraded numpy to `<2` (1.26.4) to fix OpenCV ABI compatibility on Python 3.12.
@@ -37,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/agent_sync.sh` and `./cli.sh sync`: fetch from origin, then fast-forward only when the tree is clean and the branch is behind. Never stashes, resets or force-pulls. Lists commits on `origin/main` since the branch split. Exit codes separate offline, dirty, diverged and no-upstream states. `AGENTS.md` On Start now requires running it before implementing.
 - New `docs/team_setup.md` (new-machine setup, serial permissions, cameras, common problems) and `docs/bench_safety.md` (before, during and after motion tests, stop procedure).
 
-### Added
+### Added (earlier)
 - Master CLI runner `cli.sh` providing commands for `test`, `demo`, `digital-twin`, `station`, `setup-serial`, `apriltags`, `view-camera`, `mcp`, and `urdf`.
 - Interactive 3D WebGL Digital Twin (`src/digital_twin.html` and `src/digital_twin_server.py`) with Three.js tabletop visualization, live camera feeds, kinematics telemetry, and perturbation triggers.
 - Unit test for Digital Twin assets in `tests/test_pipeline.py`.

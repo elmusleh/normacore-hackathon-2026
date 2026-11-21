@@ -27,14 +27,21 @@
 - [x] Hardware-day checklist and safe commands in `./cli.sh hw` (`scripts/hw_day.py`)
 - [ ] Run preflight with the ElRobot powered and USB connected; confirm motors 1–8 and calibration
 - [x] Motor identification wizard, torque on/off, overload guard, current probe, waypoints (teach/goto), workspace config (`scripts/hw_day.py`, `src/elrobot_hardware.py`, `src/elrobot_config.py`)
+- [x] Camera-guided assistive feeding vision detector & slave arm controller for grape bowl, spoon, and person mouth target (`src/feeding_vision.py`, `scripts/camera_feed_arm.py`, `./cli.sh feed`)
 - [ ] Identify motors on the arm (`./cli.sh hw identify`) and confirm directions
 - [ ] Probe current per motor and save thresholds (`./cli.sh hw probe-current <m>`)
 - [ ] Teach home and clear poses, then test goto both ways
 - [ ] Measure the table and set `workspace.measured` to true
-- [ ] Connect MCP server to live NormaCore Station runtime (`gremlin_py`)
+- [x] Real MCP server for the live Station (`src/robot_mcp_server.py`, `src/robot_tools.py`): camera, state, waypoints, gripper, nudge, stop. Tested offline and over stdio; not yet run against the arm
+- [x] Cameras on the real Station: udev rule, named by USB port, fixed exposure (`./cli.sh cameras`)
+- [x] Calibration of follower and leader exported to `calibration/`
+- [ ] First MCP session on the real arm: verify gripper direction, teach `clear` + pick/bin waypoints, then ELROBOT_ALLOW_MOTION=1
 - [ ] Decide how Cartesian tools (`pick_at`, `place_at`) map to joints: needs URDF-based kinematics verified on the physical arm; Station has no Cartesian API
 - [ ] Validate camera stream overlay against real table measurements
 - [ ] Execute single-object natural language pick-and-place
+
+- [x] Web console `./cli.sh console` (`src/web_console.py`, `src/web/console.html`): table + gripper cameras on the left, chat with microphone (local faster-whisper STT) on the right. Tested offline; not yet with live camera frames
+- [ ] Connect the console chat to Claude: MCP `listen`/`say` tools reading/writing `/api/messages` (plan 3.2/3.4, owner D)
 
 ## Phase 4: Closed-Loop Recovery & Stress Testing — PENDING
 - [ ] Tune ST3215 gripper motor load thresholds

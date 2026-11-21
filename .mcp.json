@@ -1,10 +1,14 @@
 {
   "mcpServers": {
-    "normacore-robot": {
-      "command": "python3",
-      "args": ["src/mcp_server.py"],
+    "elrobot": {
+      "command": ".venv/bin/python",
+      "args": [
+        "src/robot_mcp_server.py"
+      ],
       "env": {
-        "PYTHONUNBUFFERED": "1"
+        "PYTHONUNBUFFERED": "1",
+        "ELROBOT_ALLOW_MOTION": "0",
+        "ELROBOT_BUS": "5B61034962"
       }
     }
   }

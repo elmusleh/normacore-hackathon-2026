@@ -16,5 +16,17 @@
     "z_hover_mm": 45.0,
     "z_grasp_mm": 14.0,
     "measured": false
+  },
+  "cameras": {
+    "table": "port:3-2.4",
+    "gripper": "port:3-2.2"
+  },
+  "camera_settings": {
+    "table": {
+      "exposure": 160
+    },
+    "gripper": {
+      "exposure": 14
+    }
   }
 }

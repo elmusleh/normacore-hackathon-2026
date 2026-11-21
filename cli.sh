@@ -25,6 +25,7 @@ print_usage() {
     echo ""
     echo -e "${C_BOLD}Mission Control (Web & Unified):${C_RESET}"
     echo -e "  ${C_CYAN}start [port]${C_RESET}        Launch unified Mission Control Web Dashboard & daemons (Default: 8080)"
+    echo -e "  ${C_GREEN}feed [grapes|spoon]${C_RESET} Run camera-guided assistive feeding (detects grape bowl -> mouth via /dev/video4)"
     echo -e "  ${C_GREEN}teleop${C_RESET}              Run Master -> Slave teleoperation loop in terminal"
     echo -e "  ${C_YELLOW}station${C_RESET}             Launch official NormaCore Station binary (--web --tcp)"
     echo ""
@@ -38,6 +39,7 @@ print_usage() {
     echo -e "  ${C_YELLOW}station${C_RESET}             Launch official pre-compiled Station binary (--web --tcp)"
     echo -e "  ${C_YELLOW}setup-serial${C_RESET}        Configure Linux USB permissions (dialout, udev rules) for ElRobot servos"
     echo -e "  ${C_YELLOW}mcp${C_RESET}                 Run Model Context Protocol (MCP) server for Claude / Codex"
+    echo -e "  ${C_YELLOW}console [port]${C_RESET}      Web console: live cameras + voice chat (Default: http://localhost:8890)"
     echo -e "  ${C_YELLOW}urdf${C_RESET}                Open official NormaCore online 3D URDF interactive viewer"
     echo ""
     echo -e "${C_BOLD}Hardware Day (ElRobot):${C_RESET}"
@@ -56,6 +58,7 @@ print_usage() {
     echo -e "  ${C_CYAN}hw workspace${C_RESET}         Show workspace limits and whether they were measured"
     echo -e "  ${C_CYAN}hw bundle${C_RESET}            Pack logs, config and state for debugging or sharing"
     echo -e "  ${C_CYAN}logs [-f]${C_RESET}            Show the newest run log (-f follows it live)"
+    echo -e "  ${C_CYAN}cameras${C_RESET}              Apply fixed camera exposure (Station must be stopped)"
     echo -e "  ${C_CYAN}preflight${C_RESET}            Read-only ElRobot readiness check (writes logs/)"
     echo ""
     echo -e "${C_BOLD}Team Sync:${C_RESET}"
@@ -151,9 +154,17 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         fi
         ;;
 
+    console)
+        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        echo -e "${C_GREEN}[+] Starting ElRobot web console (cameras + voice chat)...${C_RESET}"
+        exec "$PY" src/web_console.py --port "${1:-8890}"
+        ;;
+
     mcp)
-        echo -e "${C_CYAN}[+] Starting MCP server (stdin/stdout)...${C_RESET}"
-        python3 src/mcp_server.py
+        # stdout carries the MCP protocol, so messages go to stderr.
+        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        echo -e "${C_CYAN}[+] Starting ElRobot MCP server (stdio, motion ${ELROBOT_ALLOW_MOTION:-0})...${C_RESET}" >&2
+        exec "$PY" src/robot_mcp_server.py
         ;;
 
     urdf)
@@ -171,8 +182,19 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         python3 scripts/teleop_sync.py "$@"
         ;;
 
+    feed)
+        MODE="${1:-grapes}"
+        shift || true
+        echo -e "${C_GREEN}[+] Running Camera-Guided Assistive Feeding (${MODE})...${C_RESET}"
+        python3 scripts/camera_feed_arm.py --mode "$MODE" "$@"
+        ;;
+
     hw)
         python3 scripts/hw_day.py "$@"
+        ;;
+
+    cameras)
+        python3 scripts/camera_settings.py "$@"
         ;;
 
     sync)

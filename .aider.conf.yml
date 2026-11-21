@@ -2,6 +2,7 @@
 # Read these files at the start of every session for project context
 
 read:
+  - docs/FEEDING_ASSISTANT_PLAN.md
   - .ai-sync/HANDOFF.md
   - .ai-sync/PROGRESS.md
   - .ai-sync/PLAN.md

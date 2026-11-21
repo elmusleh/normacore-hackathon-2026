@@ -27,35 +27,42 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcp_server import NormaCoreMCPServer
 from vision_homography import TabletopCalibrator
+from feeding_vision import FeedingVisionDetector, run_camera_feeding_cycle
 
 SERVER_PORT = 8080
 mcp_server = NormaCoreMCPServer()
 calibrator = TabletopCalibrator()
+feeding_detector = FeedingVisionDetector(calibrator=mcp_server.calibrator)
 
 # Global state for teleoperation background subprocess
 teleop_process: Optional[subprocess.Popen] = None
 teleop_lock = threading.Lock()
+latest_feeding_overlay_b64: Optional[str] = None
 
 
 def get_live_camera_feed():
-    """Tries to capture from /dev/video4 or /dev/video2, overlays metric grid."""
-    for cam_idx in [4, 2]:
+    """Tries to capture from /dev/video4 or /dev/video2, overlays feeding detections & metric grid."""
+    for cam_idx in [4, 2, 0]:
         cap = cv2.VideoCapture(cam_idx)
         if cap.isOpened():
             ret, frame = cap.read()
             cap.release()
-            if ret:
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if ret and frame is not None and frame.size > 0:
+                _, annotated_bgr = feeding_detector.analyze_and_annotate(frame)
+                rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
                 from PIL import Image
                 pil_img = Image.fromarray(rgb)
                 try:
-                    annotated = calibrator.overlay_calibrated_grid(pil_img)
+                    annotated = mcp_server.calibrator.overlay_calibrated_grid(pil_img)
                 except Exception:
                     annotated = pil_img
                 buf = io.BytesIO()
                 annotated.save(buf, format="JPEG", quality=80)
                 return base64.b64encode(buf.getvalue()).decode("utf-8")
-    
+
+    if latest_feeding_overlay_b64:
+        return latest_feeding_overlay_b64
+
     try:
         view = mcp_server.get_calibrated_view()
         return view["image_base64"]
@@ -107,7 +114,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
-        global teleop_process
+        global teleop_process, latest_feeding_overlay_b64
         if self.path == "/api/command":
             content_length = int(self.headers.get("Content-Length", 0))
             post_data = self.rfile.read(content_length)
@@ -119,7 +126,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                 # --- 1. CLI Execution Integration ---
                 if action == "run_cli":
                     cli_cmd = cmd.get("command", "").strip()
-                    allowed_prefixes = ["test", "preflight", "hw", "demo", "view-camera", "apriltags", "sdk-check", "sync"]
+                    allowed_prefixes = ["test", "preflight", "hw", "demo", "view-camera", "apriltags", "sdk-check", "sync", "feed"]
                     
                     # Split command arguments
                     parts = cli_cmd.split()
@@ -197,6 +204,21 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                     res = {
                         "status": "TESTS_PASSED" if passed else "TESTS_FAILED",
                         "output": test_run.stdout[-1500:],
+                    }
+
+                elif action in ("feed_grapes", "feed_spoon"):
+                    mode = "grapes" if action == "feed_grapes" else "spoon"
+                    feed_res = run_camera_feeding_cycle(
+                        mode=mode,
+                        mcp_server=mcp_server,
+                        preferred_camera=int(cmd.get("camera", 4)),
+                    )
+                    latest_feeding_overlay_b64 = feed_res.get("annotated_image_base64")
+                    res = {
+                        "status": f"FEEDING_{mode.upper()}_COMPLETE",
+                        "camera_source": feed_res["camera_source"],
+                        "detections": feed_res["detections"],
+                        "output": "\n".join(feed_res["steps"]),
                     }
 
                 elif action == "run_demo":
