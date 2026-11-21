@@ -45,8 +45,10 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
 
 ## Before the first real session
 
-1. **Camera names.** Run `list_cameras` (or ask Claude), wave at each camera, then name them in
-   `config/elrobot.json`: `"cameras": {"table": "usbvideo/<hash>", "gripper": "usbvideo/<hash>"}`.
+1. **Camera names.** Cameras are named by the USB socket they are plugged into, because the Station
+   makes a new queue (new hash) every time a camera is replugged. `list_cameras` shows each live
+   camera's `port`. Set `config/elrobot.json`: `"cameras": {"table": "port:3-2.4", "gripper": "port:3-2.2"}`.
+   Keep each camera in the same socket; if you move one, update its port.
 2. **Frame size.** `station.yaml` stores frames at `resize_target: 224` px. Too small to spot
    small objects; try `480` and restart the Station.
 3. **Gripper direction.** `config/elrobot.json` → `gripper.open_at` (`"max"` or `"min"`) says which
@@ -74,6 +76,7 @@ Logs: `logs/mcp-latest.log`. Errors come back to Claude as `{"ok": false, "error
 | `cannot reach the ElRobot through the Station` | Start `./cli.sh station`; check power and USB |
 | `--bus auto needs exactly one bus` | Set `ELROBOT_BUS` to the follower serial in `.mcp.json` |
 | `torque is off on motors [...]` | Ask Claude to `enable_torque`, or `./cli.sh hw torque on` |
+| Camera icon greyed out / `no cameras found`, but `ls /dev/video*` shows cameras | The Station uses libuvc (raw USB), which needs write access to `/dev/bus/usb/...`. Install `scripts/99-normacore-cameras.rules` (instructions inside), replug the cameras, restart the Station |
 | `no cameras found` | Camera unplugged, or Station not run from this repo (set `ELROBOT_STATION_DATA` or `ELROBOT_CAMERA_QUEUES`) |
 | `frame is old` | Camera stalled. Replug it and restart the Station |
 | `moves larger than 600 steps are refused` | Go to `clear` first, or move the arm closer by hand |

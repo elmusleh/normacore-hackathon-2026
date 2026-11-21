@@ -1,0 +1,12 @@
+# Let the NormaCore Station open USB cameras without sudo.
+# The Station captures through libuvc (raw USB, /dev/bus/usb/...), not /dev/video*,
+# and those nodes are root-only by default, so cameras show as "No active cameras".
+#
+# Install:  sudo cp scripts/99-normacore-cameras.rules /etc/udev/rules.d/
+#           sudo udevadm control --reload-rules && sudo udevadm trigger
+# Then unplug and replug the cameras, and restart the Station.
+#
+# Add a line for any other camera: find its ID with `lsusb` (ID vendor:product).
+
+# KD-USB Cameras (Sonix), the two cameras in the hackathon kit
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="2c7f", ATTR{idProduct}=="4a60", MODE="0660", GROUP="plugdev", TAG+="uaccess"

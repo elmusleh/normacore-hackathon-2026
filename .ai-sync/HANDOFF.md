@@ -15,6 +15,10 @@ stop_reason: needs-physical-arm
 - Verified over stdio with a real MCP client: 10 tools register; without a Station, tools return a clear connection error.
 - Station facts found: cameras are `usbvideo/<md5>` queues of JPEG frames (resize_target 224 by default); teleop is built into the Station viewer (follower bus card dropdown → leader serial); ElRobot auto-calibration needs >= 7.0 V, so the 5 V leader is calibrated by hand.
 
+- Cameras: Station captures via libuvc (raw USB), so cameras need `scripts/99-normacore-cameras.rules` installed (sudo). Without it the viewer shows no cameras. Camera queues live in `station_data/<station id>/usbvideo/<hash>` (discovery handles this). Follower bus 5B61034962, leader 5B61037051.
+
+- Cameras work after the udev rule. Named by USB port in config (`table` = port:3-2.4, `gripper` = port:3-2.2) because every replug creates a new queue hash. `list_cameras` only shows plugged-in cameras. Images are heavily overexposed (nearly white) at 224 px: open issue.
+
 ### Next steps
 1. Station + arm connected: in Claude Code, `/mcp` → elrobot connected; `get_robot_state`, `list_cameras`, `look`.
 2. Name cameras in `config/elrobot.json` → `cameras`; raise `resize_target` in `station.yaml` to ~480.

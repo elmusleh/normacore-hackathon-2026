@@ -36,6 +36,7 @@ class FakeArm:
         self.stall_at = {}  # motor -> position it stops at
         self.held = []
         self.frames = {}
+        self.first = {}  # queue -> first entry bytes (camera connect event)
 
     def snapshot(self):
         return dict(self.readings)
@@ -65,7 +66,7 @@ class FakeArm:
         return items[-back] if back <= len(items) else None
 
     def read_first(self, queue, timeout_s=3.0):
-        return None
+        return self.first.get(queue)
 
     def close(self):
         pass
@@ -78,7 +79,8 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(elrobot_config, "CONFIG_DIR", tmp_path)
     monkeypatch.setenv("ELROBOT_ALLOW_MOTION", "1")
     arm = FakeArm()
-    tools = RobotTools(lambda: arm, camera_queues=lambda: ["usbvideo/abc"])
+    tools = RobotTools(lambda: arm, camera_queues=lambda: ["usbvideo/abc", "usbvideo/old"],
+                       usb_ports_fn=lambda: {(3, 26): "3-2.4"})
     return tools, arm, tmp_path
 
 
@@ -191,25 +193,56 @@ def test_errors_become_results(env):
     assert res == {"ok": False, "error": "RuntimeError: no st3215/inference frames from station"}
 
 
-@pytest.mark.skipif(not (SDK / "target" / "gen_python").exists(), reason="norma-core SDK not downloaded")
-def test_look_decodes_station_jpeg(env):
+needs_sdk = pytest.mark.skipif(not (SDK / "target" / "gen_python").exists(),
+                               reason="norma-core SDK not downloaded")
+
+
+def _envelopes():
     sys.path.insert(0, str(SDK))
     from target.gen_python.protobuf.drivers.usbvideo import frame, usbvideo
 
+    def frame_entry(jpeg):
+        return usbvideo.RxEnvelope(
+            type=usbvideo.RxEnvelopeType.ET_FRAMES,
+            frames=frame.FramesPack(
+                format=frame.FrameFormat(width=298, height=224, kind=frame.FrameFormatKind.FF_JPEG),
+                stamps=[frame.FrameStamp(local_stamp_ns=1)],
+                frames_data=[jpeg],
+            ),
+        ).encode()
+
+    def connect_entry(unique_id):
+        return usbvideo.RxEnvelope(type=usbvideo.RxEnvelopeType.ET_DEVICE_CONNECTED,
+                                   camera=usbvideo.Camera(product="KD-USB Cameras", unique_id=unique_id)).encode()
+
+    return frame_entry, connect_entry
+
+
+@needs_sdk
+def test_look_decodes_station_jpeg(env):
+    frame_entry, connect_entry = _envelopes()
     tools, arm, tmp = env
     jpeg = b"\xff\xd8fakejpeg\xff\xd9"
-    env_bytes = usbvideo.RxEnvelope(
-        type=usbvideo.RxEnvelopeType.ET_FRAMES,
-        frames=frame.FramesPack(
-            format=frame.FrameFormat(width=298, height=224, kind=frame.FrameFormatKind.FF_JPEG),
-            stamps=[frame.FrameStamp(local_stamp_ns=1)],
-            frames_data=[jpeg],
-        ),
-    ).encode()
-    connect = usbvideo.RxEnvelope(type=usbvideo.RxEnvelopeType.ET_DEVICE_CONNECTED).encode()
-    arm.frames["usbvideo/abc"] = [env_bytes, connect]  # newest entry is not a frame
+    arm.first["usbvideo/abc"] = connect_entry("11391:19040:3:26")
+    arm.first["usbvideo/old"] = connect_entry("11391:19040:3:21")  # unplugged, older queue
+    arm.frames["usbvideo/abc"] = [frame_entry(jpeg), connect_entry("x")]  # newest entry is not a frame
     meta, data = tools.look()
-    assert data == jpeg and meta["width"] == 298 and meta["ok"]
+    assert data == jpeg and meta["width"] == 298 and meta["queue"] == "usbvideo/abc"
+    cams = tools.list_cameras()
+    assert [c["queue"] for c in cams["cameras"]] == ["usbvideo/abc"] and cams["unplugged_old_queues"] == 1
+
+
+@needs_sdk
+def test_camera_named_by_usb_port(env):
+    frame_entry, connect_entry = _envelopes()
+    tools, arm, tmp = env
+    (tmp / "elrobot.json").write_text(json.dumps({"cameras": {"table": "port:3-2.4", "gripper": "port:3-2.2"}}))
+    arm.first["usbvideo/abc"] = connect_entry("11391:19040:3:26")
+    arm.frames["usbvideo/abc"] = [frame_entry(b"jpg")]
+    meta, data = tools.look("table")
+    assert data == b"jpg" and tools.list_cameras()["cameras"][0]["name"] == "table"
+    meta, data = tools.look("gripper")
+    assert data is None and "not plugged in" in meta["error"]
 
 
 def test_server_registers_tools():
@@ -219,3 +252,12 @@ def test_server_registers_tools():
     names = {t.name for t in asyncio.run(robot_mcp_server.server.list_tools())}
     assert {"look", "get_robot_state", "go_to_waypoint", "set_gripper", "stop",
             "nudge_joint", "list_waypoints", "teach_waypoint", "enable_torque", "list_cameras"} <= names
+
+
+def test_camera_discovery_finds_station_id_layout(tmp_path, monkeypatch):
+    from elrobot_camera import discover_camera_queues
+
+    monkeypatch.delenv("ELROBOT_CAMERA_QUEUES", raising=False)
+    (tmp_path / "73c0ff" / "usbvideo" / "aa11" / "wal").mkdir(parents=True)
+    (tmp_path / "73c0ff" / "st3215" / "inference" / "wal").mkdir(parents=True)
+    assert discover_camera_queues(tmp_path) == ["usbvideo/aa11"]

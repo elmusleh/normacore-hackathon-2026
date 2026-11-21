@@ -2,10 +2,13 @@
   "mcpServers": {
     "elrobot": {
       "command": ".venv/bin/python",
-      "args": ["src/robot_mcp_server.py"],
+      "args": [
+        "src/robot_mcp_server.py"
+      ],
       "env": {
         "PYTHONUNBUFFERED": "1",
-        "ELROBOT_ALLOW_MOTION": "0"
+        "ELROBOT_ALLOW_MOTION": "0",
+        "ELROBOT_BUS": "5B61034962"
       }
     }
   }

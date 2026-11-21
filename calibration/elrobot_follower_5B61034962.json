@@ -1,0 +1,90 @@
+{
+  "arm": "ElRobot",
+  "role": "follower",
+  "bus_serial": "5B61034962",
+  "exported_at": "2026-11-21T13:13:50+01:00",
+  "source": "NormaCore Station st3215/inference (range_min/range_max per motor)",
+  "units": "servo steps, 0..4095 (4096 per revolution)",
+  "motors": [
+    {
+      "id": 1,
+      "range_min": 1079,
+      "range_max": 3017,
+      "range_frozen": true,
+      "eeprom_min_angle_limit": 0,
+      "eeprom_max_angle_limit": 4095,
+      "eeprom_position_offset_raw": 64125,
+      "registers_hex": "030a000903010000010000ff0f468c28f4010c2c2f10000010000101f401017dfa0014c8190ac8c80109fb080000ab01e803000000000001f908000014047b21000000fb080000"
+    },
+    {
+      "id": 2,
+      "range_min": 994,
+      "range_max": 3102,
+      "range_frozen": true,
+      "eeprom_min_angle_limit": 0,
+      "eeprom_max_angle_limit": 4095,
+      "eeprom_position_offset_raw": 1722,
+      "registers_hex": "030a000903020000010000ff0f468c28f4010c2c2f10000010000101f40101ba060014c8190ac8c80106a70700005301e803000000000001a407000018047c22000000a7070100"
+    },
+    {
+      "id": 3,
+      "range_min": 890,
+      "range_max": 3206,
+      "range_frozen": true,
+      "eeprom_min_angle_limit": 0,
+      "eeprom_max_angle_limit": 4095,
+      "eeprom_position_offset_raw": 63976,
+      "registers_hex": "030a000903030000010000ff0f468c28f4010c2c2f10000010000101f40101e8f90014c8190ac8c80110720c00008e02e8030000000000016d0c000020047b31000000720c0100"
+    },
+    {
+      "id": 4,
+      "range_min": 884,
+      "range_max": 3212,
+      "range_frozen": true,
+      "eeprom_min_angle_limit": 0,
+      "eeprom_max_angle_limit": 4095,
+      "eeprom_position_offset_raw": 63695,
+      "registers_hex": "030a000903040000010000ff0f468c28f4010c2c2f10000010000101f40101cff80014c8190ac8c80132880300000307e8030000000000019503000040007c3100000088030200"
+    },
+    {
+      "id": 5,
+      "range_min": 136,
+      "range_max": 3960,
+      "range_frozen": true,
+      "eeprom_min_angle_limit": 0,
+      "eeprom_max_angle_limit": 4095,
+      "eeprom_position_offset_raw": 1040,
+      "registers_hex": "030a000903050000010000ff0f468c28f4010c2c2f10000010000101f4010110040014c8190ac8c801065e0700004c01e8030000000000016107000018007b230000005e070000"
+    },
+    {
+      "id": 6,
+      "range_min": 1007,
+      "range_max": 3089,
+      "range_frozen": true,
+      "eeprom_min_angle_limit": 0,
+      "eeprom_max_angle_limit": 4095,
+      "eeprom_position_offset_raw": 63729,
+      "registers_hex": "030a000903060000010000ff0f468c28f4010c2c2f10000010000101f40101f1f80014c8190ac8c80107f60b00007901e803000000000001e70b000048047b2a000000f60b0300"
+    },
+    {
+      "id": 7,
+      "range_min": 109,
+      "range_max": 3987,
+      "range_frozen": true,
+      "eeprom_min_angle_limit": 0,
+      "eeprom_max_angle_limit": 4095,
+      "eeprom_position_offset_raw": 63749,
+      "registers_hex": "030a000903070000010000ff0f468c28f4010c2c2f10000010000101f4010105f90014c8190ac8c8010c930a00001d02e803000000000001910a000014047c22000000930a0000"
+    },
+    {
+      "id": 8,
+      "range_min": 1253,
+      "range_max": 2843,
+      "range_frozen": true,
+      "eeprom_min_angle_limit": 0,
+      "eeprom_max_angle_limit": 4095,
+      "eeprom_position_offset_raw": 1996,
+      "registers_hex": "030a000903080000010000ff0f468c28f4010c2c2f10000010000101f40101cc070014c8190ac8c8013dfe0400002a08e8030000000000010405000024007b23000000fe040100"
+    }
+  ]
+}

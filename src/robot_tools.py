@@ -26,7 +26,14 @@ import re
 import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from elrobot_camera import MAX_LOOKBACK, decode_frame, describe_camera, discover_camera_queues
+from elrobot_camera import (
+    MAX_LOOKBACK,
+    decode_frame,
+    describe_camera,
+    discover_camera_queues,
+    port_of,
+    usb_ports,
+)
 from elrobot_config import current_threshold_for, load_config, load_waypoints, save_waypoints
 from elrobot_hardware import (
     DEFAULT_SAFETY_MARGIN_STEPS,
@@ -61,9 +68,12 @@ def raw_from_percent(r: MotorReading, pct: float) -> int:
 class RobotTools:
     """The tool implementations. `connect` returns an object like ElRobotHardwareSync."""
 
-    def __init__(self, connect: Callable[[], Any], camera_queues: Optional[Callable[[], List[str]]] = None):
+    def __init__(self, connect: Callable[[], Any], camera_queues: Optional[Callable[[], List[str]]] = None,
+                 usb_ports_fn: Optional[Callable[[], dict]] = None):
         self._connect = connect
         self._camera_queues = camera_queues or discover_camera_queues
+        self._usb_ports = usb_ports_fn or usb_ports
+        self._camera_info: Dict[str, Dict[str, Any]] = {}  # queue -> describe_camera(); fixed per queue
         self._hw = None
         self._lock = threading.Lock()
         self._gripper_cmd_open: Optional[float] = None  # last commanded gripper opening, %
@@ -172,35 +182,54 @@ class RobotTools:
         return {"ok": True, "waypoints": sorted(points), "clear_waypoint": cfg["agent"]["clear_waypoint"],
                 "hint": "Teach new ones with teach_waypoint or ./cli.sh hw teach <name>." if not points else ""}
 
-    def list_cameras(self) -> Dict[str, Any]:
-        cfg = self._cfg()
-        named = {q: n for n, q in cfg["cameras"].items()}
+    def _cameras(self, cfg) -> List[Dict[str, Any]]:
+        """Every camera queue with its product, USB port (None if unplugged) and configured name.
+
+        Config names map to "port:<usb port>" (stable across replugs) or "usbvideo/<hash>".
+        """
+        ports = self._usb_ports()
+        names = {v: k for k, v in cfg["cameras"].items()}
         cams = []
         for q in self._camera_queues():
-            info: Dict[str, Any] = {"queue": q, "name": named.get(q)}
-            try:
-                info.update(describe_camera(self.hw().read_first(q)))
-            except Exception:  # noqa: BLE001 - description is optional
-                log.debug("describe %s failed", q, exc_info=True)
-            cams.append(info)
-        return {"ok": True, "cameras": cams,
-                "hint": "" if cams else "No camera queues found. Is a camera plugged in and the Station running "
-                                        "from this repo (station_data/usbvideo)?"}
+            if q not in self._camera_info:
+                try:
+                    self._camera_info[q] = describe_camera(self.hw().read_first(q))
+                except Exception:  # noqa: BLE001 - description is optional
+                    log.debug("describe %s failed", q, exc_info=True)
+                    self._camera_info[q] = {}
+            info = dict(self._camera_info[q])
+            port = port_of(info.get("unique_id", ""), ports)
+            cams.append({"queue": q, "port": port, "live": port is not None,
+                         "name": names.get(f"port:{port}") or names.get(q), "product": info.get("product")})
+        return cams
+
+    def list_cameras(self) -> Dict[str, Any]:
+        cfg = self._cfg()
+        cams = self._cameras(cfg)
+        live = [c for c in cams if c["live"]]
+        return {"ok": True, "cameras": live, "unplugged_old_queues": len(cams) - len(live),
+                "hint": "" if live else "No camera is plugged in, or the Station cannot open it "
+                                        "(see scripts/99-normacore-cameras.rules)."}
 
     def look(self, camera: str = "") -> Tuple[Dict[str, Any], Optional[bytes]]:
-        """Newest JPEG from a camera. `camera` is a configured name, a queue id, or empty for the default."""
+        """Newest JPEG from a camera: a configured name ('table'), 'port:3-2.4', a queue id, or empty."""
         cfg = self._cfg()
-        queues = self._camera_queues()
-        if camera in cfg["cameras"]:
-            queue = cfg["cameras"][camera]
-        elif camera:
-            queue = camera if camera.startswith("usbvideo/") else f"usbvideo/{camera}"
-        elif "table" in cfg["cameras"]:
-            queue = cfg["cameras"]["table"]
-        elif queues:
-            queue = queues[0]
+        cams = self._cameras(cfg)
+        live = [c for c in cams if c["live"]]
+        want = camera or ("table" if "table" in cfg["cameras"] else "")
+        target = cfg["cameras"].get(want, want)
+        if not target:
+            if not live:
+                return {"ok": False, "error": "no camera plugged in; see list_cameras"}, None
+            queue = live[0]["queue"]
+        elif target.startswith("port:"):
+            match = [c for c in live if f"port:{c['port']}" == target]
+            if not match:
+                return {"ok": False, "error": f"camera {camera or want!r} ({target}) is not plugged in",
+                        "live_cameras": live}, None
+            queue = match[0]["queue"]
         else:
-            return {"ok": False, "error": "no cameras found; see list_cameras"}, None
+            queue = target if target.startswith("usbvideo/") else f"usbvideo/{target}"
         hw = self.hw()
         for back in range(1, MAX_LOOKBACK + 1):
             data = hw.read_recent(queue, back=back)

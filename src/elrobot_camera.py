@@ -48,10 +48,44 @@ def discover_camera_queues(station_data: Optional[Path] = None) -> List[str]:
     if env:
         return [q.strip() for q in env.split(",") if q.strip()]
     base = Path(os.environ.get("ELROBOT_STATION_DATA", station_data or DEFAULT_STATION_DATA))
-    video_dir = base / "usbvideo"
-    if not video_dir.is_dir():
-        return []
-    return sorted(f"usbvideo/{p.name}" for p in video_dir.iterdir() if (p / "wal").exists())
+    # Queues live in <base>/<station id>/usbvideo/<hash>/wal (older layouts: <base>/usbvideo/...).
+    found = {f"usbvideo/{wal.parent.name}"
+             for pattern in ("usbvideo/*/wal", "*/usbvideo/*/wal") for wal in base.glob(pattern)}
+    return sorted(found)
+
+
+SYS_USB = Path("/sys/bus/usb/devices")
+
+
+def usb_ports(sys_usb: Path = SYS_USB) -> dict:
+    """Map (bus, device number) -> USB port path like '3-2.4' for devices plugged in now.
+
+    The Station's camera unique_id is 'vendor:product:bus:device'. The device number
+    changes on every replug, so each replug makes a new queue. The port path does not
+    change while the cable stays in the same socket, so cameras are named by port.
+    """
+    ports = {}
+    if not sys_usb.is_dir():
+        return ports
+    for dev in sys_usb.iterdir():
+        try:
+            bus = int((dev / "busnum").read_text())
+            num = int((dev / "devnum").read_text())
+        except (OSError, ValueError):
+            continue
+        ports[(bus, num)] = dev.name
+    return ports
+
+
+def port_of(unique_id: str, ports: dict) -> Optional[str]:
+    """USB port of a camera from its Station unique_id, or None if it is not plugged in now."""
+    parts = unique_id.split(":")
+    if len(parts) != 4:
+        return None
+    try:
+        return ports.get((int(parts[2]), int(parts[3])))
+    except ValueError:
+        return None
 
 
 def decode_frame(data: bytes) -> Optional[CameraFrame]:
