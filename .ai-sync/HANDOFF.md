@@ -9,6 +9,14 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-21, ~22:35, claude for Jafer): camera picture enhancement
+- Request: "the camera still looks bad; enhance it so the robot reliably detects food". Branch `feat/console-face-camera` (not pushed).
+- Measured live (read-only): table camera 62% pure-white pixels, gripper 47% (see FINDINGS.md). The Station also shrinks frames to 299x224.
+- Changed: new `src/frame_enhance.py` (denoise, table-based white balance, auto gamma, CLAHE, light sharpen, about 9 ms per frame). `RobotTools.look()` uses it and returns `exposure` and `exposure_warning`, and `raw=True` skips it. The MCP `look` has a `raw` parameter, and the console serves `/frame/<cam>?raw=1`. Config `camera_enhance` (defaults in `src/elrobot_config.py`, nothing added to `config/elrobot.json`). `scripts/camera_settings.py`: `--tune [name] [--write]` exposure sweep, plus `controls` for extra V4L2 controls. The demo recorder is untouched and still stores raw frames.
+- Local only (gitignored): `station.yaml` `resize_target` 224 -> 480. Takes effect at the next Station restart.
+- Verified: 127 tests pass. Compared raw vs enhanced on the live table and gripper frames by eye: the grape stands out more and the colour is neutral. NOT run: `--tune` (needs the Station stopped and the hardware owner).
+- Next: 1) Stop the Station. 2) `./cli.sh cameras --tune table gripper`, check the printed table, then `--write` and commit as `chore(elrobot): record camera exposure measured <date>`. 3) Restart the Station (now 480 px) and the console, check the tiles and that `look()` has no `exposure_warning`. 4) Consider a matte darker table cover (SUGGESTIONS.md) before recording ACT demos, and do not change camera settings between demo episodes.
+
 ## Latest session (2026-11-21, ~22:20, claude for Jafer): camera ports after hub replug
 - The udev rule with the OBSBOT line is installed, and the Station now captures the face camera.
 - At 22:12 the USB hub was replugged into another laptop port (3-5 -> 3-1), so the console showed all three cameras as "not plugged in". `config/elrobot.json` cameras now: table `port:3-1.2.2`, gripper `port:3-1.2.4`, face `port:3-1.3`. Table and gripper checked from frames; face is the only OBSBOT, and its frame was not viewed (privacy).
