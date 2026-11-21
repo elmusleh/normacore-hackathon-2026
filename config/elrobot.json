@@ -7,6 +7,31 @@
   "joint_map": {},
   "current_threshold": {},
   "default_current_threshold": 100,
+  "gripper": {
+    "motor": 8,
+    "open_at": "max",
+    "verified": false,
+    "squeeze_steps": 10
+  },
+  "cameras": {
+    "table": "port:3-1.2.2",
+    "gripper": "port:3-1.2.4",
+    "person": "v4l2:2"
+  },
+  "camera_settings": {
+    "table": {
+      "exposure": 160
+    },
+    "gripper": {
+      "exposure": 14
+    }
+  },
+  "agent": {
+    "max_speed": 500,
+    "max_waypoint_delta_steps": 1500,
+    "max_nudge_percent": 5.0,
+    "clear_waypoint": "clear"
+  },
   "workspace": {
     "x_min_mm": -180.0,
     "x_max_mm": 180.0,
@@ -17,18 +42,5 @@
     "z_hover_mm": 45.0,
     "z_grasp_mm": 14.0,
     "measured": false
-  },
-  "cameras": {
-    "table": "port:3-1.2.2",
-    "gripper": "port:3-1.2.4",
-    "person": "v4l2:6"
-  },
-  "camera_settings": {
-    "table": {
-      "exposure": 160
-    },
-    "gripper": {
-      "exposure": 14
-    }
   }
 }
