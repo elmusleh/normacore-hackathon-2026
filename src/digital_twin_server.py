@@ -495,11 +495,12 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
             station = mcp_server.station
             telemetry = station.get_arm_telemetry()
 
+            st_cfg = load_config().get("station", {})
             payload = {
                 "teleop_active": is_teleop_running,
                 "station_reachable": _station_reachable(),
-                "master_bus": "5B61037051",
-                "slave_bus": "5B61034962",
+                "master_bus": st_cfg.get("leader_bus", "5B61037051"),
+                "slave_bus": st_cfg.get("bus", "5B61034962"),
                 "arm_pose": telemetry["end_effector"],
                 "gripper_state": telemetry["gripper_state"],
                 "gripper_load": telemetry["gripper_load"],
@@ -592,6 +593,38 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                             res = {"status": "TELEOP_STOPPED"}
                         else:
                             res = {"status": "TELEOP_NOT_RUNNING"}
+
+                elif action == "relax_leader":
+                    st_cfg = load_config().get("station", {})
+                    leader_bus = st_cfg.get("leader_bus", "5B61037051")
+                    run_res = subprocess.run(
+                        [sys.executable, "scripts/hw_day.py", "--bus", leader_bus, "torque", "off"],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    output = run_res.stdout + ("\n" + run_res.stderr if run_res.stderr else "")
+                    res = {
+                        "status": "LEADER_TORQUE_OFF" if run_res.returncode == 0 else f"ERROR_EXIT_{run_res.returncode}",
+                        "leader": leader_bus,
+                        "output": output[-1000:] if output else f"Torque disabled on leader {leader_bus}",
+                    }
+
+                elif action == "swap_arms":
+                    cfg = load_config()
+                    st_cfg = dict(cfg.get("station") or {})
+                    old_follower = st_cfg.get("bus", "5B61034962")
+                    old_leader = st_cfg.get("leader_bus", "5B61037051")
+                    st_cfg["bus"] = old_leader
+                    st_cfg["leader_bus"] = old_follower
+                    cfg["station"] = st_cfg
+                    save_config(cfg)
+                    res = {
+                        "status": "ARMS_SWAPPED",
+                        "master_bus": st_cfg["leader_bus"],
+                        "slave_bus": st_cfg["bus"],
+                        "output": f"Swapped roles in config/elrobot.json: Master={st_cfg['leader_bus']}, Slave={st_cfg['bus']}",
+                    }
 
                 elif action == "estop":
                     with teleop_lock:

@@ -249,8 +249,8 @@
             <span class="badge" id="teleop-status-badge" style="background: #374151;">Teleop: IDLE</span>
         </div>
         <div style="display: flex; gap: 14px; font-size: 12px; align-items: center;">
-            <span>Follower (12V): <strong style="color: #34d399;">5B61034962</strong></span>
-            <span>Leader (5V): <strong style="color: #60a5fa;">5B61037051</strong></span>
+            <span>Follower (12V): <strong id="hdr-slave" style="color: #34d399;">5B61034962</strong></span>
+            <span>Leader (5V): <strong id="hdr-master" style="color: #60a5fa;">5B61037051</strong></span>
             <a href="http://localhost:8889" target="_blank" style="color: #93c5fd; text-decoration: none; font-weight: 600;">Open Station Viewer ↗</a>
         </div>
     </header>
@@ -320,6 +320,10 @@
                     <button class="btn btn-green" id="btn-teleop-start" onclick="sendAction('teleop_start')">▶ Start Teleop</button>
                     <button class="btn btn-amber" id="btn-teleop-stop" onclick="sendAction('teleop_stop')">⏹ Stop Teleop</button>
                 </div>
+                <div class="btn-group" style="margin-top: 6px;">
+                    <button class="btn btn-secondary" onclick="sendAction('relax_leader')">🔓 Relax Leader (Torque Off)</button>
+                    <button class="btn btn-secondary" onclick="sendAction('swap_arms')">⇄ Swap Master / Slave</button>
+                </div>
                 <button class="btn btn-red" style="width: 100%; margin-top: 6px;" onclick="sendAction('estop')">⚠️ EMERGENCY STOP (Torque Off)</button>
             </div>
 
@@ -382,6 +386,9 @@
                     badge.style.background = '#374151';
                     badge.style.color = '#9ca3af';
                 }
+
+                if (data.slave_bus) document.getElementById('hdr-slave').textContent = data.slave_bus;
+                if (data.master_bus) document.getElementById('hdr-master').textContent = data.master_bus;
 
                 const wpBox = document.getElementById('waypoint-chips');
                 const wps = data.waypoints || [];
