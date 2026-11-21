@@ -696,7 +696,13 @@ def cmd_envelope(args, cfg, state):
             while deadline is None or time.monotonic() < deadline:
                 readings = hw.snapshot()
                 pose = {m: readings[m].present for m in MOTORS if m in readings}
-                if all(m in pose for m in SPACE_MOTORS):
+                # A read glitch (e.g. motor 2 reading 0 once on 2026-11-21) must not enter the space.
+                glitch = [m for m in SPACE_MOTORS if m in readings and readings[m].calibrated
+                          and not readings[m].range_min - 50 <= pose[m] <= readings[m].range_max + 50]
+                if glitch:
+                    log.warning("envelope: skipped a sample, motors %s outside their calibrated range: %s",
+                                glitch, pose)
+                elif all(m in pose for m in SPACE_MOTORS):
                     rec.add(pose)
                 done = False
                 while not lines.empty():
