@@ -147,20 +147,13 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
    `{"gain": 0, "white_balance_automatic": 0, "white_balance_temperature": 4600, "backlight_compensation": 0}`.
 3. **Frame size.** `station.yaml` stores frames at `resize_target: 224` px by default. Too small to spot
    a grape; use `480` and restart the Station. `station.yaml` is local, so set it on each machine.
-4. **Picture enhancement.** `look()` (MCP, console tiles) cleans each frame up in software before Claude sees it:
-   edge-keeping denoise, white balance against the table, auto gamma, CLAHE local contrast, light sharpening
-   (`src/frame_enhance.py`, about 9 ms per frame). Tune or turn it off in `config/elrobot.json` → `camera_enhance`
-   (per camera under `cameras`). `look(raw=True)` and the console's `/frame/<cam>?raw=1` give the untouched picture.
-   `look()` also returns `exposure` (mean, share of pure-white and black pixels) and an `exposure_warning` when the
-   camera itself is badly exposed: pure-white pixels cannot be recovered, so lower the exposure then.
-   ACT demo recordings store raw frames, never the enhanced ones.
-5. **Gripper direction.** `config/elrobot.json` → `gripper.open_at` (`"max"` or `"min"`) says which
+4. **Gripper direction.** `config/elrobot.json` → `gripper.open_at` (`"max"` or `"min"`) says which
    end of motor 8's range is open. Check with `./cli.sh hw identify 8`, fix if needed, set `"verified": true`.
-6. **Waypoints.** Teach at least `clear` (above the table, gripper open), then the pick spots and bins
+5. **Waypoints.** Teach at least `clear` (above the table, gripper open), then the pick spots and bins
    (`./cli.sh hw teach <name>` with torque off, or ask Claude to `teach_waypoint` after you pose the arm).
    For a pick, teach a hover pose and a grasp pose (`pick_1_hover`, `pick_1`), so Claude can do
    hover → grasp with `via_clear=false`.
-7. **Current thresholds.** The overload guard uses `current_threshold` per motor. Probe with
+6. **Current thresholds.** The overload guard uses `current_threshold` per motor. Probe with
    `./cli.sh hw probe-current <m>`, the gripper first.
 
 ## Limits (config/elrobot.json → `agent`)

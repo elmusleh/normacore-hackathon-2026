@@ -52,6 +52,14 @@ def video_devices_by_port() -> dict:
 
 CONTROL_LINE = re.compile(r"^\s*(\w+)\s+0x[0-9a-f]+\s+\(", re.MULTILINE)
 
+# Exposure measurement for --tune. Luminance at or above CLIPPED_LEVEL counts as blown out,
+# at or below DARK_LEVEL as crushed black. TARGET_MEAN is the mid-grey --tune aims for.
+CLIPPED_LEVEL = 250
+DARK_LEVEL = 5
+OVEREXPOSED_SHARE = 0.10
+UNDEREXPOSED_SHARE = 0.25
+TARGET_MEAN = 115.0
+
 # Exposures tried by --tune (exposure_time_absolute, units of 100 us on UVC cameras).
 TUNE_EXPOSURES = [5, 10, 14, 20, 30, 40, 50, 70, 100, 130, 160, 200, 250]
 
@@ -77,11 +85,28 @@ def supported_controls(dev: str) -> set:
     return {m.group(1) for m in CONTROL_LINE.finditer(out)}
 
 
+def exposure_stats(bgr) -> dict:
+    """Mean luminance and the share of blown-out and black pixels of a BGR frame, with a verdict."""
+    import cv2  # noqa: WPS433
+    import numpy as np  # noqa: WPS433
+
+    y = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    total = float(y.size) or 1.0
+    clipped = float(np.count_nonzero(y >= CLIPPED_LEVEL)) / total
+    dark = float(np.count_nonzero(y <= DARK_LEVEL)) / total
+    if clipped > OVEREXPOSED_SHARE:
+        verdict = "overexposed"
+    elif dark > UNDEREXPOSED_SHARE:
+        verdict = "underexposed"
+    else:
+        verdict = "ok"
+    return {"mean": round(float(y.mean()), 1), "clipped_share": round(clipped, 3),
+            "dark_share": round(dark, 3), "verdict": verdict}
+
+
 def score_exposure(stats: dict) -> float:
     """Lower is better: distance of the mean from mid-grey, with a heavy cost for blown-out
     pixels (food on a white table disappears there) and a smaller one for black pixels."""
-    from frame_enhance import TARGET_MEAN  # noqa: WPS433
-
     return abs(stats["mean"] - TARGET_MEAN) + 400.0 * stats["clipped_share"] + 150.0 * stats["dark_share"]
 
 
@@ -93,7 +118,6 @@ def pick_exposure(results: dict) -> int:
 def tune(dev: str, name: str) -> dict:
     """Try each exposure on one camera and return {exposure: stats}. Needs OpenCV."""
     import cv2  # noqa: WPS433
-    from frame_enhance import exposure_stats  # noqa: WPS433
 
     cap = cv2.VideoCapture(dev, cv2.CAP_V4L2)
     if not cap.isOpened():

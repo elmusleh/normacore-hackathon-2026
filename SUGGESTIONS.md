@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Test that `look()` never changes the picture — Priority 75% (High value) [Best practices]
+   What: Add a small offline test that feeds a known JPEG through `RobotTools.look()` and checks that the same bytes come back.
+   Why: The picture clean-up was added and then removed. A test makes sure no future change quietly starts altering what Claude sees, which would also change what the AprilTag calibration measures.
+   How: In `tests/test_robot_mcp.py`, reuse the `env` fixture and `_envelopes()` helper: put a JPEG made with OpenCV into the fake camera queue, call `tools.look()`, and assert the returned bytes equal the input.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Small; do it in the next vision change.
+
+2. Save one raw reference frame per camera after each exposure change — Priority 55% (Nice to have) [Professionalism]
+   What: After `./cli.sh cameras --write`, save one frame per camera into `data/camera_reference/` with the date and exposure in its name.
+   Why: With no software clean-up, picture quality depends only on the camera settings. A reference frame lets the team see later whether the light or the settings changed. `data/` is gitignored, so people in the frame stay out of git.
+   How: In `scripts/camera_settings.py`, after a `--tune --write`, keep the frame captured at the chosen exposure and write it with `cv2.imwrite`. Print the path.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs a live tuning session with the Station stopped.
+
+3. Show the camera exposure in the console page — Priority 35% (Optional) [Professionalism]
+   What: Show the configured exposure value for each camera under its tile on the console page.
+   Why: `look()` no longer reports exposure. A visible value helps someone at the bench notice when a camera is still on old or automatic settings.
+   How: In `src/web_console.py`, return `camera_settings` from the `/cameras` endpoint, and in `src/web/console.html` print `exposure` under each tile's name.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Cosmetic; wait until the exposure values are final.
+
 1. Add a hard table-height floor to every IK target — Priority 92% (Critical) [Security]
    What: Before any Cartesian move, check that every point on the planned path stays a few millimetres above the table and inside the tag rectangle, and refuse the move otherwise.
    Why: A wrong joint zero or a typo in a target can send the fingertips into the table or the bowl. The arm already hit the table once (motor 2, 2026-11-21). A check in code catches this before a motor moves, whatever Claude or a person asks for.
@@ -24,7 +45,7 @@
 1. Put a matte, darker cloth on the table — Priority 88% (High value) [Best practices]
    What: Replace the bright white table cover with a matte mid-grey or dark-blue cloth or card.
    Why: On white, 47-62% of the table and gripper pictures are pure white (measured 2026-11-21), and a pale green grape almost disappears. No software can recover pure-white pixels; a darker, non-shiny surface gives the grape and bowls clear edges for Claude and for the ACT policy.
-   How: Lay the cloth over the work area, tape the corners so it cannot move, run `./cli.sh cameras --tune` again (Station stopped), then check `exposure.verdict` is `ok` in `look()`.
+   How: Lay the cloth over the work area, tape the corners so it cannot move, run `./cli.sh cameras --tune` again (Station stopped), then check that the chosen exposure's verdict is `ok` in the `--tune` table.
    Status: ⏳ Unimplemented
    Reason Deferred: Needs a physical material at the bench and the team's agreement before ACT demos are recorded.
 
@@ -36,9 +57,9 @@
    Reason Deferred: Camera settings are still being tuned; do it once they are final.
 
 3. Crop the table camera to the table — Priority 55% (Nice to have) [Security]
-   What: Add an optional crop box per camera in `camera_enhance`, so `look()` only shows the table area.
+   What: Add an optional crop box per camera in `config/elrobot.json`, so `look()` only shows the table area.
    Why: The table and gripper cameras also catch people and screens in the background. Cropping keeps them out of what is sent to Claude and of the logs, and gives the food more pixels.
-   How: Add `"crop": [x, y, w, h]` (fractions of the frame) to `camera_enhance.cameras.table`, apply it in `src/frame_enhance.py` before enhancement, and add a test with a synthetic frame.
+   How: Add `"crop": [x, y, w, h]` (fractions of the frame) under `camera_settings.table`, apply it in `RobotTools.look()` in `src/robot_tools.py`, and add a test with a synthetic frame. Note that this is image processing again; the software picture enhancement was removed on request on 2026-11-22.
    Status: ⏳ Unimplemented
    Reason Deferred: The crop box needs to be chosen on the real camera view once the camera position is final.
 

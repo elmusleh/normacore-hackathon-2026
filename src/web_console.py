@@ -187,8 +187,7 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         if not await run_in_threadpool(station_up):
             return JSONResponse({"ok": False, "error": "the Station is not running (./cli.sh station)"},
                                 status_code=503)
-        raw = request.query_params.get("raw", "") in ("1", "true")
-        result = await run_in_threadpool(tools.call, lambda: tools.look(name, raw=raw))
+        result = await run_in_threadpool(tools.call, lambda: tools.look(name))
         if isinstance(result, dict):  # tools.call turned an exception into {"ok": False, ...}
             return JSONResponse(result, status_code=503)
         meta, jpeg = result

@@ -1,6 +1,6 @@
 ---
 last_agent: claude
-timestamp: 2026-11-22T00:20:00
+timestamp: 2026-11-22T10:00:00
 status: apriltag-ik-calibration-ready-untested-on-arm
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (Assistive Feeding)"
 current_task: "AprilTag table frame + URDF IK (ACT dropped); bench calibration next"
@@ -9,7 +9,15 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
-## Latest session (2026-11-22, ~00:20, claude for Jafer): AprilTag table frame + IK, ACT dropped
+## Latest session (2026-11-22, claude for Jafer): camera preprocessing removed
+- Request: "please undo any preprocessing". Read as: remove the software picture enhancement added 2026-11-21 (commit 179b423). Branch `feat/vision-apriltag-ik` (not pushed).
+- Changed: deleted `src/frame_enhance.py`. `RobotTools.look()`, the MCP `look` tool and the console's `/frame/<cam>` return the camera's JPEG unchanged; no `raw` parameter, no `exposure`/`exposure_warning` fields, no `camera_enhance` defaults. `scripts/calib.py` no longer passes `raw=True`. `exposure_stats` moved into `scripts/camera_settings.py`, so `./cli.sh cameras --tune` still works. Docs updated (`docs/mcp_server.md`, plan status table, SUGGESTIONS).
+- Kept on purpose: camera exposure/V4L2 settings (hardware settings, not image processing) and the internal upscale in `tag_calibration.detect_tags` (works on a private grayscale copy; tag pixels are scaled back).
+- Verified: 134 tests pass, `bash -n cli.sh`, py_compile. Not tested on live frames (no motion involved).
+- Next: if food is hard to see in the raw frames, fix it at the camera (`./cli.sh cameras --tune`, Station stopped) or with a darker table cover, not in software.
+- Hardware owner: steve (unchanged).
+
+## Previous session (2026-11-22, ~00:20, claude for Jafer): AprilTag table frame + IK, ACT dropped
 - Decision by Jafer: reset the approach. ACT imitation learning is dropped. One AprilTag per table corner defines a table frame in mm; the arm moves to Cartesian (TCP) targets via URDF inverse kinematics. Plan doc has a decision banner; docs/act_pick_skill.md marked superseded.
 - Found and fixed: the tag sheet in docs (and the PDF made from it) were NOT AprilTags (hand-typed 8x8 grids), so they could never be detected. `scripts/generate_apriltags.py` now uses OpenCV's 36h11 bits, 80 mm default. Update: the old printed sheet is readable after all (custom dictionary `printed-v1` in `src/tag_calibration.py`), so no reprint is needed; it needs the 480 px Station frames. New placement (seen from the person): 0 front-left, 1 front-right, 2 back-right, 3 back-left.
 - New, branch `feat/vision-apriltag-ik` (from `feat/console-face-camera`, not pushed): `src/tag_calibration.py`, `src/arm_kinematics.py`, `scripts/calib.py` (`./cli.sh calib layout|camera|zero|touch|fit|where|reach|pixel|show`), `docs/tcp_calibration.md`, `tests/test_calibration.py`, `tests/test_apriltags.py`. All read-only; `calib reach` only prints joint steps. No motion code changed.

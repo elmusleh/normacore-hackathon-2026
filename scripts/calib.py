@@ -101,7 +101,7 @@ def _read_arm():
 def _grab_frame(camera: str):
     import cv2
     from robot_mcp_server import tools  # lazy: connects to the Station
-    meta, jpeg = tools.look(camera, raw=True)
+    meta, jpeg = tools.look(camera)  # look() returns the camera's own JPEG
     if not jpeg:
         raise SystemExit(f"ERROR: no frame from camera {camera!r}: {meta.get('error', meta)}")
     return cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)

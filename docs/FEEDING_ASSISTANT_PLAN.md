@@ -69,7 +69,7 @@ not to compute coordinates. Mark the zones on the table with tape.
 | Teleop | Works: on the follower's card in the web viewer, pick the leader serial in the dropdown. Set back to **(Self-controlled)** before Claude moves the arm |
 | MCP server | `src/robot_mcp_server.py`, registered in `.mcp.json` as `elrobot`. Tested offline and read-only on the real arm. **No motion run yet** |
 | Cameras | `table` (USB port 3-2.4) and `gripper` (port 3-2.2). Need `scripts/99-normacore-cameras.rules` installed (done on the main laptop) |
-| Camera exposure | Auto exposure washes out under the Station. Fixed exposure in `config/elrobot.json` → `camera_settings`; apply with `./cli.sh cameras` **while the Station is stopped**; find a value with `./cli.sh cameras --tune`. Not yet confirmed that the Station keeps it after restart. `look()` frames are enhanced in software (`camera_enhance`, `src/frame_enhance.py`) and report an `exposure_warning` |
+| Camera exposure | Auto exposure washes out under the Station. Fixed exposure in `config/elrobot.json` → `camera_settings`; apply with `./cli.sh cameras` **while the Station is stopped**; find a value with `./cli.sh cameras --tune`. Not yet confirmed that the Station keeps it after restart. `look()` returns the camera's own picture, with no software clean-up |
 | Waypoints | None taught yet (`config/waypoints.json` is empty) |
 | Gripper | Direction (which end is "open") **not verified**. Grasp detection is tuned for firm objects, not grapes |
 | Voice, mouth tracking, food zones | Not started |

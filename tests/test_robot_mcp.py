@@ -343,20 +343,3 @@ def test_stop_interrupts_a_running_plan_without_waiting_for_the_lock(plans):
     res = tools.call(tools.play_sequence, "grapes")
     assert not res["ok"] and "stopped by request" in res["error"]
     assert len(arm.moves) == 2
-
-
-@needs_sdk
-def test_look_enhances_real_jpeg_and_raw_skips_it(env):
-    cv2 = pytest.importorskip("cv2")
-    np = pytest.importorskip("numpy")
-    frame_entry, connect_entry = _envelopes()
-    tools, arm, tmp = env
-    ok, buf = cv2.imencode(".jpg", np.full((224, 298, 3), 253, np.uint8))  # washed-out white table
-    jpeg = buf.tobytes()
-    arm.first["usbvideo/abc"] = connect_entry("11391:19040:3:26")
-    arm.frames["usbvideo/abc"] = [frame_entry(jpeg)]
-    meta, data = tools.look()
-    assert meta["enhanced"] and data != jpeg and meta["exposure"]["verdict"] == "overexposed"
-    assert "--tune" in meta["exposure_warning"]
-    meta, data = tools.look(raw=True)
-    assert data == jpeg and "enhanced" not in meta

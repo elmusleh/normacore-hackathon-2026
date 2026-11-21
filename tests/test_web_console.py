@@ -22,7 +22,7 @@ class FakeTools:
         except Exception as exc:  # noqa: BLE001 - mirrors RobotTools.call
             return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
-    def look(self, camera="", raw=False):
+    def look(self, camera=""):
         if camera == "table":
             return {"ok": True, "width": 298, "height": 224, "age_seconds": 0.1}, JPEG
         if camera == "broken":
