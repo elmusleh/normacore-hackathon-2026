@@ -9,6 +9,12 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-21, ~19:10, claude for Jafer): action space from the leader arm
+- First stepwise console run (18:53): Claude found the grape but pushed motor 2 down ~14% while learning directions and hit the table (motor 2 timeout). It backed off; the user stopped it. Learned: motor 1 turns sideways, motor 2 + goes down/forward, gripper 100 = open (seen by Claude on camera, not checked by a human).
+- Fix, chosen by the user: they drive the follower with the leader (teleop) and we record the follower's poses. New `src/action_space.py`, `./cli.sh hw envelope record|show` (scripts/hw_day.py), `config/envelope.json`. `RobotTools.nudge_joint` refuses nudges ending > `agent.envelope_margin_steps` (80) from every recorded pose unless they move back toward the space; console stepwise mode sets `ELROBOT_REQUIRE_ENVELOPE=1` (no recording -> no nudges). MCP tool `get_action_space` (anchors with per-motor % nudges to reach them); stepwise prompt steers toward anchors. Motion-code change approved by the user in the session.
+- Verified: 112 tests pass. NOT verified on the arm; no envelope recorded yet.
+- Next: 1) close the console. 2) teleop ON. 3) `./cli.sh hw envelope record`, drive slowly everywhere the arm may go, never touching the table, toward the face only to ~10 cm; type `above_grape`, `lifted`, `face_standoff` at those poses; `q`. 4) teleop OFF (Self-controlled). 5) `./cli.sh console 8890 --mode stepwise` (fresh start), "I want a grape". 6) Commit config/envelope.json as a calibration commit.
+
 ## Latest session (2026-11-21, ~18:50, claude for Jafer): stepwise console mode + failed grapes run
 - Branch `feat/brain-claude-stepwise-control` (from `jafer` at `315c896`). Not pushed, no PR yet.
 - Camera names swapped in `config/elrobot.json` (table = port 3-5.2.2, gripper = 3-5.2.4), confirmed by the user; commit `315c896` on `jafer`.

@@ -76,8 +76,18 @@ Claude then works in ticks: look at the cameras, one or two small `nudge_joint` 
 the face), look again. It grasps with `set_gripper`, lifts, turns to the person, approaches the mouth from the
 gripper camera and stops when the face fills about half the gripper image; the person leans in.
 
-- Claude only gets `look`, `list_cameras`, `get_robot_state`, `nudge_joint`, `set_gripper`, `stop`. Waypoints,
-  recorded plans, teaching and torque are removed in code (`STEPWISE_TOOLS` in `src/console_agent.py`).
+- Claude only gets `look`, `list_cameras`, `get_robot_state`, `get_action_space`, `nudge_joint`, `set_gripper`,
+  `stop`. Waypoints, recorded plans, teaching and torque are removed in code (`STEPWISE_TOOLS` in
+  `src/console_agent.py`).
+- **Action space (required in this mode).** Record it first, with teleop ON and the console closed:
+  `./cli.sh hw envelope record`. Drive the leader slowly through every place the arm may go (above the table,
+  over each food, lifted, toward the person up to a safe distance). Type a name + Enter to mark an anchor
+  (`above_grape`, `lifted`, `face_standoff`), `q` to finish. It only reads the follower. Saved to
+  `config/envelope.json`; `./cli.sh hw envelope` shows it, `--append` adds to it.
+  `nudge_joint` then refuses any nudge ending more than `agent.envelope_margin_steps` (80) from every recorded
+  pose, unless it moves back toward the space. Without a recording, stepwise nudges are refused
+  (`ELROBOT_REQUIRE_ENVELOPE=1`, set by the console). Claude reads the anchors with `get_action_space()` and
+  steers toward them. The space is only valid while the arm base and table stay where they were.
 - Up to 150 tool rounds per request (plans mode: 25). Each tick takes a few seconds, so a full feed is minutes.
 - Joint directions and the gripper direction are not verified; the prompt tells Claude to learn them with 2%
   test nudges. The face standoff is a prompt rule judged from the image, **not enforced in code**: keep a hand

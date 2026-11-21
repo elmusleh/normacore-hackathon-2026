@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Slow down and shrink nudges near the face anchor in code — Priority 85% (High value) [Security]
+   What: When the arm is close to the recorded `face_standoff` anchor, let `nudge_joint` allow only 1-2% nudges at low speed, whatever Claude asks for.
+   Why: The action space stops the arm going where the operator never went, but near the face the speed and step size are still Claude's choice. The plan requires code limits near a person (safety rule 4).
+   How: In `RobotTools.nudge_joint`, if the distance to the `face_standoff` anchor is under about 150 steps, cap `delta_percent` at 2 and `speed` at 150; add a fake-arm test.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs a recorded `face_standoff` anchor to tune the distance.
+
+2. Warn when the recorded action space no longer matches the table — Priority 60% (Nice to have) [Best practices]
+   What: At console start, warn if the table camera view differs a lot from the view at recording time.
+   Why: The space is only valid while the arm base and table stay put. If someone moves the table, the "safe" space may now go through it.
+   How: Keep a small table-camera thumbnail locally when recording (logs/, not git), compare it with a fresh frame when the console starts, and post a warning in the chat if they differ a lot.
+   Status: ⏳ Unimplemented
+   Reason Deferred: First see how stable the setup is during a session.
+
+3. Show the recorded space as a picture — Priority 45% (Nice to have) [Professionalism]
+   What: A small plot of the recorded poses per pair of joints (for example motor 2 vs motor 3), with anchors marked.
+   Why: It shows at a glance whether the operator covered the area over the food and toward the person, or left gaps that will make Claude's nudges get refused.
+   How: Add `./cli.sh hw envelope plot` that writes a PNG into `logs/` from `config/envelope.json`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Only useful once a real recording exists.
+
 1. Reconnect the arm command channel after a Station restart — Priority 95% (Critical) [Best practices]
    What: Make the MCP server notice that the Station restarted and open a fresh connection for motor commands, not only for readings.
    Why: On 2026-11-21 the Station was restarted while the MCP server kept running. Readings still worked, but every move and even the "hold" from stop() silently went nowhere (the motors' goal register kept its old value). A stop that does nothing is the worst failure near a person.

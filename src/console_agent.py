@@ -35,7 +35,8 @@ MAX_TOOL_ROUNDS = 25  # tool calls per user message before the agent must stop a
 STEPWISE_MAX_TOOL_ROUNDS = 150
 MODES = ("plans", "stepwise")
 # Stepwise mode: Claude decides every move itself. No waypoints, no recorded plans, no teaching.
-STEPWISE_TOOLS = frozenset({"look", "list_cameras", "get_robot_state", "nudge_joint", "set_gripper", "stop"})
+STEPWISE_TOOLS = frozenset({"look", "list_cameras", "get_robot_state", "get_action_space", "nudge_joint",
+                            "set_gripper", "stop"})
 STOP_WORDS = re.compile(r"^\s*(stop|halt|wait|freeze|emergency stop)[\s.!]*$", re.IGNORECASE)
 
 CONSOLE_PROMPT = """\
@@ -125,8 +126,22 @@ cameras.
 In this mode there are no taught poses and no recorded plans. You steer the arm yourself, one
 small move at a time, from what you see. Your tools: look(camera) with "table" (a fixed camera
 looking at the whole table from the far side) or "gripper" (on the arm, looking past the
-gripper); get_robot_state(); nudge_joint(motor 1-7, delta_percent) which moves one joint by at
-most 5% of its range per call; set_gripper(open_percent) with 100 = open and 0 = closed; stop().
+gripper); get_robot_state(); get_action_space(); nudge_joint(motor 1-7, delta_percent) which
+moves one joint by at most 5% of its range per call; set_gripper(open_percent) with 100 = open
+and 0 = closed; stop().
+
+# Your action space
+
+The operator recorded where the arm may go by driving it with the leader arm: every pose they
+drove through, plus named anchors such as above_grape, lifted or face_standoff. Call
+get_action_space() at the start of every request. It gives what each joint does (joint_map, if
+filled in), the range each joint was driven through, and for each anchor the nudge in % per
+motor that would reach it from where the arm is now. Use the anchors as targets: nudge the
+motors with the biggest remaining difference first (5% max per nudge), call get_action_space()
+again every few ticks to see what is left, and use the cameras to fine-tune the last part.
+A nudge that would leave the recorded space is refused (refused: action_space). That is the
+table, the person or somewhere the operator never went: do not push in that direction, try
+another joint or the way back. If no space is recorded, say so and do not move.
 
 # What the person wants
 
@@ -137,9 +152,9 @@ do not move. If two foods could match, ask one short question.
 # How to steer (the tick loop)
 
 Every tick is: look -> decide one small move -> nudge -> look again. Never chain moves blind.
-1. Start every request with get_robot_state(), look("table") and look("gripper").
-2. Joint meanings and directions are NOT verified on this arm. Learn them as you go: when you
-   are unsure what a joint does, nudge it by 2% and compare the gripper image before and after.
+1. Start every request with get_action_space(), look("table") and look("gripper").
+2. If the joint_map does not say what a joint does, learn it: nudge it by 2% (lifted, away from
+   the table) and compare the gripper image before and after.
    Remember what you learned for the rest of the conversation (for example "motor 1 + turns the
    view to the left"). Earlier findings in this conversation are valid while the arm is unchanged.
 3. Approach the food from above: first turn and reach until the food is centred in the gripper
@@ -237,8 +252,10 @@ class ConsoleAgent:
 
             self._client = anthropic.AsyncAnthropic()
             cfg = load_mcp_server_config()
-            params = StdioServerParameters(command=cfg["command"], args=cfg["args"], cwd=str(ROOT),
-                                           env={**os.environ, **cfg["env"]})
+            env = {**os.environ, **cfg["env"]}
+            if self.mode == "stepwise":
+                env["ELROBOT_REQUIRE_ENVELOPE"] = "1"  # no nudges without a recorded action space
+            params = StdioServerParameters(command=cfg["command"], args=cfg["args"], cwd=str(ROOT), env=env)
             self._stack = contextlib.AsyncExitStack()
             read, write = await self._stack.enter_async_context(stdio_client(params))
             self._session = await self._stack.enter_async_context(ClientSession(read, write))

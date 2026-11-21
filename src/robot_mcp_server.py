@@ -134,6 +134,16 @@ def nudge_joint(motor: int, delta_percent: float, speed: Optional[int] = None) -
 
 
 @server.tool(structured_output=False)
+def get_action_space() -> dict:
+    """The space a human recorded by driving the arm with the leader arm: what each joint does
+    (joint_map), the range each joint was driven through, named anchor poses (for example
+    above_grape, lifted, face_standoff) with the nudges in % that would reach them from here,
+    and whether the arm is inside the space now. Nudges that would leave it are refused.
+    Moves nothing."""
+    return tools.call(tools.get_action_space)
+
+
+@server.tool(structured_output=False)
 def set_gripper(open_percent: float) -> dict:
     """Open or close the gripper: 100 = fully open, 0 = fully closed. When closing, result is
     'holding_object' if it stopped on something (it then keeps a light squeeze), or

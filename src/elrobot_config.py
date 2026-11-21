@@ -51,6 +51,9 @@ DEFAULTS: Dict[str, Any] = {
         "max_speed": 500,
         "max_waypoint_delta_steps": 1500,
         "max_nudge_percent": 5.0,
+        # A nudge may end at most this many steps (any one motor) from a pose recorded with
+        # ./cli.sh hw envelope record (config/envelope.json).
+        "envelope_margin_steps": 80,
         "clear_waypoint": "clear",
         # play_sequence (recorded plans, config/sequences.json): speed, pause at each waypoint (s),
         # and how far short of a waypoint a stopped motor may be (loaded joints sag 20-45 steps).

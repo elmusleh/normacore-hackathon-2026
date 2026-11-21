@@ -12,6 +12,11 @@ fault and torque checks, speed caps, overload hold):
   * Waypoint moves route through the `clear` waypoint by default, and any single
     motor moving more than agent.max_waypoint_delta_steps is refused.
   * Nudges are capped at agent.max_nudge_percent of the joint's calibrated range.
+  * Nudges stay inside the action space a human recorded with the leader arm
+    (config/envelope.json, ./cli.sh hw envelope record): a nudge that would end more than
+    agent.envelope_margin_steps from every recorded pose is refused, unless it brings the arm
+    closer to the space. With ELROBOT_REQUIRE_ENVELOPE=1 (console stepwise mode) nudges are
+    refused when no space is recorded.
   * One tool call at a time (a lock), so two moves never interleave. stop() is the exception:
     it skips the lock, so it also interrupts a recorded plan (play_sequence) that is running.
   * play_sequence only plays plans a human recorded (./cli.sh hw record), with the same checks
@@ -30,6 +35,7 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from action_space import SPACE_MOTORS, load_action_space
 from elrobot_camera import (
     MAX_LOOKBACK,
     decode_frame,
@@ -59,6 +65,10 @@ TELEOP_WATCH_S = 1.0        # goal registers must stay still this long before a 
 
 def motion_allowed() -> bool:
     return os.environ.get("ELROBOT_ALLOW_MOTION", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def envelope_required() -> bool:
+    return os.environ.get("ELROBOT_REQUIRE_ENVELOPE", "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def percent_of_range(r: MotorReading) -> Optional[float]:
@@ -345,9 +355,79 @@ class RobotTools:
         if r is None or not r.calibrated:
             return {"ok": False, "error": f"motor {motor} not visible or not calibrated"}
         delta = int(round(delta_percent / 100.0 * (r.range_max - r.range_min)))
+        envelope = self._check_envelope(motor, r.present + delta, cfg)
+        if envelope is not None and not envelope["ok"]:
+            return envelope
         res = self._move({motor: r.present + delta}, cfg, speed)
         res["delta_steps"] = delta
+        if envelope is not None:
+            res["action_space_distance_steps"] = envelope["distance_after"]
         return res
+
+    def _check_envelope(self, motor: int, goal: int, cfg: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """None if no action space is recorded and none is required; else the check result."""
+        space = load_action_space()
+        if space is None or space.empty:
+            if envelope_required():
+                return {"ok": False, "error": "no action space recorded, so nudges are not allowed in this mode",
+                        "hint": "Ask the operator to record one: teleop on, ./cli.sh hw envelope record."}
+            return None
+        readings = self.hw().snapshot()
+        missing = [m for m in SPACE_MOTORS if m not in readings]
+        if missing:
+            return {"ok": False, "error": f"cannot read motors {missing}; cannot check the action space"}
+        current = {m: readings[m].present for m in SPACE_MOTORS}
+        r = readings[motor]
+        goal, _ = clamp_goal(goal, r.range_min, r.range_max)
+        check = space.check_move(current, {**current, motor: goal}, int(cfg["agent"]["envelope_margin_steps"]))
+        if not check["ok"]:
+            log.warning("nudge motor %d refused: %s", motor, check["reason"])
+            return {"ok": False, "error": check["reason"], "refused": "action_space",
+                    "distance_now_steps": check["distance_before"],
+                    "hint": "Try the other direction, a smaller nudge, or another joint. get_action_space() "
+                            "shows the recorded range and the anchors."}
+        return check
+
+    def get_action_space(self) -> Dict[str, Any]:
+        """What the human recorded with the leader arm: joint meanings, the range each joint was
+        driven through, named anchor poses, and how far the arm is from the space now."""
+        cfg = self._cfg()
+        space = load_action_space()
+        joint_map = {m: cfg["joint_map"][m] for m in sorted(cfg["joint_map"], key=int)}
+        if space is None or space.empty:
+            return {"ok": True, "recorded": False, "joint_map": joint_map, "required": envelope_required(),
+                    "hint": "No action space recorded. The operator records one with teleop on: "
+                            "./cli.sh hw envelope record."}
+        readings = self.hw().snapshot()
+
+        def pct(m: int, raw: int) -> Optional[float]:
+            r = readings.get(m)
+            if r is None or not r.calibrated:
+                return None
+            return round((raw - r.range_min) * 100.0 / (r.range_max - r.range_min), 1)
+
+        now = {m: readings[m].present for m in SPACE_MOTORS if m in readings}
+        joints = {}
+        for m, (lo, hi) in space.seen_range().items():
+            joints[str(m)] = {"recorded_min_percent": pct(m, lo), "recorded_max_percent": pct(m, hi),
+                              "now_percent": pct(m, now[m]) if m in now else None}
+        anchors = {}
+        for name, pose in space.anchors.items():
+            to_go = {}
+            for m in SPACE_MOTORS:
+                a, n = pct(m, int(pose[str(m)])), pct(m, now[m]) if m in now else None
+                if a is not None and n is not None:
+                    to_go[str(m)] = round(a - n, 1)
+            anchors[name] = {"distance_steps": max(abs(int(pose[str(m)]) - now[m]) for m in now) if now else None,
+                             "nudge_percent_to_reach": to_go}
+        distance = space.distance(now) if len(now) == len(SPACE_MOTORS) else None
+        margin = int(cfg["agent"]["envelope_margin_steps"])
+        return {"ok": True, "recorded": True, "updated": space.meta.get("updated"), "poses": len(space.poses),
+                "joint_map": joint_map, "joints": joints, "anchors": anchors,
+                "distance_now_steps": distance, "inside": distance is not None and distance <= margin,
+                "margin_steps": margin,
+                "note": "Nudges that would leave the recorded space are refused. nudge_percent_to_reach is "
+                        "per motor, in % of range, from where the arm is now (5% max per nudge)."}
 
     def set_gripper(self, open_percent: float) -> Dict[str, Any]:
         cfg = self._cfg()
