@@ -8,15 +8,18 @@
   body { font-family: Arial, sans-serif; margin: 0; color: #222; }
   h2 { font-size: 15px; margin: 0 0 4px 0; }
   .note { font-size: 11px; margin: 0 0 8px 0; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; justify-items: center; }
-  .tag-card { border: 1px dashed #999; padding: 3mm; text-align: center; break-inside: avoid; }
+  /* One column: an 80 mm tag card is ~108 mm wide, two would not fit A4's 190 mm print width. */
+  .grid { display: grid; grid-template-columns: 1fr; gap: 6mm; justify-items: center; }
+  .tag-card { border: 1px dashed #999; padding: 3mm; text-align: center; break-inside: avoid;
+               page-break-inside: avoid; }
+  .tag-card:nth-child(2) { break-after: page; page-break-after: always; }
   .tag-card h3 { font-size: 13px; margin: 0 0 2mm 0; }
   .tag-card p { font-size: 10px; margin: 2mm 0 0 0; color: #555; }
 </style>
 </head>
 <body>
   <h2>Table corner AprilTags (36h11, IDs 0&ndash;3)</h2>
-  <p class="note">Print at 100% (no "fit to page"). Measure the black square with a ruler and use that size.
+  <p class="note">2 pages, 2 tags each. Print at 100% (no "fit to page" / "shrink to fit"). Measure the black square with a ruler and use that size.
   Keep the white margin around each tag. Tape them flat, one per table corner, IDs as labelled
   (front = the side where the person sits, seen from there). Then measure the tag-centre distances for ./cli.sh calib.</p>
   <div class="grid">
