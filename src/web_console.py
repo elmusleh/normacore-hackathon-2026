@@ -13,7 +13,8 @@ Chat messages are kept in memory and served at /api/messages, so an MCP `listen`
 Read-only: nothing here moves the arm. Needs the Station running (./cli.sh station).
 
 Environment:
-  WEB_CONSOLE_STT_MODEL   faster-whisper model (default small.en; base.en is faster)
+  WEB_CONSOLE_STT_MODEL   faster-whisper model (default large-v3-turbo on a GPU, small.en on CPU)
+  WEB_CONSOLE_STT_PROMPT  words to expect, as a hint to Whisper (default: the demo foods and commands)
   ELROBOT_STATION / ELROBOT_BUS / ELROBOT_CAMERA_QUEUES   same as the MCP server
 """
 
@@ -47,6 +48,9 @@ PAGE = Path(__file__).resolve().parent / "web" / "console.html"
 DEFAULT_PORT = 8890
 MAX_AUDIO_BYTES = 10 * 1024 * 1024
 MAX_MESSAGE_CHARS = 2000
+# Whisper is much better at short commands when told which words to expect.
+DEFAULT_STT_PROMPT = ("Requests to a feeding robot: I want a grape. Some rice, please. Cheese. "
+                      "Use the spoon. Another one. Stop. Wait. I'm done.")
 STATION_PORT = 8888  # the Station's TCP port (the SDK default)
 
 
@@ -66,8 +70,10 @@ def station_reachable() -> bool:
 class SpeechToText:
     """faster-whisper, loaded once in the background so the first click is not slow."""
 
-    def __init__(self, model_name: str):
-        self.model_name = model_name
+    def __init__(self, model_name: Optional[str] = None, prompt: str = DEFAULT_STT_PROMPT):
+        self.model_name = model_name or ""  # empty: chosen when loading, by GPU or CPU
+        self.prompt = prompt
+        self.device = ""
         self.state = "idle"  # idle | loading | ready | unavailable
         self.error = ""
         self._model = None
@@ -82,9 +88,14 @@ class SpeechToText:
     def _load(self) -> None:
         try:
             from faster_whisper import WhisperModel  # noqa: WPS433 - optional dependency
-            self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
+            import ctranslate2  # noqa: WPS433 - installed with faster-whisper
+            gpu = ctranslate2.get_cuda_device_count() > 0
+            self.device = "cuda" if gpu else "cpu"
+            self.model_name = self.model_name or ("large-v3-turbo" if gpu else "small.en")
+            self._model = WhisperModel(self.model_name, device=self.device,
+                                       compute_type="float16" if gpu else "int8")
             self.state = "ready"
-            log.info("speech-to-text ready (%s)", self.model_name)
+            log.info("speech-to-text ready (%s on %s)", self.model_name, self.device)
         except Exception as exc:  # noqa: BLE001 - reported to the page
             self.state = "unavailable"
             self.error = f"{type(exc).__name__}: {exc}"
@@ -94,8 +105,17 @@ class SpeechToText:
         if self.state != "ready":
             raise RuntimeError(f"speech-to-text is {self.state}")
         with self._lock:  # one transcription at a time; the model is not shared across threads
-            segments, _ = self._model.transcribe(decode_audio(audio), language="en", vad_filter=True)
-            return " ".join(s.text.strip() for s in segments).strip()
+            samples = decode_audio(audio)
+            segments, _ = self._model.transcribe(
+                samples, language="en", beam_size=5, initial_prompt=self.prompt or None,
+                condition_on_previous_text=False,
+                # Keep VAD (it stops Whisper inventing words in silence) but pad generously so
+                # short commands and first/last syllables are not cut.
+                vad_filter=True, vad_parameters={"speech_pad_ms": 500, "min_silence_duration_ms": 800},
+            )
+            text = " ".join(s.text.strip() for s in segments).strip()
+            log.info("heard %.1f s of audio: %r", len(samples) / 16000, text)
+            return text
 
 
 def decode_audio(audio: bytes, rate: int = 16000):
@@ -179,7 +199,8 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None) 
     async def stt_status(_: Request):
         if stt is None:
             return JSONResponse({"state": "unavailable", "error": "disabled"})
-        return JSONResponse({"state": stt.state, "model": stt.model_name, "error": stt.error})
+        return JSONResponse({"state": stt.state, "model": stt.model_name, "device": stt.device,
+                             "error": stt.error})
 
     async def transcribe(request: Request):
         if stt is None or stt.state != "ready":
@@ -239,7 +260,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     for noisy in ("httpx", "httpx2", "huggingface_hub"):  # model download chatter
         logging.getLogger(noisy).setLevel(logging.WARNING)
-    stt = None if args.no_stt else SpeechToText(os.environ.get("WEB_CONSOLE_STT_MODEL", "small.en"))
+    stt = None if args.no_stt else SpeechToText(os.environ.get("WEB_CONSOLE_STT_MODEL") or None,
+                                                os.environ.get("WEB_CONSOLE_STT_PROMPT", DEFAULT_STT_PROMPT))
 
     import uvicorn  # noqa: WPS433
     print(f"ElRobot console: http://{'localhost' if args.host == '127.0.0.1' else args.host}:{args.port}",

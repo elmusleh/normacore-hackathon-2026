@@ -50,9 +50,11 @@ viewer again; [calibration/](../calibration/) holds the ranges measured on 2026-
   Each shows its frame age; amber means the camera has stalled. Needs the Station running.
 - Right: a chat box with a big microphone button. Click to talk, click again to stop (or hold Space).
   The text goes into the box to check, then Send/Enter. Tick "Send right after speaking" to skip that.
-- Speech-to-text runs locally with faster-whisper (`small.en`, about 1 s per sentence on CPU). The first
-  start downloads the model (~500 MB) from Hugging Face, so do it once while online. Set
-  `WEB_CONSOLE_STT_MODEL=base.en` for a faster, less accurate model. Without faster-whisper (or with
+- Speech-to-text runs locally with faster-whisper: `large-v3-turbo` on an NVIDIA GPU, `small.en` on CPU
+  (about 1 s per sentence). The first start downloads the model (~1.6 GB / ~500 MB) from Hugging Face, so
+  do it once while online. Override with `WEB_CONSOLE_STT_MODEL=<name>`. Whisper is told which words to
+  expect (`WEB_CONSOLE_STT_PROMPT`, default: the demo foods and commands); add new foods there.
+  The server log prints what it heard (`heard 2.1 s of audio: '...'`). Without faster-whisper (or with
   `--no-stt`) the page uses the browser's speech recognition, which sends audio online (Chrome only).
 - The microphone only works when the page is opened as `localhost` (browsers block it on plain http
   from another machine).

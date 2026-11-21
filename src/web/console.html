@@ -242,7 +242,7 @@ async function chooseEngine() {
     let s = { state: "unavailable" };
     try { s = await (await fetch("/api/stt")).json(); } catch (_) {}
     if (s.state === "ready") {
-      engine = "server"; $("engine").textContent = `Local speech-to-text (${s.model})`;
+      engine = "server"; $("engine").textContent = `Local speech-to-text (${s.model}, ${s.device === "cuda" ? "GPU" : "CPU"})`;
       mic.disabled = false; setStatus("Click the microphone and speak.");
       return;
     }
@@ -268,13 +268,15 @@ async function startServerRecording() {
     return;
   }
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    // Browser noise suppression tends to garble speech for Whisper; raw audio works better.
+    stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
   } catch (e) {
     setStatus(`Microphone blocked: ${e.message}`, true);
     return;
   }
   chunks = [];
-  recorder = new MediaRecorder(stream);
+  recorder = new MediaRecorder(stream, { audioBitsPerSecond: 128000 });
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   recorder.onstop = async () => {
     stream.getTracks().forEach(t => t.stop());
@@ -323,7 +325,12 @@ function toggle() {
     engine === "server" ? startServerRecording() : startBrowserRecording();
   } else {
     setRecording(false);
-    if (engine === "server" && recorder?.state === "recording") recorder.stop();
+    // Keep recording a moment after the click so the last word is not cut off.
+    if (engine === "server" && recorder?.state === "recording") {
+      busy = true; setStatus("Finishing…");
+      const r = recorder;
+      setTimeout(() => r.state === "recording" && r.stop(), 400);
+    }
     if (engine === "browser" && recognizer) recognizer.stop();
   }
 }
