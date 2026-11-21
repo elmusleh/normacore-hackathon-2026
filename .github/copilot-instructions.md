@@ -1,3 +1,5 @@
+**Current team plan:** read `docs/FEEDING_ASSISTANT_PLAN.md` first (goal, safety rules, task list).
+
 # Copilot Instructions
 
 This project uses `.ai-sync/` for cross-platform AI agent synchronization.

@@ -21,7 +21,10 @@ stop_reason: needs-physical-arm
 
 - Done this session, do not repeat: Station + both arms connected, calibration exported to `calibration/`, MCP `elrobot` connected, cameras named and exposure fixed.
 
+- Team goal is now an assistive feeding robot: plan, safety rules, 4-person split and task list in `docs/FEEDING_ASSISTANT_PLAN.md`. All agent rule files point to it.
+
 ### Next steps
+0. Follow the task table for your role in docs/FEEDING_ASSISTANT_PLAN.md.
 1. On a new laptop: follow `docs/mcp_server.md` → Setup, calibrate in the Station viewer, start the Station, check `/mcp` → elrobot, `look`.
 2. Optional: raise `resize_target` in `station.yaml` (local, gitignored) from 224 to ~480 for small objects.
 3. Verify gripper direction (`./cli.sh hw identify 8`), set `gripper.open_at` and `verified`.
