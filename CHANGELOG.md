@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Raised `usb-video.resize_target` in `station.yaml` from `224` to `480` for clearer Station camera frames.
 - Stacked dual camera layout (`Table Cam` above `Person Cam`) and one-click **Save Default** button in Mission Control (`src/digital_twin.html`, `src/digital_twin_server.py`) that persists the selected camera mappings into `config/elrobot.json`.
 - Replaced the offline Three.js `<canvas>` mockup in Mission Control (`src/digital_twin.html`) with full-size dual live camera views (`Table Cam` + `Person Cam`), saved waypoint badges from `config/waypoints.json`, and clean role-specific real detections only (removed fake fallback `BOWL`/`SPOON`/`MOUTH` placeholder overlays in `src/digital_twin_server.py`).
 - Confirmed hardware config in `config/elrobot.json` (follower bus `5B61034962`, `table` = `port:3-1.2.2`, `gripper` = `port:3-1.2.4`, `person` = `v4l2:6`) and config-backed default camera selection in `CameraHub` (`src/digital_twin_server.py`).
