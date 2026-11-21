@@ -24,8 +24,9 @@ import cv2
 
 FAMILY = "36h11"
 TAG_IDS = (0, 1, 2, 3)
-# Where each tag goes, looking down at the table from the person's side.
-CORNERS = {0: "back-left", 1: "back-right", 2: "front-right", 3: "front-left"}
+# Where each tag goes, seen from the person's side of the table ("front" = nearest the person).
+# This makes the table frame right-handed: +x from tag 0 to 1, +y from tag 0 to 3 (away), z up.
+CORNERS = {0: "front-left", 1: "front-right", 2: "back-right", 3: "back-left"}
 
 
 def tag_bits(tag_id: int) -> List[List[int]]:
@@ -81,7 +82,7 @@ def generate_printable_sheet(output_html: str = "docs/apriltags_printable.html",
   <h2>Table corner AprilTags ({FAMILY}, IDs 0&ndash;3)</h2>
   <p class="note">Print at 100% (no "fit to page"). Measure the black square with a ruler and use that size.
   Keep the white margin around each tag. Tape them flat, one per table corner, IDs as labelled
-  (back = far side from the person). Then measure the tag-centre distances for ./cli.sh calib.</p>
+  (front = the side where the person sits, seen from there). Then measure the tag-centre distances for ./cli.sh calib.</p>
   <div class="grid">{cards}
   </div>
 </body>
