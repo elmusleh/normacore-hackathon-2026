@@ -228,8 +228,9 @@ class RobotTools:
                 "hint": "" if live else "No camera is plugged in, or the Station cannot open it "
                                         "(see scripts/99-normacore-cameras.rules)."}
 
-    def look(self, camera: str = "") -> Tuple[Dict[str, Any], Optional[bytes]]:
-        """Newest JPEG from a camera: a configured name ('table'), 'port:3-2.4', a queue id, or empty."""
+    def camera_queue(self, camera: str = "") -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+        """(queue id, None) for a configured name ('table'), 'port:3-2.4', a queue id, or empty;
+        (None, error result) if that camera is not plugged in."""
         cfg = self._cfg()
         cams = self._cameras(cfg)
         live = [c for c in cams if c["live"]]
@@ -237,16 +238,21 @@ class RobotTools:
         target = cfg["cameras"].get(want, want)
         if not target:
             if not live:
-                return {"ok": False, "error": "no camera plugged in; see list_cameras"}, None
-            queue = live[0]["queue"]
-        elif target.startswith("port:"):
+                return None, {"ok": False, "error": "no camera plugged in; see list_cameras"}
+            return live[0]["queue"], None
+        if target.startswith("port:"):
             match = [c for c in live if f"port:{c['port']}" == target]
             if not match:
-                return {"ok": False, "error": f"camera {camera or want!r} ({target}) is not plugged in",
-                        "live_cameras": live}, None
-            queue = match[0]["queue"]
-        else:
-            queue = target if target.startswith("usbvideo/") else f"usbvideo/{target}"
+                return None, {"ok": False, "error": f"camera {camera or want!r} ({target}) is not plugged in",
+                              "live_cameras": live}
+            return match[0]["queue"], None
+        return (target if target.startswith("usbvideo/") else f"usbvideo/{target}"), None
+
+    def look(self, camera: str = "") -> Tuple[Dict[str, Any], Optional[bytes]]:
+        """Newest JPEG from a camera: a configured name ('table'), 'port:3-2.4', a queue id, or empty."""
+        queue, err = self.camera_queue(camera)
+        if err:
+            return err, None
         hw = self.hw()
         for back in range(1, MAX_LOOKBACK + 1):
             data = hw.read_recent(queue, back=back)

@@ -50,6 +50,10 @@
 - [x] Action space from the leader arm: `hw envelope record`, nudges refused outside it, `get_action_space` tool. NOT yet recorded on the arm
 - [ ] Record the action space (teleop on, console closed) with anchors above_grape, lifted, face_standoff; commit config/envelope.json
 - [ ] Run stepwise mode on the arm: "I want a grape" end to end, hand on the 12 V switch
+- [x] ACT demo recorder `./cli.sh demos record` (reads only), runbook docs/act_pick_skill.md. NOT yet run against the live Station
+- [ ] Record 60-100 demos each: pick grape, pick chocolate
+- [ ] Convert demos to a LeRobot dataset and train ACT per skill (.venv-lerobot)
+- [ ] Policy runner with safety filter + MCP run_skill(skill, food); evaluate 20 attempts per food
 - [ ] MCP command connection goes stale after a Station restart (reads work, writes do not land): reconnect it
 
 ## Phase 4: Closed-Loop Recovery & Stress Testing — PENDING

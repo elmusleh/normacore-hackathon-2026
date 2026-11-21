@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Teleop demonstration recorder for ACT: `./cli.sh demos record --skill pick --food grape` / `demos list` (`scripts/record_demos.py`, `src/demo_recorder.py`). Stores follower position (state), follower goal register (action), leader position and table/gripper camera frames at 30 per second in `data/demos/`; reads only. Runbook `docs/act_pick_skill.md`. `RobotTools.camera_queue()` split out of `look()`. `.venv-*/` gitignored (LeRobot goes in `.venv-lerobot`).
 - `hw envelope record` skips samples where a motor reads outside its calibrated range (a read glitch put motor 2 = 0 into the first recording).
 - `config/envelope.json`: first action space, 1027 follower poses and 8 anchors, recorded with the leader arm 2026-11-21.
 - Action space recorded with the leader arm: `./cli.sh hw envelope record` samples the follower while a person drives it with teleop and marks named anchors (`config/envelope.json`, `src/action_space.py`). `nudge_joint` refuses nudges that would leave the recorded space (margin `agent.envelope_margin_steps`, 80 steps) unless they move back toward it; stepwise console mode requires a recording. New MCP tool `get_action_space` gives Claude the recorded ranges, anchors and the nudges that reach them.

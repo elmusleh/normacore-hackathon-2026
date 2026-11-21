@@ -57,6 +57,7 @@ print_usage() {
     echo -e "  ${C_GREEN}hw waypoints${C_RESET}        List taught waypoints"
     echo -e "  ${C_GREEN}hw record <seq>${C_RESET}     Record a sequence: pose the arm, Enter saves each step (moves nothing)"
     echo -e "  ${C_GREEN}hw envelope record${C_RESET}  Record the action space: drive the follower with the leader, name anchors (moves nothing)"
+    echo -e "  ${C_GREEN}demos record --skill pick --food grape${C_RESET}  Record teleop demos for ACT (reads only); demos list"
     echo -e "  ${C_RED}hw play <seq|wp...>${C_RESET}  Go through all waypoints, ONE MOVE prompt, waits until stopped + --pause"
     echo -e "  ${C_GREEN}hw sequences${C_RESET}        List recorded sequences"
     echo -e "  ${C_RED}hw demo [motors]${C_RESET}     Follower: sweep each motor, then all together; per-motor report"
@@ -206,6 +207,12 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
 
     cameras)
         python3 scripts/camera_settings.py "$@"
+        ;;
+
+    demos)
+        # Teleop demonstrations for ACT training (reads only), e.g. demos record --skill pick --food grape
+        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        "$PY" scripts/record_demos.py "$@"
         ;;
 
     sync)
