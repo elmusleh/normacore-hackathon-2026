@@ -40,6 +40,13 @@ def check_sdk():
         return
     report("PASS", "SDK folder", str(SDK.relative_to(ROOT)))
 
+    # The old unpacked copy has no .git of its own, so git would report this project's repo.
+    # Submodule checkouts always have a .git file, so require it before any other check.
+    if not (SDK / ".git").exists():
+        report("FAIL", "SDK submodule", "external/norma-core is an old unpacked copy, not the submodule. "
+               "Move it aside, then run: git submodule update --init external/norma-core")
+        return
+
     code, head = git_in_sdk("rev-parse", "HEAD")
     if code == 0 and head == EXPECTED_COMMIT:
         report("PASS", "SDK pin", f"commit {EXPECTED_COMMIT[:7]}")

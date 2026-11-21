@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AGENTS.md`: after each implementation, agents give 3 prioritized suggestions and record them in `SUGGESTIONS.md`.
 - `AGENTS.md`: added setup and safety pointers, where things live, a definition of done, testing, conventions, blocker reporting and privacy rules, plus shared-file etiquette for handoffs.
 - `external/norma-core` is now a git submodule of NormaCore (`norma-core/norma-core`), pinned to commit `5f4f805` (release 0.1.0-beta.10). Replaces the manually unpacked archive. `.gitignore` ignores `external/*` except the submodule.
+- `FINDINGS.md`: new file for verified observations, each with evidence and status. Rules stay in `GUIDELINES.md`, and ideas in `SUGGESTIONS.md`. `AGENTS.md` now lists where each kind of information belongs.
+- `scripts/sdk_check.py`: fails clearly when `external/norma-core` is the old unpacked copy, not the submodule. The old copy differs from `5f4f805` in about 50 files, so it is not supported.
+- `docs/team_setup.md`: the submodule is the only supported SDK source. The guide shows how to move an old unpacked copy aside.
+- `SUGGESTIONS.md`: restored the protobuf-regeneration guard as suggestion 27. It was removed by mistake, since it was never implemented.
 - `scripts/sdk_check.py` and `./cli.sh sdk-check`: read-only check that the SDK submodule is at the pinned commit with no local edits, that its version and two Python imports work, and that `bin/station` reports build 5f4f805. Never moves the arm.
 - `scripts/agent_sync.sh` (`./cli.sh sync`) also runs `git submodule update --init --recursive` after a pull.
 - `docs/team_setup.md`: clone with `--recurse-submodules`; section 4 is now the submodule pin plus the Station binary; new troubleshooting rows for an empty or dirty submodule.

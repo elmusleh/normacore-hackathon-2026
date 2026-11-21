@@ -68,6 +68,11 @@ After each implementation, give the user **3 suggestions** for the next steps in
 - `docs/`: runbooks and setup guides. Start with `docs/team_setup.md`, `docs/bench_safety.md` and `docs/elrobot_hardware_bridge.md`.
 - `external/norma-core/`: the NormaCore SDK, a git submodule pinned to commit `5f4f805` (see `.gitmodules`). Do not edit files inside it.
 - `data/`, `logs/`, `station_data/`, `bin/`, and other `external/` contents (for example `external/lerobot_robot_elrobot/`): local only, gitignored.
+- Where to write what (one owner per fact):
+  - `GUIDELINES.md` and `PREFERENCES.md`: rules and conventions.
+  - `FINDINGS.md`: observed facts, each with its evidence and status.
+  - `SUGGESTIONS.md`: open ideas and next steps.
+  - `.ai-sync/HANDOFF.md`: what is happening now, and who has the hardware.
 - Team roles: the split in `README.md`.
 
 ## Definition of Done
@@ -102,7 +107,7 @@ A change is finished when all of these are true:
 ## On Stop
 1. Update `HANDOFF.md` with: completed work, specific next steps, files changed, build status, hardware owner
 2. Update `PROGRESS.md` with completed items
-3. Update `GUIDELINES.md` and `PREFERENCES.md` if new conventions were established (create them if missing)
+3. Update `GUIDELINES.md` and `PREFERENCES.md` if new conventions were established (create them if missing). Record each verified hardware or setup observation in `FINDINGS.md` with its evidence.
 4. Run verification (tests, syntax check) before stopping
 5. Confirm every change is committed (see Commit Every Change)
 6. Give the 3 post-implementation suggestions and record them in `SUGGESTIONS.md` (see Post-Implementation Suggestions)

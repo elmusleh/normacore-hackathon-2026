@@ -31,6 +31,12 @@ Both must come from NormaCore release **0.1.0-beta.10 (build 5f4f805)**. A misma
 
 **a. SDK (`external/norma-core/`)**
 This is a git submodule pinned in `.gitmodules`. Step 1 fetched it. Nothing to download or extract.
+
+The submodule is the only supported SDK source. An old unpacked copy (no `.git` inside `external/norma-core/`) is not the same code and must not be used. If you have one, move it aside before you run `git submodule update --init`:
+```bash
+mv external/norma-core ~/norma-core-old-unpacked
+git submodule update --init --recursive
+```
 - To change the SDK version, change the pin in its own commit, approved by the owner (see `AGENTS.md` Team Workflow). Do not edit files inside `external/norma-core/`. Do not regenerate `target/gen_python` (the generated protobuf code).
 
 **b. Station binary (`bin/station`)**
@@ -77,6 +83,7 @@ Record which serial number is which arm in `HANDOFF.md` once it is confirmed. As
 | Station exited | Restart it with `./cli.sh station`. Check `logs/station/` for the last error. |
 | Port 8888 not listening | The Station is not running. |
 | `external/norma-core/` is empty | Run `git submodule update --init --recursive`. |
+| `sdk-check`: "is an old unpacked copy, not the submodule" | Move the folder aside (step 4a), then run `git submodule update --init --recursive`. |
 | `./cli.sh sdk-check` fails on the SDK pin or local changes | Run `git submodule update --init --recursive`. If local changes are listed, reset that folder. Do not commit them. |
 | `./cli.sh sdk-check` fails on the Station build | Replace `bin/station` with release v0.1.0-beta.10 (see step 4b). |
 

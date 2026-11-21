@@ -193,3 +193,10 @@
     How: After every machine has run `./cli.sh sdk-check` and passed, delete both paths. They are gitignored, so nothing is committed.
     Status: ⏳ Unimplemented
     Reason Deferred: Deleting files needs the owner's go-ahead, and the backups are the fallback if the submodule has a problem on the bench.
+
+27. Guard the generated protobuf code against accidental regeneration — Priority 40% (Optional) [Professionalism]
+    What: A check that fails if `external/norma-core/target/gen_python` differs from the team's known copy.
+    Why: Regenerating the protobuf code with a different `protoc` version can break the message format quietly. A check catches that before a bench session. (Restored: this was wrongly removed as obsolete. Git now tracks the folder and `sdk-check` already fails on local edits, but it does not compare the generated code itself.)
+    How: Store a checksum of the generated folder's file list in `scripts/sdk_check.py` and compare it on each run.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Low risk while nobody regenerates the code. Worth doing now that the SDK is pinned.
