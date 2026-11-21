@@ -9,6 +9,14 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Change (2026-11-21, 21:00, claude on Jan's Mac, branch `jan`): cameras work on macOS
+
+- **Problem:** the console showed "camera 'table' (port:3-2.4) is not plugged in" on macOS although the Station recorded all cameras. `usb_ports()` reads `/sys/bus/usb`, which only exists on Linux, so every camera counted as unplugged.
+- **Fix:** `src/elrobot_camera.py` gained `mac_port()` (USB location from the macOS camera id `0x<locationID><vid><pid>`, e.g. `0x21240002c7f4a60` -> `2-1.2.4`), `mac_usb_ports()` (`system_profiler SPCameraDataType -json`, cached 2 s) and `camera_ports()` (picks Linux or macOS). `port_of()` also accepts macOS ids. Linux behaviour unchanged.
+- **Config:** a camera name may now list several targets (`elrobot_config.camera_targets`), used by `robot_tools` and `scripts/camera_settings.py`. `config/elrobot.json`: `table` = `port:3-2.4` (Linux) or `port:2-1.2.2` (Jan's Mac), `gripper` = `port:3-2.2` or `port:2-1.2.4`. The Mac mapping was set from the pictures (2-1.2.2 shows the table from above, 2-1.2.4 shows the gripper). On Jan's Mac the hub sockets are the other way round from the Linux config: check the Linux mapping if table/gripper look swapped there. A third camera (OBSBOT, side view, `2-1.3`) is live but unnamed.
+- **Build status:** 95 tests pass (+4 camera tests). Live: `look("table")` and `look("gripper")` return fresh frames (< 0.1 s).
+- **Next:** restart `./cli.sh console` to load the new code.
+
 ## Change (2026-11-21, 18:45, claude on Jan's Mac, branch `jan`): console speech-to-text -> OpenAI gpt-transcribe
 
 - **What changed:** `SpeechToText` in `src/web_console.py` no longer loads faster-whisper. It decodes the browser recording with PyAV, writes a 16 kHz mono WAV with `speech.write_wav` and calls `speech.transcribe` (`src/speech.py`: `gpt-transcribe`, `languages=["de","en"]`, keywords). `speech.transcribe` gained optional `model`/`keywords` arguments; its CLI behaviour is unchanged.

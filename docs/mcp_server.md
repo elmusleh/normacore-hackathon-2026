@@ -101,6 +101,9 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
    makes a new queue (new hash) every time a camera is replugged. `list_cameras` shows each live
    camera's `port`. Set `config/elrobot.json`: `"cameras": {"table": "port:3-2.4", "gripper": "port:3-2.2"}`.
    Keep each camera in the same socket; if you move one, update its port.
+   Linux reads ports from `/sys/bus/usb`; macOS reads them from `system_profiler SPCameraDataType`
+   (the camera id holds the USB location, e.g. `2-1.2.4`). Ports differ between laptops, so a name may
+   list several: `"table": ["port:3-2.4", "port:2-1.2.2"]`. The first one plugged in wins.
 2. **Exposure.** Under the Station the cameras' auto exposure gives near-white frames. Fixed exposure per camera is in
    `config/elrobot.json` → `camera_settings` (table 160, gripper 14, tuned 2026-11-21 in daylight). Apply with the Station
    stopped: `./cli.sh cameras`, then start the Station. Repeat after replugging a camera or rebooting, or if the light changes.

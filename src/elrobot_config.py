@@ -40,7 +40,8 @@ DEFAULTS: Dict[str, Any] = {
     # Gripper (motor 8). open_at: which end of the calibrated range is OPEN ("max" or "min").
     # Not checked on the arm yet: run ./cli.sh hw identify and set verified to true.
     "gripper": {"motor": 8, "open_at": "max", "verified": False, "squeeze_steps": 10},
-    # Friendly camera names for the MCP server, e.g. {"table": "usbvideo/<hash>"}.
+    # Friendly camera names for the MCP server, e.g. {"table": "usbvideo/<hash>"} or "port:3-2.4".
+    # A value may be a list, to name the same camera on several laptops (Linux and macOS ports).
     "cameras": {},
     # Fixed exposure per named camera, applied by ./cli.sh cameras (auto exposure washes out under the Station).
     "camera_settings": {},
@@ -75,6 +76,15 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
             out[key] = _deep_merge(out[key], value)
         else:
             out[key] = value
+    return out
+
+
+def camera_targets(cfg: Dict[str, Any]) -> Dict[str, List[str]]:
+    """config `cameras` as name -> list of targets. A value may be one target or a list, so one
+    name can cover several machines (e.g. a Linux port and a macOS port)."""
+    out: Dict[str, List[str]] = {}
+    for name, value in cfg.get("cameras", {}).items():
+        out[name] = [value] if isinstance(value, str) else [str(v) for v in value]
     return out
 
 

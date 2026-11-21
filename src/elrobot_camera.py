@@ -14,6 +14,7 @@ Set ELROBOT_CAMERA_QUEUES=usbvideo/<hash>,... to skip discovery.
 from __future__ import annotations
 
 import os
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -77,8 +78,78 @@ def usb_ports(sys_usb: Path = SYS_USB) -> dict:
     return ports
 
 
+def mac_port(unique_id: str) -> Optional[str]:
+    """USB port path like '2-1.2.4' from a macOS camera unique id, or None.
+
+    On macOS the Station reports AVFoundation's id: '0x' + USB locationID + vendor (4 hex)
+    + product (4 hex), e.g. '0x21240002c7f4a60'. The locationID is the bus in the top byte,
+    then one hub port per nibble until the first 0 (0x02124000 -> bus 2, ports 1.2.4).
+    It depends on the socket, not on replugging, like the Linux port path.
+    """
+    if not unique_id.startswith("0x") or len(unique_id) <= 10:
+        return None
+    try:
+        location = int(unique_id[2:-8], 16)
+    except ValueError:
+        return None
+    bus = location >> 24
+    hops = []
+    for shift in range(20, -1, -4):
+        nibble = (location >> shift) & 0xF
+        if nibble == 0:
+            break
+        hops.append(str(nibble))
+    if not bus or not hops:
+        return None
+    return f"{bus}-{'.'.join(hops)}"
+
+
+_mac_cache: dict = {"at": 0.0, "ports": {}}
+MAC_CACHE_S = 2.0  # system_profiler takes ~0.3 s; the console asks several times a second
+
+
+def mac_usb_ports(now: Optional[float] = None, run=None) -> dict:
+    """macOS: map camera unique id -> USB port path for cameras plugged in now.
+
+    Reads `system_profiler SPCameraDataType -json`, cached for MAC_CACHE_S seconds.
+    `run` replaces subprocess.run in tests.
+    """
+    import json  # noqa: WPS433
+    import subprocess  # noqa: WPS433
+
+    now = time.monotonic() if now is None else now
+    if now - _mac_cache["at"] < MAC_CACHE_S:
+        return _mac_cache["ports"]
+    ports = {}
+    try:
+        out = (run or subprocess.run)(["system_profiler", "SPCameraDataType", "-json"],
+                                      capture_output=True, text=True, timeout=5).stdout
+        for cam in json.loads(out).get("SPCameraDataType", []):
+            uid = cam.get("spcamera_unique-id", "")
+            port = mac_port(uid)
+            if port:
+                ports[uid] = port
+    except (OSError, ValueError, subprocess.SubprocessError):
+        ports = {}
+    _mac_cache.update(at=now, ports=ports)
+    return ports
+
+
+def camera_ports() -> dict:
+    """Plugged-in cameras for port_of: Linux sysfs, or the macOS camera list."""
+    if sys.platform == "darwin":
+        return mac_usb_ports()
+    return usb_ports()
+
+
 def port_of(unique_id: str, ports: dict) -> Optional[str]:
-    """USB port of a camera from its Station unique_id, or None if it is not plugged in now."""
+    """USB port of a camera from its Station unique_id, or None if it is not plugged in now.
+
+    Linux ids are 'vendor:product:bus:device' (ports keyed by (bus, device)); macOS ids are
+    '0x<locationID><vendor><product>' (ports keyed by the id itself, see mac_usb_ports).
+    """
+    if unique_id in ports:
+        return ports[unique_id]
     parts = unique_id.split(":")
     if len(parts) != 4:
         return None

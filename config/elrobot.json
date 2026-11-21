@@ -19,8 +19,8 @@
     "measured": false
   },
   "cameras": {
-    "table": "port:3-2.4",
-    "gripper": "port:3-2.2"
+    "table": ["port:3-2.4", "port:2-1.2.2"],
+    "gripper": ["port:3-2.2", "port:2-1.2.4"]
   },
   "camera_settings": {
     "table": {

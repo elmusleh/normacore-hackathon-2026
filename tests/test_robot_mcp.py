@@ -247,6 +247,59 @@ def test_camera_named_by_usb_port(env):
     assert data is None and "not plugged in" in meta["error"]
 
 
+@needs_sdk
+def test_camera_named_by_list_of_ports_on_macos(tmp_path, monkeypatch):
+    """One name lists a Linux and a macOS port; on the Mac the macOS one matches."""
+    frame_entry, connect_entry = _envelopes()
+    monkeypatch.setattr(elrobot_config, "CONFIG_FILE", tmp_path / "elrobot.json")
+    (tmp_path / "elrobot.json").write_text(json.dumps({"cameras": {
+        "table": ["port:3-2.4", "port:2-1.2.2"], "gripper": ["port:3-2.2", "port:2-1.2.4"]}}))
+    arm = FakeArm()
+    mac_id = "0x21220002c7f4a60"
+    tools = RobotTools(lambda: arm, camera_queues=lambda: ["usbvideo/mac"],
+                       usb_ports_fn=lambda: {mac_id: "2-1.2.2"})
+    arm.first["usbvideo/mac"] = connect_entry(mac_id)
+    arm.frames["usbvideo/mac"] = [frame_entry(b"jpg")]
+    meta, data = tools.look("table")
+    assert data == b"jpg" and tools.list_cameras()["cameras"][0]["name"] == "table"
+    meta, data = tools.look("gripper")
+    assert data is None and "port:2-1.2.4" in meta["error"]
+
+
+def test_mac_port_from_unique_id():
+    from elrobot_camera import mac_port, port_of
+    assert mac_port("0x21240002c7f4a60") == "2-1.2.4"
+    assert mac_port("0x21300003564fefe") == "2-1.3"
+    assert mac_port("47B4B64B-7067-4B9C-AD2B-AE273A71F4B5") is None  # built-in FaceTime camera
+    assert mac_port("11391:19040:3:26") is None  # Linux id
+    assert port_of("0x21240002c7f4a60", {"0x21240002c7f4a60": "2-1.2.4"}) == "2-1.2.4"
+    assert port_of("11391:19040:3:26", {(3, 26): "3-2.4"}) == "3-2.4"  # Linux unchanged
+
+
+def test_mac_usb_ports_lists_plugged_cameras_and_caches(monkeypatch):
+    import elrobot_camera
+    monkeypatch.setattr(elrobot_camera, "_mac_cache", {"at": 0.0, "ports": {}})
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        out = json.dumps({"SPCameraDataType": [
+            {"_name": "KD-USB Cameras", "spcamera_unique-id": "0x21240002c7f4a60"},
+            {"_name": "FaceTime HD Camera", "spcamera_unique-id": "47B4B64B-7067-4B9C-AD2B-AE273A71F4B5"}]})
+        return type("Done", (), {"stdout": out})()
+
+    assert elrobot_camera.mac_usb_ports(now=100.0, run=fake_run) == {"0x21240002c7f4a60": "2-1.2.4"}
+    elrobot_camera.mac_usb_ports(now=101.0, run=fake_run)  # within the cache window
+    assert len(calls) == 1
+    elrobot_camera.mac_usb_ports(now=103.0, run=fake_run)
+    assert len(calls) == 2
+
+
+def test_camera_targets_accepts_string_or_list():
+    assert elrobot_config.camera_targets({"cameras": {"a": "port:1-1", "b": ["port:2-2", "usbvideo/x"]}}) == {
+        "a": ["port:1-1"], "b": ["port:2-2", "usbvideo/x"]}
+
+
 def test_server_registers_tools():
     pytest.importorskip("mcp")
     import robot_mcp_server

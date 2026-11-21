@@ -31,10 +31,10 @@ from elrobot_camera import (
     decode_frame,
     describe_camera,
     discover_camera_queues,
+    camera_ports,
     port_of,
-    usb_ports,
 )
-from elrobot_config import current_threshold_for, load_config, load_waypoints, save_waypoints
+from elrobot_config import camera_targets, current_threshold_for, load_config, load_waypoints, save_waypoints
 from elrobot_hardware import (
     DEFAULT_SAFETY_MARGIN_STEPS,
     ELROBOT_MOTOR_IDS,
@@ -72,7 +72,7 @@ class RobotTools:
                  usb_ports_fn: Optional[Callable[[], dict]] = None):
         self._connect = connect
         self._camera_queues = camera_queues or discover_camera_queues
-        self._usb_ports = usb_ports_fn or usb_ports
+        self._usb_ports = usb_ports_fn or camera_ports
         self._camera_info: Dict[str, Dict[str, Any]] = {}  # queue -> describe_camera(); fixed per queue
         self._hw = None
         self._lock = threading.Lock()
@@ -188,7 +188,7 @@ class RobotTools:
         Config names map to "port:<usb port>" (stable across replugs) or "usbvideo/<hash>".
         """
         ports = self._usb_ports()
-        names = {v: k for k, v in cfg["cameras"].items()}
+        names = {t: name for name, targets in camera_targets(cfg).items() for t in targets}
         cams = []
         for q in self._camera_queues():
             if q not in self._camera_info:
@@ -217,19 +217,22 @@ class RobotTools:
         cams = self._cameras(cfg)
         live = [c for c in cams if c["live"]]
         want = camera or ("table" if "table" in cfg["cameras"] else "")
-        target = cfg["cameras"].get(want, want)
-        if not target:
+        targets = camera_targets(cfg).get(want, [want] if want else [])
+        port_targets = [t for t in targets if t.startswith("port:")]
+        queue_targets = [t for t in targets if not t.startswith("port:")]
+        match = [c for t in port_targets for c in live if f"port:{c['port']}" == t]
+        if not targets:
             if not live:
                 return {"ok": False, "error": "no camera plugged in; see list_cameras"}, None
             queue = live[0]["queue"]
-        elif target.startswith("port:"):
-            match = [c for c in live if f"port:{c['port']}" == target]
-            if not match:
-                return {"ok": False, "error": f"camera {camera or want!r} ({target}) is not plugged in",
-                        "live_cameras": live}, None
+        elif match:
             queue = match[0]["queue"]
+        elif queue_targets:
+            t = queue_targets[0]
+            queue = t if t.startswith("usbvideo/") else f"usbvideo/{t}"
         else:
-            queue = target if target.startswith("usbvideo/") else f"usbvideo/{target}"
+            return {"ok": False, "error": f"camera {camera or want!r} ({', '.join(port_targets)}) "
+                                          "is not plugged in", "live_cameras": live}, None
         hw = self.hw()
         for back in range(1, MAX_LOOKBACK + 1):
             data = hw.read_recent(queue, back=back)
