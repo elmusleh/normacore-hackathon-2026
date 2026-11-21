@@ -28,6 +28,15 @@ Rules for what goes in a commit:
 - If a pre-commit hook fails on files you did not write, report it and do not bypass it. Use `--no-verify` only when the failing check is provably outside your change, and say why in the commit body.
 - Push only when asked.
 
+## Post-Implementation Suggestions
+After each implementation, give the user **3 suggestions** for the next steps in this project.
+- Each must be **new**: not already done, and not already in `SUGGESTIONS.md`, `PROGRESS.md` or `PLAN.md`.
+- Give each one a **priority** as a percentage and label: 90–100% Critical, 70–89% High value, 40–69% Nice to have, below 40% Optional. Order them most important first.
+- Give each one a **category**: Professionalism, Security or Best practices.
+- Explain each in plain English, for a reader who is not a specialist: **What** it is (one sentence), **Why** it matters (the benefit or the risk it removes), and **How** to do it (beginner-friendly steps).
+- Record all 3 in `SUGGESTIONS.md` under the header `### Post-Implementation Suggestions` (create the file if it is missing). Status is `⏳ Unimplemented`, with a **Reason Deferred**. When a suggestion is implemented, delete its entry. Do not mark it done or keep an archive.
+- Stage and commit `SUGGESTIONS.md` with the change it came from.
+
 ## Team Workflow
 - **Branches:** `<type>/<area>-<short-slug>`, e.g. `fix/elrobot-goto-clamp`, `docs/agents-team-workflow`. Branch from an up-to-date `main`.
 - **Merging:** open a pull request into `main` with `gh pr create`. Get one human review before merging. Keep PRs small: one feature or fix each.
@@ -43,6 +52,7 @@ Rules for what goes in a commit:
 3. Update `GUIDELINES.md` and `PREFERENCES.md` if new conventions were established (create them if missing)
 4. Run verification (tests, syntax check) before stopping
 5. Confirm every change is committed (see Commit Every Change)
+6. Give the 3 post-implementation suggestions and record them in `SUGGESTIONS.md` (see Post-Implementation Suggestions)
 
 ## Rules
 1. Follow the plan — no unplanned features or refactors

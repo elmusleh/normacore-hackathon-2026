@@ -83,3 +83,24 @@
     How: In `OverloadDetector.update`, measure movement as the shorter distance around the 0–4095 circle.
     Status: ⏳ Unimplemented
     Reason Deferred: No joint crosses zero in the planned workspace. Fix it if a range changes.
+
+13. Enforce the commit checklist with a git pre-commit hook — Priority 74% (High value) [Best practices]
+    What: A script that runs automatically before each commit, checks that the tests pass and that `CHANGELOG.md` is staged, and blocks the commit if not.
+    Why: Right now the commit rules only live in `AGENTS.md`. A hook catches a forgotten test run or changelog entry before it reaches the shared history.
+    How: Create `.githooks/pre-commit` with a few lines that run `python3 -m pytest tests/ -q` and check `git diff --cached --name-only` for `CHANGELOG.md`, then run `git config core.hooksPath .githooks` once on each machine.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Adds a gate to every commit for the whole team. Needs agreement on which checks are mandatory before it is turned on.
+
+14. Add a hardware-safety checklist to pull requests that touch motion code — Priority 86% (High value) [Security]
+    What: A short checklist that every pull request changing motion code must complete before it is merged, covering torque state, workspace clearance, and a test run on the bench.
+    Why: The arm can hit people or the table. A code change that looks correct on paper can still move the arm the wrong way, and a reviewer who is not at the bench cannot see that.
+    How: Add `.github/pull_request_template.md` with checkboxes: "tests pass", "no `hw jog`/`hw goto` run without the hardware owner", "workspace clear", "E-stop (`./cli.sh hw stop`) tested".
+    Status: ⏳ Unimplemented
+    Reason Deferred: Needs the team to agree who the hardware owner is and what counts as a bench test before the checklist can be written.
+
+15. Use a lock file so only one terminal can send motion commands — Priority 78% (High value) [Security]
+    What: A small lock file that the motion commands check before moving the arm, so a second terminal cannot start a move while the first one is running.
+    Why: Two people or two agents sending commands at the same time can fight each other on the same motors. A lock stops that before any motor moves.
+    How: In `scripts/hw_day.py`, create `data/hw_motion.lock` with the process ID when a move starts, refuse new moves while the lock exists and the process is alive, and remove the lock when the move ends.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Changes the motion code, which needs the real arm to test properly. Should wait until the first bench session confirms the current flow.
