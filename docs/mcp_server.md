@@ -66,20 +66,6 @@ viewer again; [calibration/](../calibration/) holds the ranges measured on 2026-
   (with `"0"` Claude only describes moves). Tool calls show as grey lines in the chat.
   Needs a Claude API key: `export ANTHROPIC_API_KEY=sk-ant-...` in the terminal before `./cli.sh console`
   (never commit it). Without a key the cameras and speech-to-text still work.
-- **Goal agent (default, `src/goal_agent.py`):** every chat message that is not a stop word is a goal
-  ("put a grape in the box"). The agent repeats a fixed loop until the goal is reached or
-  `GOAL_AGENT_MAX_ITERATIONS` (20) is used up: (1) every live camera is described in text by its own Claude
-  vision call, (2) one JSON object `robot` collects joint state, waypoints, config, `motion_allowed`, the
-  camera descriptions and the last action, (3) a planning call (text only, no images) picks exactly one tool:
-  `go_to_waypoint`, `nudge_joint`, `set_gripper`, `enable_torque`, `ziel_erreicht`, `aufgeben` or
-  `frage_stellen`, (4) the tool runs through the MCP server with all its limits. `ziel_erreicht` only ends
-  the goal after an independent yes/no check with fresh pictures; if the check disagrees the chat shows
-  ACHTUNG and the loop goes on. `frage_stellen` pauses the goal; your next message is the answer. A new
-  goal cancels the running one (and holds the arm). With motion off the agent ends at the first `dry_run`.
-  The chat shows a short line per step; full descriptions and `robot` objects go to `logs/goal-*.log`.
-  Models and effort per call kind: `GOAL_AGENT_VISION_MODEL` / `_PLAN_MODEL` / `_CHECK_MODEL` and
-  `GOAL_AGENT_VISION_EFFORT` (low) / `_PLAN_EFFORT` / `_CHECK_EFFORT` (medium). Each step costs one vision
-  call per camera plus one planning call. The old free chat agent: `./cli.sh console --agent chat`.
 - **Stop:** typing or saying just "stop" / "wait" / "halt", or the red STOP button, cancels Claude's turn and
   calls the MCP `stop` tool directly (holds the arm, torque stays on). A waypoint move that is already running
   finishes first, because the MCP server runs one tool at a time; keep a hand on the power plug.

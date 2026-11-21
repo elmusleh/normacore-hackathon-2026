@@ -40,7 +40,6 @@ print_usage() {
     echo -e "  ${C_YELLOW}setup-serial${C_RESET}        Configure Linux USB permissions (dialout, udev rules) for ElRobot servos"
     echo -e "  ${C_YELLOW}mcp${C_RESET}                 Run Model Context Protocol (MCP) server for Claude / Codex"
     echo -e "  ${C_YELLOW}console [port]${C_RESET}      Web console: live cameras + voice chat (Default: http://localhost:8890)"
-    echo -e "                      Each message is a goal the agent pursues; --agent chat for the free chat agent"
     echo -e "  ${C_YELLOW}urdf${C_RESET}                Open official NormaCore online 3D URDF interactive viewer"
     echo ""
     echo -e "${C_BOLD}Hardware Day (ElRobot):${C_RESET}"
@@ -162,10 +161,7 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         # Load secrets such as ANTHROPIC_API_KEY from .env (gitignored) if present.
         if [ -f .env ]; then set -a; . ./.env; set +a; fi
         echo -e "${C_GREEN}[+] Starting ElRobot web console (cameras + voice chat)...${C_RESET}"
-        # ./cli.sh console [port] [--agent goal|chat] [other web_console.py options]
-        PORT=8890
-        if [[ "${1:-}" =~ ^[0-9]+$ ]]; then PORT="$1"; shift; fi
-        exec "$PY" src/web_console.py --port "$PORT" "$@"
+        exec "$PY" src/web_console.py --port "${1:-8890}"
         ;;
 
     mcp)
