@@ -90,16 +90,18 @@ def get_robot_state() -> dict:
 
 
 @server.tool(structured_output=False)
-def look(camera: str = "") -> list:
+def look(camera: str = "", raw: bool = False) -> list:
     """Take the newest picture from a camera. camera: a configured name like 'table' or
     'gripper', a usbvideo queue id, or empty for the table camera (or the first camera).
-    Returns frame info and the image. Check age_seconds: an old frame means a stalled camera."""
-    result = tools.call(lambda: _look(camera))
+    The picture is contrast- and colour-corrected to make food easier to spot; raw=True gives
+    the camera's own picture. Returns frame info and the image. Check age_seconds: an old
+    frame means a stalled camera. If exposure_warning is present, tell the human."""
+    result = tools.call(lambda: _look(camera, raw))
     return result if isinstance(result, list) else [result]
 
 
-def _look(camera: str):
-    meta, jpeg = tools.look(camera)
+def _look(camera: str, raw: bool = False):
+    meta, jpeg = tools.look(camera, raw=raw)
     return [meta] if jpeg is None else [meta, Image(data=jpeg, format="jpeg")]
 
 

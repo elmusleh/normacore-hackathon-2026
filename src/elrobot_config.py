@@ -44,8 +44,14 @@ DEFAULTS: Dict[str, Any] = {
     "gripper": {"motor": 8, "open_at": "max", "verified": False, "squeeze_steps": 10},
     # Friendly camera names for the MCP server, e.g. {"table": "usbvideo/<hash>"}.
     "cameras": {},
-    # Fixed exposure per named camera, applied by ./cli.sh cameras (auto exposure washes out under the Station).
+    # Fixed exposure and other V4L2 controls per named camera, applied by ./cli.sh cameras
+    # (auto exposure washes out under the Station). Find a good exposure with ./cli.sh cameras --tune.
     "camera_settings": {},
+    # Software clean-up of the pictures Claude and the console see (src/frame_enhance.py).
+    # Shared keys apply to every camera; "cameras": {"face": {...}} overrides one camera.
+    # The ACT demo recorder always stores raw frames.
+    "camera_enhance": {"enabled": True, "denoise": 4, "white_balance": True, "gamma": "auto",
+                       "clahe_clip": 1.8, "clahe_grid": 8, "sharpen": 0.2, "cameras": {}},
     # Limits for moves requested by Claude through the MCP server (src/robot_mcp_server.py).
     "agent": {
         "max_speed": 500,

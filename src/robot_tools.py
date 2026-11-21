@@ -36,6 +36,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from action_space import SPACE_MOTORS, load_action_space
+from frame_enhance import enhance_jpeg, exposure_hint, options_for
 from elrobot_camera import (
     MAX_LOOKBACK,
     decode_frame,
@@ -248,8 +249,11 @@ class RobotTools:
             return match[0]["queue"], None
         return (target if target.startswith("usbvideo/") else f"usbvideo/{target}"), None
 
-    def look(self, camera: str = "") -> Tuple[Dict[str, Any], Optional[bytes]]:
-        """Newest JPEG from a camera: a configured name ('table'), 'port:3-2.4', a queue id, or empty."""
+    def look(self, camera: str = "", raw: bool = False) -> Tuple[Dict[str, Any], Optional[bytes]]:
+        """Newest JPEG from a camera: a configured name ('table'), 'port:3-2.4', a queue id, or empty.
+
+        The picture is enhanced for food detection (src/frame_enhance.py) unless raw=True or
+        config camera_enhance says otherwise. meta["exposure"] describes the raw frame."""
         queue, err = self.camera_queue(camera)
         if err:
             return err, None
@@ -266,7 +270,17 @@ class RobotTools:
                         "age_seconds": None if age is None else round(age, 2)}
                 if age is not None and age > 2.0:
                     meta["warning"] = "frame is old: the camera may be disconnected or stalled"
-                return meta, frame.jpeg
+                if raw:
+                    return meta, frame.jpeg
+                name = camera or ("table" if "table" in self._cfg()["cameras"] else queue)
+                jpeg, stats, enhanced = enhance_jpeg(frame.jpeg, options_for(self._cfg(), name))
+                meta["enhanced"] = enhanced
+                if stats is not None:
+                    meta["exposure"] = stats
+                    hint = exposure_hint(name, stats)
+                    if hint:
+                        meta["exposure_warning"] = hint
+                return meta, jpeg
         return {"ok": False, "error": f"no frame in {queue}; is the camera streaming?"}, None
 
     # -- motion ---------------------------------------------------------------

@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Put a matte, darker cloth on the table — Priority 88% (High value) [Best practices]
+   What: Replace the bright white table cover with a matte mid-grey or dark-blue cloth or card.
+   Why: On white, 47-62% of the table and gripper pictures are pure white (measured 2026-11-21), and a pale green grape almost disappears. No software can recover pure-white pixels; a darker, non-shiny surface gives the grape and bowls clear edges for Claude and for the ACT policy.
+   How: Lay the cloth over the work area, tape the corners so it cannot move, run `./cli.sh cameras --tune` again (Station stopped), then check `exposure.verdict` is `ok` in `look()`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs a physical material at the bench and the team's agreement before ACT demos are recorded.
+
+2. Freeze the camera setup before recording ACT demos, and store it with each episode — Priority 80% (High value) [Best practices]
+   What: Save the camera exposure, controls and `resize_target` into each demo episode's metadata, and warn when they differ from the first episode.
+   Why: A policy trained on one exposure or frame size can fail when the picture changes. Without the settings stored, nobody can tell later why a model stopped working.
+   How: In `src/demo_recorder.py`, add `camera_settings` (from `config/elrobot.json`) and `resize_target` (from `station.yaml`) to the episode's meta file; in `scripts/record_demos.py`, compare with episode 0 and print a warning if they differ.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Camera settings are still being tuned; do it once they are final.
+
+3. Crop the table camera to the table — Priority 55% (Nice to have) [Security]
+   What: Add an optional crop box per camera in `camera_enhance`, so `look()` only shows the table area.
+   Why: The table and gripper cameras also catch people and screens in the background. Cropping keeps them out of what is sent to Claude and of the logs, and gives the food more pixels.
+   How: Add `"crop": [x, y, w, h]` (fractions of the frame) to `camera_enhance.cameras.table`, apply it in `src/frame_enhance.py` before enhancement, and add a test with a synthetic frame.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The crop box needs to be chosen on the real camera view once the camera position is final.
+
 1. Warn on start when a named camera is missing — Priority 60% (Nice to have) [Professionalism]
    What: When the console starts, print which configured cameras (`table`, `gripper`, `face`) the Station is actually streaming, and name any that are missing.
    Why: Today a missing camera only shows as an error tile on the page. The USB hub on bus 3 has dropped cameras several times, and a clear message at start saves time at the bench.

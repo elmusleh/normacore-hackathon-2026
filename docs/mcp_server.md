@@ -141,15 +141,26 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
 2. **Exposure.** Under the Station the cameras' auto exposure gives near-white frames. Fixed exposure per camera is in
    `config/elrobot.json` → `camera_settings` (table 160, gripper 14, tuned 2026-11-21 in daylight). Apply with the Station
    stopped: `./cli.sh cameras`, then start the Station. Repeat after replugging a camera or rebooting, or if the light changes.
-3. **Frame size.** `station.yaml` stores frames at `resize_target: 224` px. Too small to spot
-   small objects; try `480` and restart the Station.
-4. **Gripper direction.** `config/elrobot.json` → `gripper.open_at` (`"max"` or `"min"`) says which
+   To find a good value, stop the Station, point the camera at the real scene and run `./cli.sh cameras --tune table`
+   (add `--write` to save it). It tries exposures from 5 to 250 and picks the one with the fewest pure-white and black
+   pixels. Other V4L2 controls go in `camera_settings.<name>.controls`, e.g.
+   `{"gain": 0, "white_balance_automatic": 0, "white_balance_temperature": 4600, "backlight_compensation": 0}`.
+3. **Frame size.** `station.yaml` stores frames at `resize_target: 224` px by default. Too small to spot
+   a grape; use `480` and restart the Station. `station.yaml` is local, so set it on each machine.
+4. **Picture enhancement.** `look()` (MCP, console tiles) cleans each frame up in software before Claude sees it:
+   edge-keeping denoise, white balance against the table, auto gamma, CLAHE local contrast, light sharpening
+   (`src/frame_enhance.py`, about 9 ms per frame). Tune or turn it off in `config/elrobot.json` → `camera_enhance`
+   (per camera under `cameras`). `look(raw=True)` and the console's `/frame/<cam>?raw=1` give the untouched picture.
+   `look()` also returns `exposure` (mean, share of pure-white and black pixels) and an `exposure_warning` when the
+   camera itself is badly exposed: pure-white pixels cannot be recovered, so lower the exposure then.
+   ACT demo recordings store raw frames, never the enhanced ones.
+5. **Gripper direction.** `config/elrobot.json` → `gripper.open_at` (`"max"` or `"min"`) says which
    end of motor 8's range is open. Check with `./cli.sh hw identify 8`, fix if needed, set `"verified": true`.
-5. **Waypoints.** Teach at least `clear` (above the table, gripper open), then the pick spots and bins
+6. **Waypoints.** Teach at least `clear` (above the table, gripper open), then the pick spots and bins
    (`./cli.sh hw teach <name>` with torque off, or ask Claude to `teach_waypoint` after you pose the arm).
    For a pick, teach a hover pose and a grasp pose (`pick_1_hover`, `pick_1`), so Claude can do
    hover → grasp with `via_clear=false`.
-6. **Current thresholds.** The overload guard uses `current_threshold` per motor. Probe with
+7. **Current thresholds.** The overload guard uses `current_threshold` per motor. Probe with
    `./cli.sh hw probe-current <m>`, the gripper first.
 
 ## Limits (config/elrobot.json → `agent`)
