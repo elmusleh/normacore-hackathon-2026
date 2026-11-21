@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Leader/follower serial roles were swapped in `scripts/teleop_sync.py` (it drove the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` and `docs/team_setup.md`. Confirmed on the arm 2026-11-21: follower `5B61034962`, leader `5B61037051`.
 
 ### Added
+- `move_and_watch(near_tolerance=..., stall_s=0.8)` in `src/elrobot_hardware.py`: a motor that has stopped within `near_tolerance` of its goal without overload is reported as `near` instead of waiting for the timeout (loaded joints sag 20-35 steps under gravity).
 - Camera-guided assistive feeding pipeline (`src/feeding_vision.py`, `scripts/camera_feed_arm.py`, and `./cli.sh feed [grapes|spoon]`): uses the overhead tabletop camera (`/dev/video4` with automatic Station/mock fallback) to detect the grape bowl, spoon holder, and person's mouth, and plans/executes safe slave arm motions stopping at a 5–10 cm facial standoff.
 - Mission Control Web Dashboard (`src/digital_twin.html` & `src/digital_twin_server.py`) integration for one-click `Feed Grapes (Bowl -> Mouth)` and `Feed with Spoon (Scoop -> Mouth)` actions with live annotated camera overlays.
 - Unit tests for `FeedingVisionDetector` and `run_camera_feeding_cycle` in `tests/test_pipeline.py`.

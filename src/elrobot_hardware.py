@@ -25,6 +25,7 @@ import os
 import struct
 import sys
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -469,11 +470,16 @@ class ElRobotHardware:
         thresholds: Optional[Dict[int, int]] = None,
         tolerance: int = 12,
         poll_s: float = 0.1,
+        near_tolerance: Optional[int] = None,
+        stall_s: float = 0.8,
     ) -> Dict[int, str]:
         """Move, then watch each motor until it arrives, overloads, faults, or times out.
 
         On overload, fault, or timeout, every motor still moving is held in place.
         Returns a status per motor: reached, overload, fault, missing or timeout.
+        With near_tolerance set, a motor that has stopped moving (<= 2 steps for stall_s)
+        within near_tolerance of its goal, without overload, is "near" instead of waiting
+        for the timeout. Loaded joints settle 20-35 steps short of the goal under gravity.
         """
         results = await self.move_motors(
             goals, enable_motion=enable_motion, margin=margin, max_speed=max_speed, max_accel=max_accel)
@@ -485,6 +491,8 @@ class ElRobotHardware:
         status: Dict[int, str] = {}
         self.last_peaks = {m: 0 for m in targets}
         started = asyncio.get_running_loop().time()
+        last_present: Dict[int, int] = {}
+        still_since: Dict[int, float] = {}
 
         while len(status) < len(targets):
             await asyncio.sleep(poll_s)
@@ -507,6 +515,11 @@ class ElRobotHardware:
                     status[mid] = "overload"
                     self.log.error("motor %d OVERLOAD: current %d above %d while stalled at %d",
                                    mid, r.current, detectors[mid].threshold, r.present)
+                elif near_tolerance is not None and abs(r.present - goal) <= near_tolerance and \
+                        self._stopped(mid, r.present, last_present, still_since, stall_s):
+                    status[mid] = "near"
+                    self.log.warning("motor %d stopped %+d steps from goal %d (within %d): accepted as near",
+                                     mid, r.present - goal, goal, near_tolerance)
                 else:
                     self.log.debug("motor %d moving: present=%d goal=%d current=%d",
                                    mid, r.present, goal, r.current)
@@ -521,6 +534,17 @@ class ElRobotHardware:
                 break
         self.log.info("move finished: %s", status)
         return status
+
+    @staticmethod
+    def _stopped(mid, present, last_present, still_since, stall_s) -> bool:
+        """True once a motor has moved <= 2 steps between polls for stall_s seconds."""
+        now = time.monotonic()
+        prev = last_present.get(mid)
+        last_present[mid] = present
+        if prev is None or abs(present - prev) > 2:
+            still_since[mid] = now
+            return False
+        return now - still_since.get(mid, now) >= stall_s
 
     async def _sync_write(self, address: int, motors: List[Tuple[int, bytes]]) -> None:
         if not motors:
