@@ -43,7 +43,7 @@ log = logging.getLogger("elrobot.feeding")
 STANDOFF_MOUTH_WIDTH_PX = 95
 DEFAULT_FRAME_W = 640
 DEFAULT_FRAME_H = 480
-MAR_OPEN_THRESHOLD = 0.25
+MAR_OPEN_THRESHOLD = 0.26
 MOUTH_OPEN_DEBOUNCE_FRAMES = 3
 FACE_WATCHDOG_TIMEOUT_S = 0.5
 DEFAULT_FACE_LANDMARKER_MODEL = Path(__file__).resolve().parent.parent / "data" / "face_landmarker.task"
@@ -438,6 +438,30 @@ class FeedingVisionDetector:
                             ],
                         },
                     )
+                # MediaPipe is active and confirmed NO face in frame:
+                # do NOT fall through to noisy OpenCV skin-tone heuristics (which false-trigger on windows/walls).
+                face_lost = self.mouth_tracker.check_watchdog()
+                return DetectedTarget(
+                    label="person_mouth",
+                    u_px=w_img // 2,
+                    v_px=h_img // 4,
+                    x_mm=0.0,
+                    y_mm=245.0,
+                    width_px=0,
+                    height_px=0,
+                    confidence=0.0,
+                    extra={
+                        "detector": "mediapipe",
+                        "face_detected": False,
+                        "face_lost": face_lost,
+                        "mouth_open": False,
+                        "mouth_open_confirmed": False,
+                        "at_standoff": False,
+                        "standoff_cm": 8.0,
+                        "waypoint": "serve",
+                        "fallback": True,
+                    },
+                )
             except Exception as exc:  # noqa: BLE001
                 log.debug("MediaPipe detect_mouth failed, falling back to OpenCV: %s", exc)
 
