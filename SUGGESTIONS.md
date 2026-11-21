@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Add a pre-push verification command or `./cli.sh push` helper — Priority 90% (Critical) [Best practices]
+   What: Introduce `./cli.sh push` that automatically validates the local branch against tests (`pytest`, `bash -n`) and sync status before prompting and running `git push -u origin <branch>`.
+   Why: Reduces friction for developers pushing branches while guaranteeing that broken or unverified builds never reach the remote repository.
+   How: Add a `push` subcommand in `cli.sh` that checks `git status`, executes verification, and triggers `git push` with clear user feedback.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Initial rule update establishes the agent policy first.
+
+2. Integrate a GitHub PR check / creation prompt into agent completion — Priority 82% (High value) [Professionalism]
+   What: Have agents ask whether to open a PR (`gh pr create`) automatically after user confirms a branch push.
+   Why: Streamlines peer review and branch integration into `main` so changes do not stall on remote feature branches.
+   How: Include an automated GitHub CLI prompt (`gh pr create --fill`) whenever a branch is newly pushed to `origin`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Depends on developer push workflow adoption first.
+
+3. Add git commit reminder linting to `./cli.sh sync` — Priority 75% (High value) [Security]
+   What: Warn developers during `./cli.sh sync` if their local feature branch has unpushed commits that are more than 2 hours old.
+   Why: Avoids silent local drift or accidental work loss during active multi-agent / multi-developer hackathon sessions.
+   How: Add an `ahead` count check and timestamp warning in `cli.sh` under `sync` command output.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Non-blocking polish item for hackathon workflow tooling.
+
 1. Teach and lock the 6 assistive feeding waypoints on the follower arm (`zone_a_hover`, `zone_a`, `serve`, `spoon_holder`, `bowl_scoop`, `serve_spoon`) — Priority 94% (Critical) [Best practices]
    What: Pose the physical follower arm by hand (with torque off) at the grape bowl, spoon holder, and a 7 cm standoff in front of the diner's mouth, and save each pose with `./cli.sh hw teach <name>`.
    Why: The camera-guided feeding controller (`./cli.sh feed`) maps detected food and mouth targets directly to these verified joint waypoints so the arm moves smoothly without inverse-kinematics guesswork near a person's face.

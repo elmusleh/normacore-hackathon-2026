@@ -35,7 +35,7 @@ Rules for what goes in a commit:
 - Never commit `data/`, `logs/`, `station_data/`, `bin/`, other contents of `external/` (all gitignored) or secrets. Never commit edits made inside the `external/norma-core` submodule.
 - Never commit another person's in-flight edit. Example: an uncommitted `config/elrobot.json` change is not yours to bundle. Ask, or commit only your own paths.
 - If a pre-commit hook fails on files you did not write, report it and do not bypass it. Use `--no-verify` only when the failing check is provably outside your change, and say why in the commit body.
-- Push only when asked.
+- **Pushing changes:** Agents must ask the user / developer for permission to push to remote immediately upon completing an implementation and committing (`"Would you like me to push these commits to origin/<branch> now?"`), or push when explicitly instructed, ensuring developers push faster without blocking work. Do not leave committed branches unpushed without notifying and prompting the developer.
 
 ## Post-Implementation Suggestions
 After each implementation, give the user **3 suggestions** for the next steps in this project.
@@ -81,6 +81,7 @@ A change is finished when all of these are true:
 - Tests pass (`python3 -m pytest tests/`).
 - `CHANGELOG.md` has an entry.
 - It is committed on a branch, with a clean `git status` for your files.
+- Push permission has been actively requested from the developer (or branch pushed if approved).
 - A pull request is open, or the branch is named in `HANDOFF.md`.
 - `HANDOFF.md` says what changed and what comes next.
 - For motion code: the bench checklist in `docs/bench_safety.md` was followed, or it is marked "not tested on the arm" in `HANDOFF.md`.
@@ -111,7 +112,8 @@ A change is finished when all of these are true:
 3. Update `GUIDELINES.md` and `PREFERENCES.md` if new conventions were established (create them if missing). Record each verified hardware or setup observation in `FINDINGS.md` with its evidence.
 4. Run verification (tests, syntax check) before stopping
 5. Confirm every change is committed (see Commit Every Change)
-6. Give the 3 post-implementation suggestions and record them in `SUGGESTIONS.md` (see Post-Implementation Suggestions)
+6. Prompt the developer to push immediately to remote or confirm push approval to accelerate delivery
+7. Give the 3 post-implementation suggestions and record them in `SUGGESTIONS.md` (see Post-Implementation Suggestions)
 
 ## Rules
 1. Follow the plan — no unplanned features or refactors

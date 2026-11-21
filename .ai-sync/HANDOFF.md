@@ -1,13 +1,27 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-21T15:46:00Z
-status: camera-feeding-pipeline-ready
-current_phase: "Phase 3: Agent Integration & Tabletop Primitives (Assistive Feeding)"
-current_task: "Camera-guided assistive feeding (grapes & spoon -> mouth) implemented and verified"
-stop_reason: ready-for-hardware-session
+timestamp: 2026-11-21T17:25:00Z
+status: commit-and-push-policy-updated
+current_phase: "Phase 1 / Team Workflow: Agent Commit & Push Rules"
+current_task: "Enforce per-implementation commits and proactive push prompts to accelerate development"
+stop_reason: ready-for-review
 hardware_owner: "steve"
-previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
+previous_session: antigravity 2026-11-21T15:46 — camera-guided assistive feeding
 ---
+
+## Latest session (2026-11-21): Commit & Push Policy Enhancement
+
+- **What Changed:**
+  - Updated `AGENTS.md` to strictly mandate committing after each implementation and actively asking the user to push to remote immediately upon completion to accelerate development.
+  - Updated `GUIDELINES.md` to reinforce the commit and push cadence.
+  - Added entry to `CHANGELOG.md` under `[Unreleased]`.
+  - Added 3 new post-implementation suggestions in `SUGGESTIONS.md`.
+- **Files Changed:** `AGENTS.md`, `GUIDELINES.md`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
+- **Build Status:** All tests verified.
+- **Next Steps:**
+  1. Confirm developer push approval for branch `feat/agent-commit-and-push-policy`.
+  2. Push branch to `origin` and open PR to `main`.
+
 
 ## Latest session (2026-11-21 afternoon): Camera-Guided Assistive Feeding (`./cli.sh feed`)
 

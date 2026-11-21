@@ -9,6 +9,7 @@ Standards, conventions, and safety rules for all code and AI agents working in t
 - Run the full verification suite (`python3 -m pytest tests/test_pipeline.py`) before finishing any turn or commit.
 - Never commit with broken tests. Stage explicit paths (`git add <path> ...`), never `git add -A`.
 - Update `CHANGELOG.md` before every commit following Conventional Commits.
+- **Commit and Push Cadence:** Commit changes immediately after each logical implementation or task. Always ask the developer to push immediately to accelerate collaborative integration.
 
 ---
 
