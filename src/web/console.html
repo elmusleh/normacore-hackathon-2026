@@ -40,6 +40,19 @@
   .bubble { max-width: 85%; padding: 8px 12px; border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; }
   .bubble.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
   .bubble.robot { align-self: flex-start; background: var(--panel-2); border-bottom-left-radius: 4px; }
+  .bubble.tool { align-self: flex-start; max-width: 95%; padding: 2px 4px; background: none; color: var(--muted);
+    font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .bubble.tool .t { display: none; }
+  .bubble.error { align-self: stretch; max-width: 100%; background: rgba(255,90,90,.12); color: #ffb3b3;
+    border: 1px solid rgba(255,90,90,.35); font-size: 13px; }
+  .typing { align-self: flex-start; color: var(--muted); font-size: 13px; font-style: italic; }
+  .chat-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 8px 12px 8px 16px; }
+  .chat-head h2 { border: none; padding: 0; }
+  .chat-head .agent { font-size: 12px; color: var(--muted); margin-left: 10px; font-weight: 400; }
+  #stop { background: var(--bad); color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font: inherit;
+    font-weight: 700; letter-spacing: .03em; cursor: pointer; }
+  #stop:hover { filter: brightness(1.1); }
+  #stop:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
   .bubble .t { display: block; font-size: 11px; opacity: .65; margin-top: 2px; }
 
   .mic-area { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 16px 10px; border-top: 1px solid var(--line); }
@@ -74,14 +87,17 @@
 <body>
 <header>
   <h1>ElRobot Console</h1>
-  <span class="sub">Live cameras and voice input. Read-only, nothing here moves the arm.</span>
+  <span class="sub">Live cameras. Talk to Claude, which drives the arm through the elrobot MCP tools. Say or type "stop" to hold the arm.</span>
 </header>
 <main>
   <section class="cams" id="cams" aria-label="Cameras"></section>
 
   <section class="chat" aria-label="Chat">
-    <h2>Chat</h2>
-    <div class="log" id="log" aria-live="polite"><div class="empty">Press the microphone and speak.<br>The text appears below for you to send.</div></div>
+    <div class="chat-head">
+      <h2>Chat <span class="agent" id="agent-state"></span></h2>
+      <button id="stop" type="button" title="Hold the arm where it is (does not go through Claude)">STOP</button>
+    </div>
+    <div class="log" id="log" aria-live="polite"><div class="empty">Press the microphone and speak, e.g. "look at the table".<br>Claude answers here.</div></div>
 
     <div class="mic-area">
       <button id="mic" type="button" aria-label="Start recording" title="Click to talk, click again to stop (or hold Space)">
@@ -170,23 +186,39 @@ const log = $("log");
 function render(m) {
   log.querySelector(".empty")?.remove();
   const b = document.createElement("div");
-  b.className = "bubble " + (m.role === "robot" ? "robot" : "user");
+  b.className = "bubble " + (["robot", "tool", "error"].includes(m.role) ? m.role : "user");
   b.textContent = m.text;
   const t = document.createElement("span");
   t.className = "t";
   t.textContent = new Date(m.time * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   b.appendChild(t);
-  log.appendChild(b);
+  log.insertBefore(b, typing.isConnected ? typing : null);
   log.scrollTop = log.scrollHeight;
+}
+
+const typing = document.createElement("div");
+typing.className = "typing";
+typing.textContent = "Claude is working…";
+const AGENT_LABEL = { ready: "· Claude connected", starting: "· connecting to Claude…",
+                      unavailable: "· Claude not connected", off: "· Claude off" };
+
+function showAgent(d) {
+  const el = $("agent-state");
+  el.textContent = AGENT_LABEL[d.agent] || "";
+  el.title = d.agent_error || "";
+  el.style.color = d.agent === "unavailable" ? "var(--bad)" : "";
+  if (d.busy && !typing.isConnected) { log.appendChild(typing); log.scrollTop = log.scrollHeight; }
+  if (!d.busy && typing.isConnected) typing.remove();
 }
 
 async function poll() {
   try {
     const r = await fetch(`/api/messages?after=${lastId}`, { cache: "no-store" });
     const d = await r.json();
-    for (const m of d.messages) { render(m); lastId = Math.max(lastId, m.id); }
+    for (const m of d.messages) { if (m.id > lastId) { render(m); lastId = m.id; } }
+    showAgent(d);
   } catch (_) { /* server restarting; try again */ }
-  setTimeout(poll, 1000);
+  setTimeout(poll, 700);
 }
 poll();
 
@@ -198,6 +230,8 @@ async function send(text) {
   const d = await r.json();
   if (d.ok && d.message.id > lastId) { render(d.message); lastId = d.message.id; }
 }
+
+$("stop").addEventListener("click", () => fetch("/api/stop", { method: "POST" }));
 
 $("form").addEventListener("submit", (e) => {
   e.preventDefault();

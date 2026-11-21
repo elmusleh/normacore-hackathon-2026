@@ -53,7 +53,7 @@ MOTORS = list(ELROBOT_MOTOR_IDS)
 JOG_MAX_STEPS = 200          # about 17 degrees on a 4096-step encoder
 JOG_DEFAULT_SPEED = 300
 JOG_MAX_SPEED = 800
-GOTO_MAX_DELTA = 600         # per motor, unless --allow-large
+GOTO_WARN_DELTA = 1500       # per motor; goto always moves, but flags larger moves in the plan
 GOTO_DEFAULT_SPEED = 300
 IDENT_NUDGE = 30             # about 2.6 degrees: small enough to be safe, big enough to see
 IDENT_SPEED = 150
@@ -512,7 +512,6 @@ def cmd_goto(args, cfg, state):
         print(f"Waypoint '{args.name}' must list all 8 motors. Re-teach it.")
         return 2
     target = {int(k): int(v) for k, v in raw.items()}
-    max_delta = 10**9 if args.allow_large else GOTO_MAX_DELTA
     speed = min(args.speed, JOG_MAX_SPEED)
 
     def go(hw, cfg):
@@ -521,7 +520,7 @@ def cmd_goto(args, cfg, state):
         if not _require_torque(readings, MOTORS):
             return 1
         try:
-            deltas = plan_goto(present, target, max_delta)
+            deltas = plan_goto(present, target, 10**9)  # no step cap: goto always goes to the waypoint
         except ValueError as exc:
             print(f"Refused: {exc}")
             return 1
@@ -537,7 +536,12 @@ def cmd_goto(args, cfg, state):
                 return 1
             goals[m] = goal
             note = "  (clamped)" if clamped else ""
+            if abs(deltas[m]) > GOTO_WARN_DELTA:
+                note += "  LARGE MOVE"
             print(f"  {m:>5} {_joint(cfg, m):<14} {r.present:>8} {goal:>7} {deltas[m]:>+7}{note}")
+        large = [m for m in MOTORS if abs(deltas[m]) > GOTO_WARN_DELTA]
+        if large:
+            print(f"  Warning: motors {large} move more than {GOTO_WARN_DELTA} steps. Watch the whole path.")
         if not _confirm_motion(args.yes, "Check the path is clear of the table and objects."):
             print("Cancelled. Nothing moved.")
             return 0
@@ -599,6 +603,363 @@ def cmd_bundle(args, cfg, state):
     return 0
 
 
+# ------------------------------------------------- demo (follower) ----
+
+DEMO_DEFAULT_AMPLITUDE = 200   # steps either side of the start pose (about 17 degrees)
+DEMO_MAX_AMPLITUDE = 600       # above this, use --full
+DEMO_DEFAULT_SPEED = 250
+GRIPPER_MOTOR = 8
+TELEOP_WATCH_S = 1.0           # goal registers must stay still this long before the demo starts
+TRACK_TOLERANCE = 12           # same tolerance move_and_watch uses for "reached"
+
+
+def plan_demo(readings, motors, amplitude, full=False, gripper_full=True,
+              margin=DEFAULT_SAFETY_MARGIN_STEPS):
+    """Per-motor sweep: out one way, out the other way, back to the start pose.
+
+    Returns [(motor, [goal, goal, start]), ...]. Goals are clamped into the calibrated
+    range minus the margin. With full=True a joint goes to both calibrated limits.
+    The gripper (motor 8) does its full travel unless gripper_full=False.
+    Raises ValueError for a missing or uncalibrated motor.
+    """
+    plan = []
+    for m in motors:
+        r = readings.get(m)
+        if r is None:
+            raise ValueError(f"motor {m} is not on the bus")
+        lo, hi = r.range_min + margin, r.range_max - margin
+        if full or (m == GRIPPER_MOTOR and gripper_full):
+            targets = [hi, lo]
+        else:
+            targets = [r.present + amplitude, r.present - amplitude]
+        goals = [clamp_goal(t, r.range_min, r.range_max, margin)[0] for t in targets]
+        start = clamp_goal(r.present, r.range_min, r.range_max, margin)[0]
+        plan.append((m, goals + [start]))
+    return plan
+
+
+def plan_combined(readings, motors, amplitude, margin=DEFAULT_SAFETY_MARGIN_STEPS):
+    """All motors together: +amplitude, -amplitude, start. Returns a list of goal dicts."""
+    out, back, home = {}, {}, {}
+    for m in motors:
+        r = readings[m]
+        out[m] = clamp_goal(r.present + amplitude, r.range_min, r.range_max, margin)[0]
+        back[m] = clamp_goal(r.present - amplitude, r.range_min, r.range_max, margin)[0]
+        home[m] = clamp_goal(r.present, r.range_min, r.range_max, margin)[0]
+    return [out, back, home]
+
+
+def _goals_drifting(before, after, motors, tolerance=5):
+    """Motors whose goal register changed without us sending anything (teleop or another tool)."""
+    return [m for m in motors if m in before and m in after and after[m].torque_on
+            and abs(after[m].goal - before[m].goal) > tolerance]
+
+
+def _demo_move(hw, cfg, goals, speed, label, report):
+    t0 = time.monotonic()
+    status = hw.move_and_watch(goals, enable_motion=True, max_speed=speed, max_accel=DEFAULT_MAX_ACCEL,
+                               thresholds={m: current_threshold_for(cfg, m) for m in goals})
+    took = time.monotonic() - t0
+    time.sleep(0.2)
+    final = hw.snapshot()
+    peaks = dict(hw.last_peaks)
+    for m, g in goals.items():
+        r = final.get(m)
+        err = (r.present - g) if r else None
+        row = {"label": label, "motor": m, "goal": g, "status": status.get(m, "?"),
+               "error": err, "peak_current": peaks.get(m, 0), "seconds": round(took, 1)}
+        report.append(row)
+        log.info("demo %s motor %d goal %d -> %s err=%s peak=%s %.1fs", label, m, g, row["status"],
+                 err, row["peak_current"], took)
+        flag = "" if row["status"] == "reached" and err is not None and abs(err) <= 2 * TRACK_TOLERANCE \
+            else "   <-- CHECK"
+        err_s = f"{err:+d}" if err is not None else "?"
+        print(f"    {label:<14} m{m} goal {g:>5}  {row['status']:<8} err {err_s:>5}  "
+              f"peak I {row['peak_current']:>4}  {took:4.1f}s{flag}")
+    return status
+
+
+def _print_demo_report(cfg, report):
+    print("\n=== Follower demo summary ===")
+    print(f"  {'motor':>5} {'joint':<14} {'moves':>5} {'ok':>3} {'worst err':>9} {'peak I':>7} {'thresh':>7}  verdict")
+    bad = 0
+    for m in sorted({row["motor"] for row in report}):
+        rows = [row for row in report if row["motor"] == m]
+        ok = sum(row["status"] == "reached" and row["error"] is not None
+                 and abs(row["error"]) <= 2 * TRACK_TOLERANCE for row in rows)
+        errs = [abs(row["error"]) for row in rows if row["error"] is not None]
+        worst = max(errs) if errs else None
+        peak = max(row["peak_current"] for row in rows)
+        thr = current_threshold_for(cfg, m)
+        if ok == len(rows):
+            verdict = "OK"
+            if peak > 0.8 * thr:
+                verdict = "OK, but current near threshold (stiff joint or load?)"
+        else:
+            bad += 1
+            kinds = sorted({row["status"] for row in rows if row["status"] != "reached"})
+            if worst is not None and worst > 2 * TRACK_TOLERANCE:
+                kinds.append(f"ended {worst} steps off target")
+            verdict = "PROBLEM: " + ", ".join(kinds)
+        print(f"  {m:>5} {_joint(cfg, m):<14} {len(rows):>5} {ok:>3} "
+              f"{worst if worst is not None else '?':>9} {peak:>7} {thr:>7}  {verdict}")
+    print()
+    if bad:
+        print("Hints: timeout = joint did not arrive (blocked, weak power, speed too low, or teleop fighting);\n"
+              "       overload = current above threshold while stalled (obstacle or hard stop);\n"
+              "       fault = servo status error (check `./cli.sh hw motors`, power supply, cable).")
+    return bad
+
+
+def cmd_demo(args, cfg, state):
+    """Move every follower motor in turn, then all together, and report how each one did."""
+    motors = args.motors or MOTORS
+    if any(m not in MOTORS for m in motors):
+        print(f"Motors must be 1-8, got {motors}")
+        return 2
+    if args.amplitude <= 0 or (args.amplitude > DEMO_MAX_AMPLITUDE and not args.full):
+        print(f"Amplitude must be 1..{DEMO_MAX_AMPLITUDE} steps (use --full for the whole calibrated range).")
+        return 2
+    speed = min(args.speed, JOG_MAX_SPEED)
+
+    def go(hw, cfg):
+        readings = hw.snapshot()
+        missing = [m for m in motors if m not in readings]
+        if missing:
+            print(f"Motors {missing} are not on the follower bus. Run ./cli.sh preflight.")
+            return 1
+        if not _require_torque(readings, motors):
+            return 1
+        faulted = {m: f"0x{readings[m].status:02x}" for m in motors if readings[m].faulted}
+        if faulted:
+            print(f"Motors report faults {faulted}. Not moving. Check power and ./cli.sh hw motors.")
+            return 1
+        try:
+            plan = plan_demo(readings, motors, args.amplitude, full=args.full,
+                             gripper_full=not args.no_gripper_full)
+        except ValueError as exc:
+            print(f"Refused: {exc}")
+            return 1
+
+        # Something else (Station teleop from the leader arm) may be writing goals.
+        time.sleep(TELEOP_WATCH_S)
+        drifting = _goals_drifting(readings, hw.snapshot(), motors)
+        if drifting:
+            print(f"Goal registers of motors {drifting} changed while nothing was sent from here.\n"
+                  "Teleop (leader -> follower) is probably on. Turn it off in the Station viewer\n"
+                  "(http://localhost:8889, follower bus card) and run the demo again.")
+            return 1
+
+        arm_motors = [m for m in motors if m != GRIPPER_MOTOR]
+        print(f"\nFollower demo, speed {speed}, "
+              f"{'FULL calibrated range' if args.full else f'+/-{args.amplitude} steps around the current pose'}:")
+        print(f"  {'motor':>5} {'joint':<14} {'present':>7} {'range':>11}  sweep goals")
+        for m, goals in plan:
+            r = readings[m]
+            print(f"  {m:>5} {_joint(cfg, m):<14} {r.present:>7} {r.range_min:>5}..{r.range_max:<5}  "
+                  + " -> ".join(str(g) for g in goals))
+        if not args.no_combined and len(arm_motors) > 1:
+            print(f"  then motors {arm_motors} together +/-{args.amplitude // 2} steps and back.")
+        warn = ("\nThe arm starts from where it is now: put it in a high, open pose first (e.g. "
+                "./cli.sh hw goto clear).\nClear the table near the arm and empty the gripper. "
+                "Ctrl-C holds the arm where it is.")
+        if args.full:
+            warn += "\n--full drives every joint to its calibrated limits: the arm WILL reach the table if it can."
+        if not _confirm_motion(args.yes, warn):
+            print("Cancelled. Nothing moved.")
+            return 0
+
+        report = []
+        aborted = False
+        try:
+            for m, goals in plan:
+                print(f"\n  Motor {m} ({_joint(cfg, m)})")
+                full_sweep = args.full or (m == GRIPPER_MOTOR and not args.no_gripper_full)
+                labels = ["to max", "to min", "back to start"] if full_sweep else \
+                    ["sweep +", "sweep -", "back to start"]
+                for goal, label in zip(goals, labels):
+                    status = _demo_move(hw, cfg, {m: goal}, speed, label, report)
+                    if status.get(m) == "fault":
+                        print("  Servo fault: stopping the demo.")
+                        aborted = True
+                        break
+                    if status.get(m) != "reached":
+                        # Do not push further into an obstacle; go back to the start and move on.
+                        print("  Did not arrive. Returning this motor to its start pose and moving on.")
+                        _demo_move(hw, cfg, {m: goals[-1]}, speed, "recover", report)
+                        break
+                    if args.pause:
+                        time.sleep(args.pause)
+                if aborted:
+                    break
+                if args.step and sys.stdin.isatty() and \
+                        input("  Enter for next motor, q to stop: ").strip().lower() == "q":
+                    aborted = True
+                    break
+
+            if not aborted and not args.no_combined and len(arm_motors) > 1:
+                print("\n  All arm motors together")
+                fresh = hw.snapshot()
+                for i, goals in enumerate(plan_combined(fresh, arm_motors, args.amplitude // 2)):
+                    status = _demo_move(hw, cfg, goals, speed,
+                                        ["together +", "together -", "together back"][i], report)
+                    if any(s != "reached" for s in status.values()):
+                        print("  Not every motor arrived: stopping the combined move.")
+                        break
+        except KeyboardInterrupt:
+            hw.hold(motors)
+            print("\nInterrupted: arm held where it is (torque stays ON). ./cli.sh hw stop makes it limp.")
+            _print_demo_report(cfg, report)
+            return 130
+
+        bad = _print_demo_report(cfg, report)
+        print("Full per-move log: ./cli.sh logs")
+        return 1 if (bad or aborted) else 0
+    return _with_station(go)
+
+
+# --------------------------------------------- leader (master) monitor ----
+
+def range_percent(present, range_min, range_max):
+    """Position as a percentage of the calibrated range (0 = range_min, 100 = range_max)."""
+    if range_max <= range_min:
+        return None
+    return 100.0 * (present - range_min) / (range_max - range_min)
+
+
+class CoverageTracker:
+    """Remembers, per motor, the lowest and highest position seen and the biggest frame-to-frame jump."""
+
+    JUMP_WARN = 300  # steps between two frames ~0.1 s apart: a hand cannot do that, a glitch can
+
+    def __init__(self):
+        self.lo, self.hi, self.last, self.max_jump, self.frames = {}, {}, {}, {}, {}
+
+    def update(self, readings):
+        for m, r in readings.items():
+            p = r.present
+            if m in self.last:
+                self.max_jump[m] = max(self.max_jump.get(m, 0), abs(p - self.last[m]))
+            self.last[m] = p
+            self.lo[m] = min(self.lo.get(m, p), p)
+            self.hi[m] = max(self.hi.get(m, p), p)
+            self.frames[m] = self.frames.get(m, 0) + 1
+
+    def coverage(self, m, range_min, range_max):
+        if m not in self.lo or range_max <= range_min:
+            return 0.0
+        return 100.0 * (self.hi[m] - self.lo[m]) / (range_max - range_min)
+
+
+def leader_issues(m, r, tracker):
+    """Short problem notes for one leader motor reading."""
+    if r is None:
+        return ["MISSING from bus"]
+    issues = []
+    if not r.calibrated:
+        issues.append("uncalibrated")
+    elif r.present < r.range_min - 50 or r.present > r.range_max + 50:
+        issues.append("outside calibrated range")
+    if r.faulted:
+        issues.append(f"fault 0x{r.status:02x}")
+    if r.torque_on:
+        issues.append("torque ON (leader should be limp)")
+    if tracker.max_jump.get(m, 0) > CoverageTracker.JUMP_WARN:
+        issues.append(f"jumped {tracker.max_jump[m]} steps")
+    return issues
+
+
+def _fmt_pct(v):
+    return "   -" if v is None else f"{v:5.0f}%"
+
+
+def cmd_leader(args, cfg, state):
+    """Live read-only view of the leader (master) arm next to the follower. Moves nothing."""
+    cfg_station = cfg["station"]
+    leader_bus = args.bus or os.environ.get("ELROBOT_LEADER_BUS") or cfg_station.get("leader_bus")
+    if not leader_bus:
+        print("No leader bus serial. Pass --bus <serial> or set station.leader_bus in config/elrobot.json.")
+        return 2
+    server = os.environ.get("ELROBOT_STATION", cfg_station["server"])
+    leader = ElRobotHardwareSync(server=server, bus=leader_bus)
+    follower = None
+    try:
+        try:
+            leader.connect(timeout_s=10)
+        except Exception as exc:  # noqa: BLE001
+            raise StationDown(f"cannot read the leader bus {leader_bus} at {server} ({exc}). "
+                              "Is the Station running and the leader's USB plugged in?") from exc
+        if not args.no_follower:
+            follower = ElRobotHardwareSync(server=server, bus=os.environ.get("ELROBOT_BUS", cfg_station["bus"]))
+            try:
+                follower.connect(timeout_s=10)
+            except Exception as exc:  # noqa: BLE001 - leader view still useful on its own
+                print(f"(follower not readable: {exc}; showing the leader only)")
+                follower.close()
+                follower = None
+
+        tracker = CoverageTracker()
+        deadline = time.monotonic() + args.seconds if args.seconds else None
+        live = sys.stdout.isatty()
+        print("Move each LEADER joint slowly through its whole travel. Ctrl-C to finish and see the summary.")
+        time.sleep(1.0)
+        lead, foll = {}, {}
+        try:
+            while deadline is None or time.monotonic() < deadline:
+                lead = leader.snapshot()
+                foll = follower.snapshot() if follower else {}
+                tracker.update(lead)
+                if live:
+                    lines = ["\033[H\033[J" + f"Leader {leader_bus}"
+                             + (f"  vs follower {follower._hw.bus_serial}" if follower else "")
+                             + "   (Ctrl-C to stop)",
+                             f"{'m':>2} {'leader':>6} {'pos':>6} {'seen':>11} {'cover':>6} "
+                             f"{'follower':>8} {'pos':>6} {'diff':>6}  notes"]
+                    for m in MOTORS:
+                        r = lead.get(m)
+                        f = foll.get(m)
+                        lp = range_percent(r.present, r.range_min, r.range_max) if r else None
+                        fp = range_percent(f.present, f.range_min, f.range_max) if f else None
+                        diff = (fp - lp) if (lp is not None and fp is not None) else None
+                        seen = f"{tracker.lo.get(m, 0)}..{tracker.hi.get(m, 0)}" if r else "-"
+                        cov = tracker.coverage(m, r.range_min, r.range_max) if r else 0.0
+                        notes = leader_issues(m, r, tracker)
+                        lines.append(f"{m:>2} {r.present if r else '-':>6} {_fmt_pct(lp):>6} {seen:>11} "
+                                     f"{cov:5.0f}% {f.present if f else '-':>8} {_fmt_pct(fp):>6} "
+                                     f"{'   -' if diff is None else f'{diff:+5.0f}%':>6}  {'; '.join(notes)}")
+                    print("\n".join(lines), flush=True)
+                time.sleep(args.interval)
+        except KeyboardInterrupt:
+            pass
+
+        print("\n=== Leader summary ===")
+        print(f"  {'m':>2} {'cover':>6} {'max jump':>8}  verdict")
+        problems = 0
+        for m in MOTORS:
+            r = lead.get(m)
+            cov = tracker.coverage(m, r.range_min, r.range_max) if r else 0.0
+            issues = leader_issues(m, r, tracker)
+            if cov < args.min_coverage:
+                issues.append(f"only {cov:.0f}% of the range was seen (move it end to end)")
+            problems += bool(issues)
+            log.info("leader motor %d coverage %.0f%% jump %s issues %s", m, cov, tracker.max_jump.get(m), issues)
+            print(f"  {m:>2} {cov:5.0f}% {tracker.max_jump.get(m, 0):>8}  {'OK' if not issues else '; '.join(issues)}")
+        if foll:
+            print("\nLeader vs follower now (% of each arm's calibrated range; teleop should keep these close):")
+            for m in MOTORS:
+                r, f = lead.get(m), foll.get(m)
+                if r and f:
+                    lp = range_percent(r.present, r.range_min, r.range_max)
+                    fp = range_percent(f.present, f.range_min, f.range_max)
+                    if lp is not None and fp is not None:
+                        print(f"  m{m}: leader {lp:5.0f}%  follower {fp:5.0f}%  diff {fp - lp:+5.0f}%")
+        return 1 if problems else 0
+    finally:
+        leader.close()
+        if follower:
+            follower.close()
+
+
 # ---------------------------------------------------------- parser ----
 
 def build_parser():
@@ -649,8 +1010,27 @@ def build_parser():
     g = sub.add_parser("goto", help="move all motors to a waypoint (type MOVE to confirm)")
     g.add_argument("name")
     g.add_argument("--speed", type=int, default=GOTO_DEFAULT_SPEED)
-    g.add_argument("--allow-large", action="store_true", help=f"allow moves above {GOTO_MAX_DELTA} steps per motor")
+    g.add_argument("--allow-large", action="store_true", help="accepted for old scripts; goto no longer has a step cap")
     g.add_argument("--yes", action="store_true")
+
+    dm = sub.add_parser("demo", help="move each follower motor out, back and together; report per motor")
+    dm.add_argument("motors", nargs="*", type=int, help="subset of motors (default all 8)")
+    dm.add_argument("--amplitude", type=int, default=DEMO_DEFAULT_AMPLITUDE,
+                    help=f"steps either side of the start pose (default {DEMO_DEFAULT_AMPLITUDE}, max {DEMO_MAX_AMPLITUDE})")
+    dm.add_argument("--full", action="store_true", help="go to both calibrated limits of every joint (can hit the table)")
+    dm.add_argument("--speed", type=int, default=DEMO_DEFAULT_SPEED)
+    dm.add_argument("--pause", type=float, default=0.3, help="seconds between moves")
+    dm.add_argument("--step", action="store_true", help="wait for Enter between motors")
+    dm.add_argument("--no-combined", action="store_true", help="skip the all-motors-together move")
+    dm.add_argument("--no-gripper-full", action="store_true", help="gripper uses --amplitude instead of full travel")
+    dm.add_argument("--yes", action="store_true")
+    ld = sub.add_parser("leader", help="live read-only view of the leader (master) arm vs the follower")
+    ld.add_argument("--bus", help="leader bus serial (default station.leader_bus in config)")
+    ld.add_argument("--seconds", type=float, default=0, help="stop after N seconds (default: until Ctrl-C)")
+    ld.add_argument("--interval", type=float, default=0.1)
+    ld.add_argument("--min-coverage", type=float, default=80.0,
+                    help="flag joints moved through less than this %% of their range")
+    ld.add_argument("--no-follower", action="store_true", help="show the leader only")
 
     sub.add_parser("workspace", help="show workspace limits and whether they were measured")
     lg = sub.add_parser("logs", help="last lines of the latest hardware log")
@@ -665,9 +1045,10 @@ COMMANDS = {
     "identify": cmd_identify, "jog": cmd_jog, "probe-current": cmd_probe_current,
     "teach": cmd_teach, "waypoints": cmd_waypoints, "goto": cmd_goto,
     "workspace": cmd_workspace, "logs": cmd_logs, "bundle": cmd_bundle,
+    "demo": cmd_demo, "leader": cmd_leader,
 }
 HARDWARE_COMMANDS = {"run", "next", "jog", "stop", "motors", "torque", "identify", "probe-current",
-                     "teach", "goto", "map"}
+                     "teach", "goto", "map", "demo", "leader"}
 
 
 def main(argv=None) -> int:

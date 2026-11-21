@@ -39,9 +39,13 @@
 - [ ] Execute single-object natural language pick-and-place
 
 - [x] Web console `./cli.sh console` (`src/web_console.py`, `src/web/console.html`): table + gripper cameras on the left, chat with microphone (local faster-whisper STT) on the right. Tested offline; not yet with live camera frames
-- [ ] Connect the console chat to Claude: MCP `listen`/`say` tools reading/writing `/api/messages` (plan 3.2/3.4, owner D)
+- [x] Console chat answered by Claude (`src/console_agent.py`): Messages API tool loop over the elrobot MCP server (spawned from .mcp.json); "stop"/STOP button bypasses Claude. Tested with fakes and a live MCP subprocess; NOT yet with a real API key
+- [x] Console request-to-action prompt (`CONSOLE_PROMPT` in `src/console_agent.py`, plan 4.3 draft): understand -> check waypoints/camera -> ask if ambiguous -> say plan -> act with look after each step; safety rules (serve standoff, stop on doubt, no teach/torque/nudge unless operator asks). Not yet tried with a real API key
+- [ ] Run the console chat with ANTHROPIC_API_KEY on the arm (motion off first, then on)
 
 ## Phase 4: Closed-Loop Recovery & Stress Testing — PENDING
+- [x] Arm debug tools: `hw demo` (follower sweep + report) and `hw leader` (master live view), 2026-11-21
+- [ ] Run `hw demo` on the real follower with a human watching
 - [ ] Tune ST3215 gripper motor load thresholds
 - [ ] Rehearse judge perturbation test 5+ times consecutively
 - [ ] Run multi-object sorting sequence autonomously

@@ -101,3 +101,38 @@ def test_messages_roundtrip(client):
     msgs = client.get("/api/messages").json()["messages"]
     assert [m["text"] for m in msgs] == ["feed me", "Getting a grape"]
     assert client.get(f"/api/messages?after={msgs[0]['id']}").json()["messages"][0]["role"] == "robot"
+
+
+class FakeAgent:
+    def __init__(self, post):
+        self.post, self.state, self.error, self.busy = post, "ready", "", False
+        self.submitted, self.stops = [], 0
+
+    async def start(self):
+        pass
+
+    async def close(self):
+        pass
+
+    async def submit(self, text):
+        self.submitted.append(text)
+        self.post("robot", f"echo: {text}")
+
+    async def emergency_stop(self):
+        self.stops += 1
+
+
+def test_user_message_goes_to_agent_and_stop_button():
+    made = []
+
+    def factory(post):
+        made.append(FakeAgent(post))
+        return made[0]
+
+    with TestClient(create_app(tools=FakeTools(), stt=None, agent_factory=factory)) as c:
+        c.post("/api/messages", json={"role": "user", "text": "look at the table"})
+        d = c.get("/api/messages").json()
+        assert [m["role"] for m in d["messages"]] == ["user", "robot"]
+        assert d["agent"] == "ready" and d["busy"] is False
+        assert c.post("/api/stop").json()["ok"]
+    assert made[0].submitted == ["look at the table"] and made[0].stops == 1
