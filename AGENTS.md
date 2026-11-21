@@ -43,8 +43,51 @@ After each implementation, give the user **3 suggestions** for the next steps in
 - **Rebase, don't merge, your own branch:** `git pull --rebase origin main` before you push. Never force-push `main`. Force-push your own branch only after telling the team.
 - **Hardware is single-writer:** only the person named as hardware owner in `HANDOFF.md` runs motion commands (`hw jog`, `hw goto`, `hw torque on`, `hw identify`). Others read only (`preflight`, `hw motors`, `logs`). Hand over by updating the owner line in `HANDOFF.md` and committing it.
 - **Calibration values are committed by the person who measured them.** `config/elrobot.json` (thresholds, workspace, `measured` flag) and `config/waypoints.json` go in a dedicated commit that names the hardware session date, e.g. `chore(elrobot): record workspace measured 2026-11-22`.
-- **Handoffs are shared state.** Add a dated entry to `HANDOFF.md` with your name or agent, what changed, and the next step. On merge conflicts in `HANDOFF.md` or `PROGRESS.md`, keep both sides.
+- **Handoffs are shared state.** Add a dated entry to `HANDOFF.md` with your name or agent, what changed, and the next step. Put the newest entry at the top. Append to shared files and never rewrite someone else's entry. On merge conflicts in `HANDOFF.md`, `PROGRESS.md` or `CHANGELOG.md`, keep both sides.
 - **Identity:** commit under your own git identity. Do not commit as someone else.
+
+## Setup and Safety (read these first)
+- **New machine:** follow `docs/team_setup.md` before the first run.
+- **Before any motion command** (`hw jog`, `hw goto`, `hw torque on`, `hw identify`, `hw probe-current`): read `docs/bench_safety.md`. Stop means `./cli.sh hw stop`, and the 12 V switch is the real stop.
+- **Never guess a physical fact** (which serial port is which arm, which camera is overhead). Ask the hardware owner, or confirm with a read-only check.
+
+## Where Things Live
+- `src/`: logic, Station client, MCP server, vision, kinematics and safety.
+- `scripts/`: command-line tools (`hw_day.py`, `hardware_preflight.py`, `setup_usb_serial.sh`).
+- `config/`: committed calibration and workspace limits. Change these only in calibration commits.
+- `tests/`: offline tests. They need no hardware.
+- `docs/`: runbooks and setup guides. Start with `docs/team_setup.md`, `docs/bench_safety.md` and `docs/elrobot_hardware_bridge.md`.
+- `data/`, `logs/`, `station_data/`, `bin/`, `external/`: local only, gitignored.
+- Team roles: the split in `README.md`.
+
+## Definition of Done
+A change is finished when all of these are true:
+- Tests pass (`python3 -m pytest tests/`).
+- `CHANGELOG.md` has an entry.
+- It is committed on a branch, with a clean `git status` for your files.
+- A pull request is open, or the branch is named in `HANDOFF.md`.
+- `HANDOFF.md` says what changed and what comes next.
+- For motion code: the bench checklist in `docs/bench_safety.md` was followed, or it is marked "not tested on the arm" in `HANDOFF.md`.
+
+## Testing
+- **Offline (anywhere):** `python3 -m pytest tests/`. No hardware, no Station.
+- **Bench (needs the arm and the hardware owner):** `./cli.sh preflight --bus <serial>` and `./cli.sh hw motors`, both read-only.
+- Do not add a test that moves a motor to the default suite. Hardware tests must be separate and clearly marked.
+
+## Conventions
+- Follow `GUIDELINES.md` and `PREFERENCES.md`. They are the owners of the coding and safety rules. Do not copy them here.
+- Python 3.10+. Match the style of the file you are editing.
+- Conventional Commits for every commit message.
+
+## Asking, Reporting and Blockers
+- When a request is ambiguous, say which reading you took and why. Ask first only before changing hardware config or motion code.
+- Write blockers in `HANDOFF.md` under Blockers, with the exact error and the log path, and say so in your final message.
+- Do not hide a partial result. Report what passed, what failed, and what was not run.
+
+## Privacy and Secrets
+- Camera frames and logs can show people and their names. Keep them out of git and out of shared chats. Review `./cli.sh hw bundle` output before sharing it.
+- No keys or tokens in the repo. `.env` files stay local.
+- Do not send repo contents to an outside service unless the owner has agreed to it.
 
 ## On Stop
 1. Update `HANDOFF.md` with: completed work, specific next steps, files changed, build status, hardware owner

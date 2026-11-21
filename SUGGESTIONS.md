@@ -104,3 +104,24 @@
     How: In `scripts/hw_day.py`, create `data/hw_motion.lock` with the process ID when a move starts, refuse new moves while the lock exists and the process is alive, and remove the lock when the move ends.
     Status: ⏳ Unimplemented
     Reason Deferred: Changes the motion code, which needs the real arm to test properly. Should wait until the first bench session confirms the current flow.
+
+16. Save each camera's stable port path in the config — Priority 72% (High value) [Best practices]
+    What: Record which USB port each camera is plugged into (for example, "overhead" and "wrist") in `config/`, so the software finds the right camera without guessing.
+    Why: Camera numbers like `/dev/video2` change after a replug. Two of our cameras share the same name, so a wrong guess could send the wrong image to the robot's logic.
+    How: Use `ls -l /dev/v4l/by-path/` to find each camera's path, confirm it with a test frame, and add the paths to `config/elrobot.json` in a calibration commit.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Needs the cameras plugged into their final ports and a confirmed overhead/wrist assignment from the hardware owner first.
+
+17. Add a one-command bench readiness check — Priority 65% (Nice to have) [Best practices]
+    What: A single command that checks serial permissions, the Station, the bus serial numbers and the cameras, and prints pass or fail for each.
+    Why: Right now setup problems are found one at a time during a bench session. One check before powering the arm saves time and avoids the permission and bus-selection mistakes we have already hit.
+    How: Add a `./cli.sh bench-check` subcommand that reuses the existing preflight checks and adds a serial permission check and a camera frame check. It should only read, never move the arm.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Mostly a convenience. The manual steps in `docs/team_setup.md` cover it until the team has used them on a bench session.
+
+18. Check that every link in the docs points to a real file — Priority 45% (Nice to have) [Professionalism]
+    What: An automatic check that flags any broken link or missing file path in the Markdown docs.
+    Why: The team docs now link to each other. A renamed file would leave a broken link that a new team member finds only when they are stuck.
+    How: Add a small test in `tests/` that reads each `docs/*.md` and `AGENTS.md`, extracts relative links, and fails if a target file does not exist.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Useful but not urgent. The docs are new and few, so a manual check is enough for now.
