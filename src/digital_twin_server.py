@@ -211,6 +211,16 @@ class CameraHub:
 
             return list(self._cameras)
 
+    @staticmethod
+    def _configure_v4l2_hd(cap: cv2.VideoCapture) -> None:
+        """Request crisp 1280x720 MJPG from V4L2 cameras (e.g. OBSBOT Meet SE)."""
+        try:
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        except Exception:
+            pass
+
     def _probe_v4l2(self, idx: int) -> bool:
         lock = self._v4l2_locks.setdefault(idx, threading.Lock())
         with lock:
@@ -222,6 +232,7 @@ class CameraHub:
                 if not cap.isOpened():
                     cap.release()
                     return False
+                self._configure_v4l2_hd(cap)
                 ret, frame = cap.read()
                 if ret and frame is not None and frame.size > 0:
                     self._v4l2_caps[idx] = cap
@@ -291,6 +302,8 @@ class CameraHub:
                 cap = self._v4l2_caps.get(idx)
                 if cap is None or not cap.isOpened():
                     cap = cv2.VideoCapture(idx)
+                    if cap.isOpened():
+                        self._configure_v4l2_hd(cap)
                     self._v4l2_caps[idx] = cap
                 if not cap.isOpened():
                     return None, f"Cannot open /dev/video{idx}"
@@ -445,7 +458,7 @@ class CameraHub:
         else:
             summary = "Live feed (clean — ready for AI vision)"
 
-        ok, buf = cv2.imencode(".jpg", annotated_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+        ok, buf = cv2.imencode(".jpg", annotated_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
         b64 = base64.b64encode(buf.tobytes()).decode("utf-8") if ok else ""
 
         return {

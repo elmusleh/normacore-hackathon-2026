@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enabled 1280×720 MJPG HD capture for V4L2 cameras (OBSBOT Meet SE) and raised JPEG streaming quality to 90 in `src/digital_twin_server.py`.
 - Upgraded Table Cam detection to MediaPipe `ObjectDetector` (`efficientdet_lite0.tflite`) in `src/feeding_vision.py` and `src/digital_twin_server.py`: detects real bowls, spoons, cups, and food items with zero false positives on red robot servo wires, and highlights individual food pieces (grapes/chocolate) inside detected bowls.
 - Added per-user live Mouth & Distance Calibration in Mission Control (`src/digital_twin.html`, `src/digital_twin_server.py`, `src/feeding_vision.py`): 1-click **1. Capture Closed**, **2. Capture Open**, **Set Eating Distance**, **Reset Defaults**, and manual `MAR`/`Standoff px` inputs persisted to `config/elrobot.json` (`feeding_vision`).
 - Tuned `MAR_OPEN_THRESHOLD` to `0.26` from live OBSBOT bench testing (closed `0.00–0.02`, open `0.30–0.50`) and prevented `detect_mouth()` in `src/feeding_vision.py` from falling through to noisy OpenCV skin-tone heuristics when MediaPipe `FaceLandmarker` is active and sees no face (eliminates false yellow box on windows/background and ensures clean face-loss watchdog behavior).
