@@ -1,7 +1,7 @@
 {
   "station": {
     "server": "localhost",
-    "bus": "5B61037051"
+    "bus": "5B61034962"
   },
   "joint_map": {},
   "current_threshold": {},
@@ -18,8 +18,9 @@
     "measured": false
   },
   "cameras": {
-    "table": "port:3-2.4",
-    "gripper": "port:3-2.2"
+    "table": "port:3-1.2.2",
+    "gripper": "port:3-1.2.4",
+    "person": "v4l2:6"
   },
   "camera_settings": {
     "table": {
