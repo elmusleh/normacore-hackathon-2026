@@ -166,13 +166,6 @@
     Status: ⏳ Unimplemented
     Reason Deferred: Needs the repository to use GitHub Actions and pull requests. Nice to have once the team is using pull requests regularly.
 
-22. Pin the NormaCore SDK as a git submodule at commit 5f4f805 — Priority 84% (High value) [Best practices]
-    What: Make the SDK a git submodule of this repository, pointing at the exact NormaCore commit that matches the Station binary, so `git` fetches the same code on every machine.
-    Why: The SDK is currently a manual copy outside git. A teammate can end up with a different version, and the only check is `./cli.sh sdk-check`. A submodule records the exact commit in git, so a mismatch becomes a visible git change instead of a silent difference.
-    How: Confirm commit `5f4f805` exists upstream (it does: `norma-core/norma-core`, 2026-08-09). Then run `git submodule add https://github.com/norma-core/norma-core external/norma-core`, check out `5f4f805` inside it, commit the submodule pointer, and update `docs/team_setup.md` so teammates run `git submodule update --init`. Keep the tarball and checksum as a backup.
-    Status: ⏳ Unimplemented
-    Reason Deferred: Changes the repository structure and the setup steps for every teammate. It needs the owner's approval before it is done. The tarball plus `sdk-check` is the fallback until then.
-
 23. Record the Station binary's checksum next to the SDK's — Priority 55% (Nice to have) [Security]
     What: Store the SHA-256 of `bin/station` in the check script, so `sdk-check` also proves the binary is the one the team agreed on.
     Why: The check currently confirms the version string the binary prints. A replaced binary that prints the same version would pass. A checksum closes that gap.
@@ -180,9 +173,23 @@
     Status: ⏳ Unimplemented
     Reason Deferred: Only useful once the team's Station binary is fixed and shared. Doing it now would lock in a binary that may still change.
 
-24. Guard the generated protobuf code against accidental regeneration — Priority 40% (Optional) [Professionalism]
-    What: A check that fails if `external/norma-core/target/gen_python` differs from the team's known copy.
-    Why: Regenerating the protobuf code with a different `protoc` version can break the message format quietly. A check catches that before a bench session.
-    How: Store a checksum of the generated folder's file list in `scripts/sdk_check.py` and compare it on each run.
+24. Require an approval note when the SDK pin changes — Priority 50% (Nice to have) [Professionalism]
+    What: A pull request check that flags any change to `.gitmodules` or the submodule's commit, and asks for the owner's approval in the description.
+    Why: The SDK pin decides which NormaCore code every teammate runs. A pin changed by accident would spread to the whole team without anyone noticing in review.
+    How: Add a GitHub Actions workflow that runs `git diff --name-only origin/main...HEAD` and fails the check if `.gitmodules` or `external/norma-core` appears without the words "SDK pin approved" in the pull request body.
     Status: ⏳ Unimplemented
-    Reason Deferred: Low risk while nobody regenerates the code. Worth doing once the SDK is pinned (suggestion 22).
+    Reason Deferred: Needs GitHub Actions and pull requests in regular use. The team has not used pull requests yet.
+
+25. Keep an offline mirror of the pinned SDK — Priority 58% (Nice to have) [Best practices]
+    What: A copy of the SDK at commit `5f4f805` on a team drive or in a backup, so a bench session can go ahead even if GitHub is unreachable.
+    Why: The Station venue may have poor internet. Without a mirror, a new machine cannot fetch the submodule on the day.
+    How: Run `git bundle create norma-core-5f4f805.bundle 5f4f805` in the submodule folder, store the bundle with its SHA-256 on the team drive, and add the restore steps to `docs/team_setup.md`.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Only needed if the team will work offline. The owner should decide whether a mirror is needed for the venue.
+
+26. Remove the old SDK backup once every machine uses the submodule — Priority 35% (Optional) [Professionalism]
+    What: Delete the leftover copies `external/norma-core-snapshot/` and `external/norma-core-main.tar.gz`, which the submodule has replaced.
+    Why: Two unused copies of the SDK take up space and can be mistaken for the real one. Removing them stops a teammate from using the wrong copy.
+    How: After every machine has run `./cli.sh sdk-check` and passed, delete both paths. They are gitignored, so nothing is committed.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Deleting files needs the owner's go-ahead, and the backups are the fallback if the submodule has a problem on the bench.

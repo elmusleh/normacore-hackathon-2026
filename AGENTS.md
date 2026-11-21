@@ -9,6 +9,7 @@ This project uses `.ai-sync/` for cross-platform AI agent synchronization.
    - `2`: uncommitted changes exist, so the pull was skipped. Do not edit files that are being changed upstream. Ask the owner before you pull.
    - `3`: diverged, detached, or fast-forward refused. Stop and ask. Do not rebase on your own.
    - `4`: no upstream. Nothing to pull. Continue.
+   It also brings the NormaCore submodule to its pinned commit.
    The output also lists commits on `origin/main` since your branch split, with their files. Check those files before you edit them.
 2. Note any modified files you did not touch; they belong to someone else.
 3. Read `.ai-sync/HANDOFF.md` — current state, what was done, what's next, who owns the hardware
@@ -30,7 +31,7 @@ Nothing finished stays uncommitted. After each logical change (code, tests, docs
 5. Check with `git status`. Your files must be clean. Anything left is either someone else's (leave it) or a mistake (fix it).
 
 Rules for what goes in a commit:
-- Never commit `data/`, `logs/`, `station_data/`, `bin/`, `external/` (all gitignored) or secrets.
+- Never commit `data/`, `logs/`, `station_data/`, `bin/`, other contents of `external/` (all gitignored) or secrets. Never commit edits made inside the `external/norma-core` submodule.
 - Never commit another person's in-flight edit. Example: an uncommitted `config/elrobot.json` change is not yours to bundle. Ask, or commit only your own paths.
 - If a pre-commit hook fails on files you did not write, report it and do not bypass it. Use `--no-verify` only when the failing check is provably outside your change, and say why in the commit body.
 - Push only when asked.
@@ -51,6 +52,7 @@ After each implementation, give the user **3 suggestions** for the next steps in
 - **Hardware is single-writer:** only the person named as hardware owner in `HANDOFF.md` runs motion commands (`hw jog`, `hw goto`, `hw torque on`, `hw identify`). Others read only (`preflight`, `hw motors`, `logs`). Hand over by updating the owner line in `HANDOFF.md` and committing it.
 - **Calibration values are committed by the person who measured them.** `config/elrobot.json` (thresholds, workspace, `measured` flag) and `config/waypoints.json` go in a dedicated commit that names the hardware session date, e.g. `chore(elrobot): record workspace measured 2026-11-22`.
 - **Handoffs are shared state.** Add a dated entry to `HANDOFF.md` with your name or agent, what changed, and the next step. Put the newest entry at the top. Append to shared files and never rewrite someone else's entry. On merge conflicts in `HANDOFF.md`, `PROGRESS.md` or `CHANGELOG.md`, keep both sides.
+- **SDK pin:** `external/norma-core` is a submodule pinned to `5f4f805`. Change the pin only in its own commit, `chore(sdk): pin norma-core to <commit>`, after the owner approves it and `./cli.sh sdk-check` passes. Teammates then run `./cli.sh sync`, which updates the submodule.
 - **Identity:** commit under your own git identity. Do not commit as someone else.
 
 ## Setup and Safety (read these first)
@@ -64,7 +66,8 @@ After each implementation, give the user **3 suggestions** for the next steps in
 - `config/`: committed calibration and workspace limits. Change these only in calibration commits.
 - `tests/`: offline tests. They need no hardware.
 - `docs/`: runbooks and setup guides. Start with `docs/team_setup.md`, `docs/bench_safety.md` and `docs/elrobot_hardware_bridge.md`.
-- `data/`, `logs/`, `station_data/`, `bin/`, `external/`: local only, gitignored.
+- `external/norma-core/`: the NormaCore SDK, a git submodule pinned to commit `5f4f805` (see `.gitmodules`). Do not edit files inside it.
+- `data/`, `logs/`, `station_data/`, `bin/`, and other `external/` contents (for example `external/lerobot_robot_elrobot/`): local only, gitignored.
 - Team roles: the split in `README.md`.
 
 ## Definition of Done

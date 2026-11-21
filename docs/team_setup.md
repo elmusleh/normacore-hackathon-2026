@@ -2,12 +2,15 @@
 
 Read this before the first run on a new computer. Owner: the team. Last reviewed 2026-11-21.
 
-## 1. Get the code
+## 1. Get the code (with the NormaCore submodule)
 ```bash
-git clone https://github.com/elmusleh/normacore-hackathon-2026.git
+git clone --recurse-submodules https://github.com/elmusleh/normacore-hackathon-2026.git
 cd normacore-hackathon-2026
 git checkout main && git pull --rebase
 ```
+`--recurse-submodules` fetches the NormaCore SDK at `external/norma-core/`, pinned to commit `5f4f805`.
+
+Already cloned without it? Run `git submodule update --init --recursive`. `./cli.sh sync` also does this after each pull.
 
 ## 2. Python environment (Python 3.10 or newer)
 ```bash
@@ -24,24 +27,14 @@ python3 -m pytest tests/ -q
 Expect all tests to pass (44 at the last review). If not, stop and fix before going further.
 
 ## 4. NormaCore SDK and Station binary (must match)
-Both must come from NormaCore release **0.1.0-beta.10 (build 5f4f805)**. A mismatch can cause protocol or protobuf errors that look like hardware faults. Neither folder is in git (both are gitignored), so every machine needs the same copy.
+Both must come from NormaCore release **0.1.0-beta.10 (build 5f4f805)**. A mismatch can cause protocol or protobuf errors that look like hardware faults.
 
 **a. SDK (`external/norma-core/`)**
-1. Get `norma-core-main.tar.gz` from the team's shared drive. Ask the team lead for the location.
-2. Check it is the right archive:
-   ```bash
-   sha256sum external/norma-core-main.tar.gz
-   # must print 0fb314f9ca41158bc42b9836467b162f0d5256e4118e56bfe6072eb93f17d829
-   ```
-3. Extract it and rename the folder:
-   ```bash
-   tar -xzf external/norma-core-main.tar.gz -C external/
-   mv external/norma-core-main external/norma-core
-   ```
-Do not regenerate `target/gen_python` (the generated protobuf code) with a different `protoc`.
+This is a git submodule pinned in `.gitmodules`. Step 1 fetched it. Nothing to download or extract.
+- To change the SDK version, change the pin in its own commit, approved by the owner (see `AGENTS.md` Team Workflow). Do not edit files inside `external/norma-core/`. Do not regenerate `target/gen_python` (the generated protobuf code).
 
 **b. Station binary (`bin/station`)**
-Download release v0.1.0-beta.10 as described in [NormaCore_Repositories_and_Tooling.md](NormaCore_Repositories_and_Tooling.md), place it at `bin/station`, then run `chmod +x bin/station`. Check it with `./bin/station --version`. It must print `0.1.0-beta.10 (5f4f805)`.
+`bin/` is gitignored, so the binary is not in the repo. Download release v0.1.0-beta.10 as described in [NormaCore_Repositories_and_Tooling.md](NormaCore_Repositories_and_Tooling.md), place it at `bin/station`, then run `chmod +x bin/station`. Check it with `./bin/station --version`. It must print `0.1.0-beta.10 (5f4f805)`.
 
 **c. Verify both together**
 ```bash
@@ -83,6 +76,8 @@ Record which serial number is which arm in `HANDOFF.md` once it is confirmed. As
 | Cameras missing after a USB drop | Reseat the cable, or try another port. Then restart the Station, because it does not recover on its own. |
 | Station exited | Restart it with `./cli.sh station`. Check `logs/station/` for the last error. |
 | Port 8888 not listening | The Station is not running. |
-| `./cli.sh sdk-check` fails | The SDK and Station are from different releases. Follow section 4 again, using the team's archive and binary. |
+| `external/norma-core/` is empty | Run `git submodule update --init --recursive`. |
+| `./cli.sh sdk-check` fails on the SDK pin or local changes | Run `git submodule update --init --recursive`. If local changes are listed, reset that folder. Do not commit them. |
+| `./cli.sh sdk-check` fails on the Station build | Replace `bin/station` with release v0.1.0-beta.10 (see step 4b). |
 
 If none of these fix it, record the symptom and the log path in `HANDOFF.md` under Blockers.

@@ -7,20 +7,18 @@ protocol or protobuf errors that look like hardware faults.
 Exit 0 when every check passes (warnings do not fail). Exit 1 when a check fails.
 Never moves the arm and never changes torque.
 """
-import hashlib
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SDK = ROOT / "external" / "norma-core"
+SDK = ROOT / "external" / "norma-core"  # git submodule, pinned in .gitmodules
 STATION = ROOT / "bin" / "station"
-ARCHIVE = ROOT / "external" / "norma-core-main.tar.gz"
 
 EXPECTED_VERSION = "0.1.0-beta.10"
 EXPECTED_BUILD = "5f4f805"
-EXPECTED_ARCHIVE_SHA256 = "0fb314f9ca41158bc42b9836467b162f0d5256e4118e56bfe6072eb93f17d829"
+EXPECTED_COMMIT = "5f4f8059deb0be9b8fa4de231a8754531bf3ffe1"
 SDK_IMPORTS = ("software.station.shared.station_py", "target.gen_python")
 
 statuses = []
@@ -31,11 +29,28 @@ def report(status, name, detail):
     print(f"[{status}] {name}: {detail}")
 
 
+def git_in_sdk(*args):
+    result = subprocess.run(["git", "-C", str(SDK), *args], capture_output=True, text=True, timeout=30)
+    return result.returncode, result.stdout.strip()
+
+
 def check_sdk():
-    if not SDK.is_dir():
-        report("FAIL", "SDK folder", f"missing {SDK.relative_to(ROOT)} (see docs/team_setup.md step 4)")
+    if not SDK.is_dir() or not any(SDK.iterdir()):
+        report("FAIL", "SDK submodule", "empty or missing; run: git submodule update --init external/norma-core")
         return
     report("PASS", "SDK folder", str(SDK.relative_to(ROOT)))
+
+    code, head = git_in_sdk("rev-parse", "HEAD")
+    if code == 0 and head == EXPECTED_COMMIT:
+        report("PASS", "SDK pin", f"commit {EXPECTED_COMMIT[:7]}")
+    else:
+        report("FAIL", "SDK pin", f"checked out {head[:7] or 'unknown'}, expected {EXPECTED_BUILD}; run: git submodule update --init")
+
+    code, dirty = git_in_sdk("status", "--porcelain")
+    if code == 0 and not dirty:
+        report("PASS", "SDK local changes", "none")
+    else:
+        report("FAIL", "SDK local changes", "files in external/norma-core were edited or regenerated; reset them, do not commit them")
 
     cargo = SDK / "Cargo.toml"
     match = re.search(r'^version\s*=\s*"([^"]+)"', cargo.read_text(), re.M) if cargo.exists() else None
@@ -70,21 +85,9 @@ def check_station():
         report("FAIL", "Station build", f"got '{output or 'no output'}', expected {EXPECTED_VERSION} ({EXPECTED_BUILD})")
 
 
-def check_archive():
-    if not ARCHIVE.exists():
-        report("WARN", "SDK archive", "not present (only needed to re-extract the SDK)")
-        return
-    digest = hashlib.sha256(ARCHIVE.read_bytes()).hexdigest()
-    if digest == EXPECTED_ARCHIVE_SHA256:
-        report("PASS", "SDK archive sha256", digest[:16] + "...")
-    else:
-        report("FAIL", "SDK archive sha256", f"{digest} does not match the team's archive")
-
-
 def main():
     check_sdk()
     check_station()
-    check_archive()
     failed = statuses.count("FAIL")
     print("RESULT: PASS" if failed == 0 else f"RESULT: {failed} check(s) FAILED")
     return 1 if failed else 0

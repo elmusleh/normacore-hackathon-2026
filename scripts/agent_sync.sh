@@ -62,8 +62,20 @@ AHEAD=$(git rev-list --count "@{u}..HEAD")
 BEHIND=$(git rev-list --count "HEAD..@{u}")
 echo "ahead: $AHEAD   behind: $BEHIND"
 
+# Bring the NormaCore submodule to the commit this branch pins (no-op if none).
+sync_submodules() {
+    [ -f .gitmodules ] || return 0
+    if timeout 300 git submodule update --init --recursive >/dev/null 2>&1; then
+        echo "SYNC: submodules at the pinned commits (external/norma-core)."
+    else
+        echo "SYNC: submodule update failed. Run: git submodule update --init --recursive"
+        RC=1
+    fi
+}
+
 if [ "$BEHIND" -eq 0 ]; then
     echo "SYNC: up to date with $UPSTREAM."
+    sync_submodules
     exit "$RC"
 fi
 
@@ -79,6 +91,7 @@ fi
 
 if git merge --ff-only "@{u}" >/dev/null 2>&1; then
     echo "SYNC: fast-forwarded $BEHIND commit(s) from $UPSTREAM."
+    sync_submodules
     exit "$RC"
 fi
 
