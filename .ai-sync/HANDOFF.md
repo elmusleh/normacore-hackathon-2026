@@ -1,35 +1,38 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-21T18:24:00Z
-status: dual-camera-dashboard-live
-current_phase: "Phase 3: Dual-Camera Mission Control & Live Hardware Bring-Up"
-current_task: "Dual live camera dropdowns (Station + V4L2) and live detection log in Mission Control"
-stop_reason: ready-for-user-selection
+timestamp: 2026-11-21T20:51:00Z
+status: ready-for-first-live-ai-feeding-run
+current_phase: "Phase 3: Dual-Camera Mission Control, MCP Bring-Up & Safety Hardening"
+current_task: "Dual-camera dashboard, ./cli.sh reset, torque readback fix, and live read-only MCP verification"
+stop_reason: handoff-requested
 hardware_owner: "steve"
 previous_session: antigravity 2026-11-21T17:25 — commit-and-push-policy-updated
 ---
 
-## Latest session (2026-11-21 evening): Dual Live Camera Dropdowns & Hardware Bring-Up
+## Latest session (2026-11-21 evening): Dual-Camera Mission Control, Bench Reset & Live MCP Readiness
 
 - **What Changed:**
-  - Wired `./cli.sh reset` (no-arg quick bench reset: relaxes leader torque if Station is running, or cleans/applies camera exposure if stopped), replaced dashboard Swap button with safe **Refresh Bench** (`src/digital_twin.html`, `scripts/reset_bench.py`, `cli.sh`), and committed `./cli.sh check` (`scripts/system_health.py`) + updated `config/elrobot.json`.
-  - Added `scripts/reset_bench.py` (`--status`, `--relax-leader`, `--swap-arms`, `--set-arms`, `--clean-cameras`) and one-click **Relax Leader (Torque Off)** + **Swap Master / Slave** buttons in Mission Control (`src/digital_twin_server.py`, `src/digital_twin.html`) so any teammate can reset cameras, relax a stiff leader arm, or adjust Master/Slave roles without editing JSON.
-  - Fixed inverted Leader/Follower roles in `scripts/teleop_sync.py` to read `leader_bus` (`5B61037051`) and `bus` (`5B61034962`) from `config/elrobot.json`, and enforced explicit `set_torque(..., enable=False)` on the Leader arm before enabling Follower torque on every teleop start. Updated `teleop_start` in `src/digital_twin_server.py` to pass `--leader` and `--follower` explicitly.
-  - Raised `usb-video.resize_target` in `station.yaml` from `224` to `480` and restarted Station (`http://localhost:8889`) and Mission Control (`http://localhost:8080`). Note: `sudo apt-get install v4l-utils` requires interactive sudo password from the user to apply manual exposure (`./cli.sh cameras`).
-  - Stacked `Table Cam` above `Person Cam` in `src/digital_twin.html` and added a **Save Default** button (`save_camera_defaults` in `src/digital_twin_server.py`) that persists the chosen cameras to `config/elrobot.json`.
-  - Merged `origin/main` into `feat/agent-commit-and-push-policy` (bringing in `config/waypoints.json` with `clear` and `grape_hover`, `src/console_agent.py`, updated `scripts/hw_day.py`, and `src/web_console.py`).
-  - Removed the static offline Three.js `<canvas>` mockup from `src/digital_twin.html` so `Table Cam` and `Person Cam` fill the left viewport, added live saved waypoint chips from `config/waypoints.json`, and updated `src/digital_twin_server.py` to separate table vs. person detectors and hide hardcoded fallback `BOWL`/`SPOON`/`MOUTH` boxes.
-  - Confirmed physical hardware mapping from hardware owner (`steve`) and saved to `config/elrobot.json`: follower bus `5B61034962`, leader bus `5B61037051`, `table` camera `port:3-1.2.2` (KD-USB), `gripper` camera `port:3-1.2.4` (KD-USB), `person` camera `v4l2:6` (OBSBOT Meet SE).
-  - Updated `CameraHub.discover()` in `src/digital_twin_server.py` to default `Table Cam` and `Person Cam` from `config/elrobot.json`.
-  - Upgraded `src/digital_twin_server.py` with `CameraHub` (auto-discovers NormaCore Station `usbvideo/*` queues + local V4L2 `/dev/video*` cameras + mock fallback), `ThreadingHTTPServer`, `GET /api/cameras`, `GET /api/frame?role=table|person`, and `select_camera` action.
-  - Upgraded `src/digital_twin.html` with side-by-side **Table Cam** and **Person Cam** live feeds, camera selector dropdowns, refresh button, per-camera live detection bars, and automatic detection-change logging in the Live Terminal & Event Log.
-  - Verified live on hardware: NormaCore Station (`http://localhost:8889`) and Mission Control (`http://localhost:8080`) running; both ElRobot arms (`5B61034962` torque ON, `5B61037051` torque OFF) passed read-only preflight (all 8 motors visible, calibrated, fault-free). All 3 live cameras (`port:3-1.2.4` KD-USB, `port:3-1.2.2` KD-USB, `/dev/video6` OBSBOT Meet SE) confirmed streaming annotated JPEGs. No arm motion was commanded.
-- **Files Changed:** `src/digital_twin_server.py`, `src/digital_twin.html`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
-- **Build Status:** `python3 -m py_compile src/digital_twin_server.py` (OK), `python3 -m pytest tests/` (68 passed, 1 skipped).
-- **Next Steps:**
-  1. User opens `http://localhost:8080` and selects which camera is `Table Cam` and which is `Person Cam` from the dropdowns.
-  2. Save the confirmed camera roles and follower bus serial (`5B61034962`) in `config/elrobot.json`.
-  3. Teach initial safe waypoints (`home`, `table_hover`, `zone_a`, `serve`) and test dry-run -> live AI-guided move.
+  - **Dual-Camera Mission Control (`src/digital_twin_server.py`, `src/digital_twin.html`):** Removed the static offline Three.js `<canvas>` mockup; stacked **Table Cam** (`port:3-1.2.2`, KD-USB) above **Person Cam** (`v4l2:2`, OBSBOT Meet SE) with auto-discovery of both Station `usbvideo/*` queues and local `/dev/video*` devices, dropdown selectors, one-click **Save Default**, **Relax Leader (Torque Off)**, **Refresh Bench**, live waypoint chips from `config/waypoints.json`, and real-only role-specific detection overlays (no hardcoded fallback `BOWL`/`SPOON`/`MOUTH` placeholders) with a thread-safety lock around OpenCV `CascadeClassifier`.
+  - **Confirmed Hardware Mapping (`config/elrobot.json`):** Follower (12V) = `5B61034962`, Leader (5V) = `5B61037051`, `table` = `port:3-1.2.2`, `gripper` = `port:3-1.2.4`, `person` = `v4l2:2`.
+  - **Team Recovery & Teleop Fixes (`scripts/reset_bench.py`, `scripts/teleop_sync.py`, `scripts/system_health.py`, `cli.sh`):**
+    - Added `./cli.sh reset` (zero-arg quick bench reset: relaxes Leader torque if Station is running, or stops stale daemons and runs `./cli.sh cameras` if stopped) and `./cli.sh check`.
+    - Fixed inverted Master/Slave serials in `scripts/teleop_sync.py` to read from `config/elrobot.json` and always disable Leader torque before enabling Follower torque.
+  - **Motor Stop Safety Fix (`src/elrobot_hardware.py`):** Added readback verification and up to 4× retries in `ElRobotHardware.set_torque()` so `./cli.sh hw stop` confirms all 8 ST3215 motors actually report `torque=False`.
+  - **Environment & Repo Sync:** Merged `origin/main` (`clear` & `grape_hover` waypoints, `src/console_agent.py`, `tests/test_console_agent.py`), installed `v4l-utils` on host, created `.venv` (`--system-site-packages` + `mcp` + `anthropic`), raised local `station.yaml` `usb-video.resize_target` to `480` (local gitignored).
+  - **Hardware Verification (Read-Only + Torque-Off Only — No Arm Motion Commanded):**
+    - Both arms (`5B61034962` and `5B61037051`) passed `./cli.sh preflight` (8/8 motors visible, calibrated, fault-free).
+    - Real MCP server (`src/robot_mcp_server.py`) verified read-only against live Station: `list_cameras()` returned live `table` & `gripper`, `list_waypoints()` returned `['clear', 'grape_hover']`, `get_robot_state()` returned 8/8 joints on `5B61034962`.
+    - Servers were stopped cleanly at end of session (`bin/station` and `digital_twin_server.py` stopped).
+- **Files Changed:** `src/digital_twin_server.py`, `src/digital_twin.html`, `src/elrobot_hardware.py`, `scripts/teleop_sync.py`, `scripts/reset_bench.py`, `scripts/system_health.py`, `cli.sh`, `config/elrobot.json`, `tests/test_pipeline.py`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/PROGRESS.md`, `.ai-sync/HANDOFF.md`.
+- **Build Status:** `.venv/bin/python -m pytest tests/` (**86 passed, 0 skipped**), `bash -n cli.sh` (OK), `py_compile` (OK). All changes committed on branch `feat/agent-commit-and-push-policy` (not yet pushed to `origin`).
+- **Known Observation / Note:** When Follower `5B61034962` stays stiff after `./cli.sh hw stop`, check that its dropdown in `http://localhost:8889` is set to **(Self-controlled)** (not following `5B61037051`), or flip the 12V switch OFF to adjust by hand.
+- **Next Steps (Priority Order for Sunday Demo):**
+  1. Push branch `feat/agent-commit-and-push-policy` to `origin` and open a PR into `main`.
+  2. Start clean: run `./cli.sh reset && ./cli.sh start` (confirm `5B61034962` is **(Self-controlled)** in `http://localhost:8889`).
+  3. Teach the 2 remaining Must-have waypoints (`grape_pick` at the bowl and `serve` ~10 cm in front of the person's mouth) to join existing `clear` and `grape_hover` in `config/waypoints.json`.
+  4. Verify gripper open/close direction on a real grape and update `gripper.verified` in `config/elrobot.json`.
+  5. Run first live Claude MCP session (`claude` using `.mcp.json`): dry-run first (`ELROBOT_ALLOW_MOTION=0`), then flip `ELROBOT_ALLOW_MOTION=1` (hand on 12V switch) for the full grape pick $\rightarrow$ mouth standoff delivery.
+  6. Connect voice console (`./cli.sh console` -> `http://localhost:8890` + `src/console_agent.py`) and add a second food zone (`zone_b`).
 
 ## Previous session (2026-11-21): Commit & Push Policy Enhancement
 

@@ -25,7 +25,9 @@
 - [x] Live master/slave 50Hz teleoperation sync tool implemented and tested (`scripts/teleop_sync.py`, `./cli.sh teleop`).
 - [x] Run logging with per-run files and `latest` links (`src/elrobot_log.py`), and `logs/` bundles via `./cli.sh hw bundle`
 - [x] Hardware-day checklist and safe commands in `./cli.sh hw` (`scripts/hw_day.py`)
-- [ ] Run preflight with the ElRobot powered and USB connected; confirm motors 1–8 and calibration
+- [x] Run preflight with the ElRobot powered and USB connected; confirm motors 1–8 and calibration (both Follower `5B61034962` and Leader `5B61037051` verified fault-free)
+- [x] Dual-camera Mission Control dashboard (`Table Cam` + `Person Cam`, dropdowns, Save Default, Relax Leader, Refresh Bench) and `./cli.sh reset` / `./cli.sh check` team recovery tools
+- [x] `set_torque()` readback verification & retry fix (`src/elrobot_hardware.py`) and `.venv` setup with `mcp` + `anthropic` (86/86 tests passing; real MCP verified read-only on live Station)
 - [x] Motor identification wizard, torque on/off, overload guard, current probe, waypoints (teach/goto), workspace config (`scripts/hw_day.py`, `src/elrobot_hardware.py`, `src/elrobot_config.py`)
 - [x] Camera-guided assistive feeding vision detector & slave arm controller for grape bowl, spoon, and person mouth target (`src/feeding_vision.py`, `scripts/camera_feed_arm.py`, `./cli.sh feed`)
 - [ ] Identify motors on the arm (`./cli.sh hw identify`) and confirm directions
