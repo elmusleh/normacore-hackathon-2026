@@ -1,6 +1,6 @@
 ---
 last_agent: claude
-timestamp: 2026-11-21T12:00:00Z
+timestamp: 2026-11-21T15:00:00Z
 status: ready-for-hardware
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (partial)"
 current_task: "Real-arm MCP server built and tested offline; first session on the arm pending"
@@ -9,7 +9,7 @@ stop_reason: needs-physical-arm
 
 ## Latest session (2026-11-21, jaferub's laptop)
 
-- Environment: `bin/station` (v0.1.0-beta.10, asset is `station-linux-amd64.tar.gz`, not x86_64) and `external/norma-core` (commit 6b494f7) set up. `.venv` with `mcp` 2.3, pytest, numpy 2, pillow. Run tests with `.venv/bin/python -m pytest tests/` (58 pass).
+- Environment: `bin/station` (v0.1.0-beta.10, asset is `station-linux-amd64.tar.gz`, not x86_64) and `external/norma-core` (commit 6b494f7) set up. `.venv` with `mcp` 2.3, pytest, numpy 2, pillow. Run tests with `.venv/bin/python -m pytest tests/` (60 pass). Fresh-clone setup (venv, SDK, Station binary, udev rule, v4l-utils): `docs/mcp_server.md` → Setup.
 - Built the real MCP server: `src/robot_mcp_server.py` (stdio, mcp 2.x `MCPServer`), logic in `src/robot_tools.py`, camera decoding in `src/elrobot_camera.py`. `.mcp.json` now runs it. Guide: `docs/mcp_server.md`.
 - The old `src/mcp_server.py` was never an MCP server (plain class); it stays for the offline simulator demo and tests.
 - Verified over stdio with a real MCP client: 10 tools register; without a Station, tools return a clear connection error.
@@ -17,11 +17,13 @@ stop_reason: needs-physical-arm
 
 - Cameras: Station captures via libuvc (raw USB), so cameras need `scripts/99-normacore-cameras.rules` installed (sudo). Without it the viewer shows no cameras. Camera queues live in `station_data/<station id>/usbvideo/<hash>` (discovery handles this). Follower bus 5B61034962, leader 5B61037051.
 
-- Cameras work after the udev rule. Named by USB port in config (`table` = port:3-2.4, `gripper` = port:3-2.2) because every replug creates a new queue hash. `list_cameras` only shows plugged-in cameras. Images are heavily overexposed (nearly white) at 224 px: open issue.
+- Cameras work after the udev rule. Named by USB port in config (`table` = port:3-2.4, `gripper` = port:3-2.2) because every replug creates a new queue hash. `list_cameras` only shows plugged-in cameras. Overexposure fixed with manual exposure (camera auto exposure misbehaves under the Station's libuvc capture; fine under v4l2): `./cli.sh cameras` applies `camera_settings` (table 160, gripper 14) while the Station is stopped. Re-run after replug/reboot.
+
+- Done this session, do not repeat: Station + both arms connected, calibration exported to `calibration/`, MCP `elrobot` connected, cameras named and exposure fixed.
 
 ### Next steps
-1. Station + arm connected: in Claude Code, `/mcp` → elrobot connected; `get_robot_state`, `list_cameras`, `look`.
-2. Name cameras in `config/elrobot.json` → `cameras`; raise `resize_target` in `station.yaml` to ~480.
+1. On a new laptop: follow `docs/mcp_server.md` → Setup, calibrate in the Station viewer, start the Station, check `/mcp` → elrobot, `look`.
+2. Optional: raise `resize_target` in `station.yaml` (local, gitignored) from 224 to ~480 for small objects.
 3. Verify gripper direction (`./cli.sh hw identify 8`), set `gripper.open_at` and `verified`.
 4. Teach `clear`, `home`, `pick_<n>_hover`/`pick_<n>`, `bin_a`, `bin_b`. Probe gripper current.
 5. Set `ELROBOT_ALLOW_MOTION` to "1" in `.mcp.json` and run a single pick-and-place.

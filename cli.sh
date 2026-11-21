@@ -52,6 +52,7 @@ print_usage() {
     echo -e "  ${C_CYAN}hw workspace${C_RESET}         Show workspace limits and whether they were measured"
     echo -e "  ${C_CYAN}hw bundle${C_RESET}            Pack logs, config and state for debugging or sharing"
     echo -e "  ${C_CYAN}logs [-f]${C_RESET}            Show the newest run log (-f follows it live)"
+    echo -e "  ${C_CYAN}cameras${C_RESET}              Apply fixed camera exposure (Station must be stopped)"
     echo -e "  ${C_CYAN}preflight${C_RESET}            Read-only ElRobot readiness check (writes logs/)"
     echo ""
     echo -e "${C_BOLD}General Commands:${C_RESET}"
@@ -142,6 +143,10 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
 
     hw)
         python3 scripts/hw_day.py "$@"
+        ;;
+
+    cameras)
+        python3 scripts/camera_settings.py "$@"
         ;;
 
     preflight)

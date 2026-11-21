@@ -31,7 +31,9 @@
 - [ ] Teach home and clear poses, then test goto both ways
 - [ ] Measure the table and set `workspace.measured` to true
 - [x] Real MCP server for the live Station (`src/robot_mcp_server.py`, `src/robot_tools.py`): camera, state, waypoints, gripper, nudge, stop. Tested offline and over stdio; not yet run against the arm
-- [ ] First MCP session on the real arm: name cameras, verify gripper direction, teach `clear` + pick/bin waypoints, then ELROBOT_ALLOW_MOTION=1
+- [x] Cameras on the real Station: udev rule, named by USB port, fixed exposure (`./cli.sh cameras`)
+- [x] Calibration of follower and leader exported to `calibration/`
+- [ ] First MCP session on the real arm: verify gripper direction, teach `clear` + pick/bin waypoints, then ELROBOT_ALLOW_MOTION=1
 - [ ] Decide how Cartesian tools (`pick_at`, `place_at`) map to joints: needs URDF-based kinematics verified on the physical arm; Station has no Cartesian API
 - [ ] Validate camera stream overlay against real table measurements
 - [ ] Execute single-object natural language pick-and-place

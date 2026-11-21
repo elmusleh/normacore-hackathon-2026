@@ -41,6 +41,8 @@ DEFAULTS: Dict[str, Any] = {
     "gripper": {"motor": 8, "open_at": "max", "verified": False, "squeeze_steps": 10},
     # Friendly camera names for the MCP server, e.g. {"table": "usbvideo/<hash>"}.
     "cameras": {},
+    # Fixed exposure per named camera, applied by ./cli.sh cameras (auto exposure washes out under the Station).
+    "camera_settings": {},
     # Limits for moves requested by Claude through the MCP server (src/robot_mcp_server.py).
     "agent": {
         "max_speed": 500,

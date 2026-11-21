@@ -24,7 +24,7 @@ NormaCore **Station** is a single compiled binary (Go/Rust/C) that runs on the c
 
 ### Downloading the Pre-Built Binary
 Binaries are published on GitHub Releases (`v0.1.0-beta.10`+):
-- **Linux AMD64 (x86_64):** `station-linux-x86_64.tar.gz`
+- **Linux AMD64 (x86_64):** `station-linux-amd64.tar.gz` (the asset name is amd64, checked 2026-11-21)
 - **Linux ARM64 (aarch64 / Pi5):** `station-linux-aarch64.tar.gz`
 - **macOS ARM64 (Apple Silicon):** `station-macos-arm64.dmg` / `.zip`
 
@@ -99,6 +99,6 @@ await send_commands(client, [driver_cmd])
 
 ## 4. Key Takeaways for our Hackathon Strategy
 
-1. **Pre-Download the Binary Tonight:** Download `station-linux-x86_64.tar.gz` from the GitHub release page before traveling so you don't fight venue bandwidth.
+1. **Pre-Download the Binary Tonight:** Download `station-linux-amd64.tar.gz` from the GitHub release page before traveling so you don't fight venue bandwidth.
 2. **Explore the 3D URDF in Browser:** Open [https://normacore.dev/elrobot-urdf/](https://normacore.dev/elrobot-urdf/) to visually verify the 7 joint axes and parallel gripper range.
 3. **Seamless Switch to Real Hardware:** Our `src/mcp_server.py` and `src/kinematics_safety.py` currently plug into `MockStation`. On Saturday morning, we replace the mock with `new_station_client("127.0.0.1:8000")` and `client.follow("st3215/inference", queue)`—the high-level Claude MCP tools (`pick_at`, `place_at`, `get_calibrated_view`, `verify_grasp`) remain **100% identical**!
