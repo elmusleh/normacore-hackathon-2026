@@ -12,6 +12,7 @@ previous_session: antigravity 2026-11-21T17:25 — commit-and-push-policy-update
 ## Latest session (2026-11-21 evening): Dual Live Camera Dropdowns & Hardware Bring-Up
 
 - **What Changed:**
+  - Stacked `Table Cam` above `Person Cam` in `src/digital_twin.html` and added a **Save Default** button (`save_camera_defaults` in `src/digital_twin_server.py`) that persists the chosen cameras to `config/elrobot.json`.
   - Merged `origin/main` into `feat/agent-commit-and-push-policy` (bringing in `config/waypoints.json` with `clear` and `grape_hover`, `src/console_agent.py`, updated `scripts/hw_day.py`, and `src/web_console.py`).
   - Removed the static offline Three.js `<canvas>` mockup from `src/digital_twin.html` so `Table Cam` and `Person Cam` fill the left viewport, added live saved waypoint chips from `config/waypoints.json`, and updated `src/digital_twin_server.py` to separate table vs. person detectors and hide hardcoded fallback `BOWL`/`SPOON`/`MOUTH` boxes.
   - Confirmed physical hardware mapping from hardware owner (`steve`) and saved to `config/elrobot.json`: follower bus `5B61034962`, leader bus `5B61037051`, `table` camera `port:3-1.2.2` (KD-USB), `gripper` camera `port:3-1.2.4` (KD-USB), `person` camera `v4l2:6` (OBSBOT Meet SE).

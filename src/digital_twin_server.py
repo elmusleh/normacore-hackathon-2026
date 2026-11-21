@@ -32,7 +32,7 @@ import numpy as np
 
 # Ensure src is in sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from elrobot_config import load_config, load_waypoints
+from elrobot_config import load_config, load_waypoints, save_config
 from feeding_vision import FeedingVisionDetector, run_camera_feeding_cycle
 from mcp_server import NormaCoreMCPServer
 from vision_homography import TabletopCalibrator
@@ -235,6 +235,33 @@ class CameraHub:
             if role in self.selected:
                 self.selected[role] = source_id
             return dict(self.selected)
+
+    def save_defaults(self, table_src: Optional[str], person_src: Optional[str]) -> Dict[str, str]:
+        """Persist selected Table and Person cameras to config/elrobot.json using stable port/device ids."""
+        with self._lock:
+            cams_by_id = {c["id"]: c for c in self._cameras}
+
+        def _to_cfg_value(src: Optional[str]) -> Optional[str]:
+            if not src or src == "mock:sim":
+                return None
+            info = cams_by_id.get(src)
+            if info and info.get("type") == "station" and info.get("port"):
+                return f"port:{info['port']}"
+            return src
+
+        cfg = load_config()
+        cams = dict(cfg.get("cameras") or {})
+        t_val = _to_cfg_value(table_src)
+        p_val = _to_cfg_value(person_src)
+        if t_val:
+            cams["table"] = t_val
+            self.select_camera("table", table_src)
+        if p_val:
+            cams["person"] = p_val
+            self.select_camera("person", person_src)
+        cfg["cameras"] = cams
+        save_config(cfg)
+        return cams
 
     def _read_raw_bgr(self, source_id: str) -> Tuple[Optional[np.ndarray], str]:
         if source_id.startswith("station:"):
@@ -502,6 +529,14 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                     source = cmd.get("source", "mock:sim")
                     selected = camera_hub.select_camera(role, source)
                     res = {"status": "CAMERA_UPDATED", "selected": selected}
+
+                elif action == "save_camera_defaults":
+                    saved = camera_hub.save_defaults(cmd.get("table"), cmd.get("person"))
+                    res = {
+                        "status": "CAMERA_DEFAULTS_SAVED",
+                        "cameras": saved,
+                        "output": f"Saved defaults to config/elrobot.json: table={saved.get('table')}, person={saved.get('person')}",
+                    }
 
                 # --- 1. CLI Execution Integration ---
                 elif action == "run_cli":

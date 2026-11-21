@@ -1,11 +1,11 @@
 ### Post-Implementation Suggestions
 
-1. Persist selected Table and Person camera assignments to `config/elrobot.json` from Mission Control — Priority 91% (Critical) [Best practices]
-   What: Add a "Save Camera Mapping" button next to the Table/Person dropdowns in Mission Control that writes the chosen USB ports or device paths directly into `config/elrobot.json`.
-   Why: Prevents having to re-select which camera is Table vs. Person every time you restart the dashboard or launch the MCP server for Claude.
-   How: Add a `save_camera_config` action in `src/digital_twin_server.py` that maps the chosen Station `port:...` or `v4l2:...` IDs into `config/elrobot.json` (`cameras.table` and `cameras.person`) and reloads the config.
+1. Raise `resize_target` in `station.yaml` (224 -> 480) and apply manual exposure via `v4l-utils` — Priority 93% (Critical) [Best practices]
+   What: Increase `usb-video.resize_target` from `224` to `480` in `station.yaml`, install `v4l-utils`, and run `./cli.sh cameras` before starting the Station.
+   Why: Fixes both causes of poor Station camera image quality permanently — removes the 224px blurriness and eliminates the washed-out libuvc auto-exposure bug so AI vision sees food clearly.
+   How: Update `resize_target: 480` in `station.yaml`, install `sudo apt-get install -y v4l-utils`, stop the Station, run `./cli.sh cameras`, and restart `./cli.sh station`.
    Status: ⏳ Unimplemented
-   Reason Deferred: Waiting for the hardware owner to visually confirm which camera points at the table vs. the person first.
+   Reason Deferred: Requires a brief Station restart while `v4l2-ctl` applies manual exposure to the KD-USB cameras.
 
 2. Add OBSBOT Meet SE (`3564:fefe`) to `scripts/99-normacore-cameras.rules` and install `v4l-utils` — Priority 84% (High value) [Security]
    What: Add the OBSBOT Meet SE USB vendor/product ID (`3564:fefe`) to the camera udev rule and install `v4l-utils` so both the Station and manual exposure controls work cleanly without root privileges.
