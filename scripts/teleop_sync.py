@@ -66,11 +66,11 @@ async def identify_arms(client: Any) -> tuple[str, str]:
     logger.info(f"Connected arm buses: {serials}")
 
     # Standard hackathon convention:
-    # 5B61034962 is Leader (Master)
-    # 5B61037051 is Follower (Slave)
-    # If different serials, fallback to calibration analysis
-    if "5B61034962" in serials and "5B61037051" in serials:
-        return "5B61034962", "5B61037051"
+    # Confirmed on the arm 2026-11-21 (matches config/elrobot.json):
+    # 5B61037051 is Leader (Master)
+    # 5B61034962 is Follower (Slave)
+    if "5B61037051" in serials and "5B61034962" in serials:
+        return "5B61037051", "5B61034962"
     
     # Return first as leader, second as follower if unknown
     return serials[0], serials[1]
@@ -183,8 +183,8 @@ def main():
     leader = args.leader
     follower = args.follower
     if args.swap:
-        leader = "5B61037051"
-        follower = "5B61034962"
+        leader = "5B61034962"
+        follower = "5B61037051"
 
     try:
         asyncio.run(run_teleop_sync(leader, follower))

@@ -37,7 +37,15 @@ You control a real ElRobot arm (7 joints + gripper) on a table, through joint-le
 There are no x/y/z moves: the arm moves between named waypoints that a human taught on the
 arm, plus small joint nudges and the gripper.
 
-Work in a loop: look -> act -> look again.
+Recorded feeding plans come first. A human recorded and tested whole motion plans
+(pick a food, bring it to the person, return). list_sequences() shows them and, under
+"foods", which food each plan serves. When the person asks for a food ("I want grapes",
+"can I have some chocolate"), pick the matching plan yourself and run play_sequence(name)
+once; it runs the whole plan in one call. Do not add moves before or after it, and do not
+rebuild a plan from single waypoints. If the request matches no food, or the plan is not
+ready, say which foods are available and do not move. If two foods could match, ask.
+
+For anything else, work in a loop: look -> act -> look again.
 1. look() at the table camera and get_robot_state() before acting.
 2. list_waypoints() to see which poses exist (e.g. clear, pick_1, bin_a).
 3. Move with go_to_waypoint(). It routes through 'clear' so the arm does not sweep the table.
@@ -134,9 +142,26 @@ def set_gripper(open_percent: float) -> dict:
 
 
 @server.tool(structured_output=False)
+def list_sequences() -> dict:
+    """List the recorded motion plans and the foods they serve ("foods": food -> plan name,
+    whether it is ready). Use it to choose the plan for what the person asked for. Moves nothing."""
+    return tools.call(tools.list_sequences)
+
+
+@server.tool(structured_output=False)
+def play_sequence(name: str) -> dict:
+    """Run a recorded plan (e.g. the one for grapes) from start to end, in one call: the arm
+    goes through every recorded pose, waits until it has stopped at each one, pauses briefly,
+    then goes on. Takes about 20-60 s. On any problem (obstacle, overload, not arriving) or a
+    stop() call it holds the arm where it is and returns ok=false with the step it stopped at."""
+    return tools.call(tools.play_sequence, name)
+
+
+@server.tool(structured_output=False)
 def stop() -> dict:
-    """Stop: hold every motor where it is right now. Always allowed. Use if anything looks wrong."""
-    return tools.call(tools.stop)
+    """Stop: hold every motor where it is right now. Always allowed, also while play_sequence is
+    running (it interrupts the plan). Use if anything looks wrong."""
+    return tools.stop_now()
 
 
 @server.tool(structured_output=False)

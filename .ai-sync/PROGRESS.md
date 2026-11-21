@@ -21,7 +21,7 @@
 
 ## Phase 3: Agent Integration & Tabletop Primitives — IN PROGRESS
 - [x] Joint-level hardware bridge to the Station SDK written (`src/elrobot_hardware.py`), unit-tested offline (44 tests pass in total).
-- [x] Read-only preflight script (`scripts/hardware_preflight.py`); verified against live follower arm `5B61037051` and leader arm `5B61034962`.
+- [x] Read-only preflight script (`scripts/hardware_preflight.py`); verified against the live arms. Confirmed 2026-11-21: follower `5B61034962`, leader `5B61037051`.
 - [x] Live master/slave 50Hz teleoperation sync tool implemented and tested (`scripts/teleop_sync.py`, `./cli.sh teleop`).
 - [x] Run logging with per-run files and `latest` links (`src/elrobot_log.py`), and `logs/` bundles via `./cli.sh hw bundle`
 - [x] Hardware-day checklist and safe commands in `./cli.sh hw` (`scripts/hw_day.py`)
@@ -35,6 +35,8 @@
 - [x] Real MCP server for the live Station (`src/robot_mcp_server.py`, `src/robot_tools.py`): camera, state, waypoints, gripper, nudge, stop. Tested offline and over stdio; not yet run against the arm
 - [x] Cameras on the real Station: udev rule, named by USB port, fixed exposure (`./cli.sh cameras`)
 - [x] Calibration of follower and leader exported to `calibration/`
+- [x] Waypoint sequences: `hw record <seq>` / `hw play <seq>` (one MOVE prompt, waits until the arm stops, `--pause`), `config/sequences.json`. Not yet run on the arm
+- [x] Claude chooses a recorded plan from the request: `foods` config + MCP `list_sequences` / `play_sequence`, stop interrupts it. Not yet run on the arm via Claude
 - [ ] First MCP session on the real arm: verify gripper direction, teach `clear` + pick/bin waypoints, then ELROBOT_ALLOW_MOTION=1
 - [ ] Decide how Cartesian tools (`pick_at`, `place_at`) map to joints: needs URDF-based kinematics verified on the physical arm; Station has no Cartesian API
 - [ ] Validate camera stream overlay against real table measurements

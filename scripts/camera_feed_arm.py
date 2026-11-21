@@ -5,7 +5,7 @@ Uses the overhead tabletop camera (/dev/video4 by default) to identify:
   1. The bowl with grapes (or food bowl + spoon)
   2. The person's mouth target (stopping at a safe 5-10 cm standoff)
 
-And drives the slave arm (5B61037051 / configured bus) accordingly.
+And drives the slave arm (5B61034962 / configured bus) accordingly.
 By default, runs in safe dry-run / visual preview mode unless ELROBOT_ALLOW_MOTION=1
 and --live-motion are explicitly passed by the hardware owner.
 """

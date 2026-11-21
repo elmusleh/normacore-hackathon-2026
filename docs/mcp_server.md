@@ -90,8 +90,23 @@ power plug, set it to `"1"` and restart the server (`/mcp` → reconnect).
 | `nudge_joint(motor, delta_percent)` | Small move of one joint, max 5% of its range | Yes |
 | `set_gripper(open_percent)` | 100 open, 0 closed. Reports `holding_object` or `closed_empty` | Yes |
 | `enable_torque` | Torque on, holding the current pose | Holds |
-| `stop` | Hold every motor where it is. Always allowed | Holds |
+| `list_sequences` | Recorded plans (`config/sequences.json`) and which food each serves (`foods`) | No |
+| `play_sequence(name)` | Run a whole recorded plan, same checks as `./cli.sh hw play` | Yes |
+| `stop` | Hold every motor where it is. Always allowed, also interrupts a running `play_sequence` | Holds |
 | `teach_waypoint(name)` | Save the current pose | No |
+
+### Serving food by request ("I want grapes")
+
+1. Record a plan per food: `./cli.sh hw record grapes`, then test it with `./cli.sh hw play grapes`.
+2. Map foods to plans in `config/elrobot.json`:
+   `"foods": {"grapes": {"sequence": "grapes", "note": "..."}, "chocolate": {"sequence": "choc"}}`.
+3. Claude calls `list_sequences`, picks the plan that matches the request (any wording, speech-to-text
+   mistakes included), says what it is about to do, and calls `play_sequence` once. Unknown food or an
+   incomplete plan: it says what it can serve and does not move.
+4. `play_sequence` goes through every pose, waits until the arm has stopped at each, pauses
+   `agent.sequence_pause_s`, and accepts motors that stopped within `agent.sequence_tolerance_steps`
+   (60; loaded joints sag). Any problem, or `stop` (chat "stop", the Stop button), holds the arm and
+   ends the plan. There is no `MOVE` prompt here: `ELROBOT_ALLOW_MOTION=1` and the person's request are the go-ahead.
 
 Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (support the arm).
 
@@ -124,6 +139,7 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
 - `max_waypoint_delta_steps` 1500: any motor moving further in one leg is refused.
 - `max_nudge_percent` 5: largest single nudge.
 - `clear_waypoint` "clear": the routing pose.
+- `sequence_speed` 300, `sequence_pause_s` 1.5, `sequence_tolerance_steps` 60: for `play_sequence`.
 
 ## Troubleshooting
 

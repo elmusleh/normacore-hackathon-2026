@@ -93,8 +93,8 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
 
             payload = {
                 "teleop_active": is_teleop_running,
-                "master_bus": "5B61034962",
-                "slave_bus": "5B61037051",
+                "master_bus": "5B61037051",
+                "slave_bus": "5B61034962",
                 "arm_pose": telemetry["end_effector"],
                 "gripper_state": telemetry["gripper_state"],
                 "gripper_load": telemetry["gripper_load"],
