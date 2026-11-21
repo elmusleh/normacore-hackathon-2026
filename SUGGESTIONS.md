@@ -1,20 +1,6 @@
 ### Post-Implementation Suggestions
 
-1. Let the person turn the face camera off — Priority 85% (High value) [Security]
-   What: Add a "hide face camera" switch on the console page and a `--no-face-camera` start option, so the face feed is neither shown nor read by Claude.
-   Why: The face camera films the person being fed the whole time the console is open. A person should be able to refuse that, and frames of their face are the most sensitive data the project handles.
-   How: In `src/web/console.html`, add a checkbox that stops polling `/api/frame/face` and hides its tile. In `src/web_console.py`, refuse `/api/frame/face` when the option is set, and make `look("face")` return an "off by request" error.
-   Status: ⏳ Unimplemented
-   Reason Deferred: First see the face camera live in the console and agree with the team when it should be on.
-
-2. Keep face frames out of the demo recordings — Priority 75% (High value) [Security]
-   What: Make sure `./cli.sh demos record` stores only the `table` and `gripper` cameras unless someone explicitly asks for `face`.
-   Why: Now that the config names three cameras, a recorder that saves "all configured cameras" would quietly fill `data/demos/` with pictures of people, which then get copied to training machines.
-   How: Check how `scripts/record_demos.py` picks its cameras, set the default list to `table,gripper`, add a `--cameras` option, and add a test that `face` is not recorded by default.
-   Status: ⏳ Unimplemented
-   Reason Deferred: Not checked yet whether the recorder reads the camera list from the config.
-
-3. Warn on start when a named camera is missing — Priority 60% (Nice to have) [Professionalism]
+1. Warn on start when a named camera is missing — Priority 60% (Nice to have) [Professionalism]
    What: When the console starts, print which configured cameras (`table`, `gripper`, `face`) the Station is actually streaming, and name any that are missing.
    Why: Today a missing camera only shows as an error tile on the page. The USB hub on bus 3 has dropped cameras several times, and a clear message at start saves time at the bench.
    How: In `src/web_console.py` `main()`, call `tools.list_cameras()` once, compare the live names with `config/elrobot.json` → `cameras`, and log a warning that names each missing camera and its USB port.
