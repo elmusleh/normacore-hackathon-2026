@@ -1,7 +1,8 @@
 {
   "station": {
     "server": "localhost",
-    "bus": "5B61037051"
+    "bus": "5B61034962",
+    "leader_bus": "5B61037051"
   },
   "joint_map": {},
   "current_threshold": {},
