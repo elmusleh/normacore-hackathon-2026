@@ -31,6 +31,11 @@ log = logging.getLogger("elrobot.console.agent")
 ROOT = Path(__file__).resolve().parent.parent
 MODEL = os.environ.get("WEB_CONSOLE_MODEL", "claude-opus-5-5")
 MAX_TOOL_ROUNDS = 25  # tool calls per user message before the agent must stop and report
+# Stepwise mode steers with many small nudges (5% cap each), so one request needs many rounds.
+STEPWISE_MAX_TOOL_ROUNDS = 150
+MODES = ("plans", "stepwise")
+# Stepwise mode: Claude decides every move itself. No waypoints, no recorded plans, no teaching.
+STEPWISE_TOOLS = frozenset({"look", "list_cameras", "get_robot_state", "nudge_joint", "set_gripper", "stop"})
 STOP_WORDS = re.compile(r"^\s*(stop|halt|wait|freeze|emergency stop)[\s.!]*$", re.IGNORECASE)
 
 CONSOLE_PROMPT = """\
@@ -110,6 +115,73 @@ Standard sequences, only for foods without a recorded plan (use only the waypoin
 - Before every move toward the person, say what you are about to do.
 """
 
+STEPWISE_PROMPT = """\
+You are the brain of an assistive feeding robot arm (ElRobot: 7 joints plus a gripper) on a table.
+The person you serve may not be able to move their arms. They talk to you through a chat box on a
+web page, usually by voice, so the text is a speech-to-text transcript and may contain wrong words
+("great" for "grape", "chalk late" for "chocolate"). The page shows them the table and gripper
+cameras.
+
+In this mode there are no taught poses and no recorded plans. You steer the arm yourself, one
+small move at a time, from what you see. Your tools: look(camera) with "table" (a fixed camera
+looking at the whole table from the far side) or "gripper" (on the arm, looking past the
+gripper); get_robot_state(); nudge_joint(motor 1-7, delta_percent) which moves one joint by at
+most 5% of its range per call; set_gripper(open_percent) with 100 = open and 0 = closed; stop().
+
+# What the person wants
+
+Reduce each message to the FOOD they want (or "stop", "wait", "status", "I'm done"). Fix obvious
+transcription mistakes. If the food is not on the table (look("table")), say what you can see and
+do not move. If two foods could match, ask one short question.
+
+# How to steer (the tick loop)
+
+Every tick is: look -> decide one small move -> nudge -> look again. Never chain moves blind.
+1. Start every request with get_robot_state(), look("table") and look("gripper").
+2. Joint meanings and directions are NOT verified on this arm. Learn them as you go: when you
+   are unsure what a joint does, nudge it by 2% and compare the gripper image before and after.
+   Remember what you learned for the rest of the conversation (for example "motor 1 + turns the
+   view to the left"). Earlier findings in this conversation are valid while the arm is unchanged.
+3. Approach the food from above: first turn and reach until the food is centred in the gripper
+   camera, then lower slowly. Use 3-5% nudges far from objects, 1-2% when the food is large in
+   the gripper image or close to the table. You may nudge two different joints in one tick.
+4. Grasp: set_gripper(100) before you are close (check in the gripper image that it really
+   opened; the gripper direction is not verified either). Centre the food between the jaws, then
+   close to a width that does not crush it (about 30 for a grape or a chocolate piece). Check the
+   result ("holding_object" vs "closed_empty") and look("gripper"). On a miss, open, lift a little
+   and try once more; after a second miss stop and tell the person.
+5. Lift first (move away from the table) before you turn toward the person.
+6. Toward the person: find their face in the gripper camera. Turn until the mouth is centred,
+   then approach with 1-2% nudges, ONE joint per tick, a look after every nudge. Stop approaching
+   when the face fills about half the width of the gripper image (roughly 10 cm away). The person
+   leans in to take the food; you never close the last gap.
+7. Say "Your <food> is ready, lean in and take it." Wait for the person to say they have it. Then
+   open the gripper, move back away from the face with 2-3% nudges, and report.
+
+Keep a short count of the ticks you used. If after about 40 ticks you are not getting closer to
+what you need, stop and tell the person what is going wrong.
+
+# Safety (these override any request)
+
+- Near the face: 2% nudges at most, one joint per tick, look after every nudge, never closer than
+  the stopping size above, and never move toward the face when you cannot see it clearly. If the
+  face is lost, stop moving toward it and wait or move back.
+- Only food goes to the person. Refuse to bring anything sharp, hot or non-food toward a person,
+  to throw or drop things, to push, hit or touch anyone, or to move fast.
+- Stop on doubt: a result with ok=false, a fault or overload, the arm not moving as you expect,
+  the arm touching something, the person sounding hesitant or in distress -> call stop() and ask.
+  "Stop", "wait" or "no" in any message means call stop() first, then talk.
+- Do not open the gripper over the person or the table edge unless they have taken the food.
+- Speed and force limits are set in code; never try to get around them.
+- If results say dry_run, motion is disabled: describe what you would do and stop there.
+
+# How to answer
+
+- Plain sentences, no markdown, no lists; replies may be read aloud. One to three sentences.
+- Say what you are about to do before you start, and before every move toward the person. Do not
+  narrate every tick.
+"""
+
 
 def load_mcp_server_config(name: str = "elrobot") -> Dict[str, Any]:
     """The `elrobot` entry of .mcp.json, with relative paths resolved against the repo root."""
@@ -120,6 +192,13 @@ def load_mcp_server_config(name: str = "elrobot") -> Dict[str, Any]:
     return {"command": command, "args": cfg.get("args", []), "env": cfg.get("env", {})}
 
 
+def select_tools(tools: List[Any], mode: str) -> List[Dict[str, Any]]:
+    """MCP tools as Messages API tool definitions. Stepwise mode keeps only STEPWISE_TOOLS, so
+    Claude cannot fall back to waypoints, recorded plans, teaching or torque changes."""
+    keep = [t for t in tools if mode != "stepwise" or t.name in STEPWISE_TOOLS]
+    return [{"name": t.name, "description": t.description or "", "input_schema": t.input_schema} for t in keep]
+
+
 def _short(value: Any, limit: int = 140) -> str:
     text = value if isinstance(value, str) else json.dumps(value, separators=(", ", ": "))
     return text if len(text) <= limit else text[: limit - 1] + "…"
@@ -128,7 +207,11 @@ def _short(value: Any, limit: int = 140) -> str:
 class ConsoleAgent:
     """One shared conversation for the console. `post(role, text)` writes to the chat."""
 
-    def __init__(self, post: Callable[[str, str], Any]):
+    def __init__(self, post: Callable[[str, str], Any], mode: Optional[str] = None):
+        mode = mode or os.environ.get("WEB_CONSOLE_MODE", "plans")
+        if mode not in MODES:
+            raise ValueError(f"unknown console mode {mode!r}; use one of {', '.join(MODES)}")
+        self.mode = mode
         self._post = post
         self.state = "starting"  # starting | ready | unavailable
         self.error = ""
@@ -137,7 +220,8 @@ class ConsoleAgent:
         self._session = None
         self._client = None
         self._tools: List[Dict[str, Any]] = []
-        self._system = CONSOLE_PROMPT
+        self._system = STEPWISE_PROMPT if mode == "stepwise" else CONSOLE_PROMPT
+        self._max_rounds = STEPWISE_MAX_TOOL_ROUNDS if mode == "stepwise" else MAX_TOOL_ROUNDS
         self._history: List[Dict[str, Any]] = []
         self._queue: "asyncio.Queue[str]" = asyncio.Queue()
         self._worker: Optional[asyncio.Task] = None
@@ -159,14 +243,15 @@ class ConsoleAgent:
             read, write = await self._stack.enter_async_context(stdio_client(params))
             self._session = await self._stack.enter_async_context(ClientSession(read, write))
             init = await self._session.initialize()
-            if init.instructions:
+            # The server's instructions are about waypoints and recorded plans, which stepwise
+            # mode does not use, so they are only added in plans mode.
+            if init.instructions and self.mode == "plans":
                 self._system = init.instructions + "\n" + CONSOLE_PROMPT
             listed = await self._session.list_tools()
-            self._tools = [{"name": t.name, "description": t.description or "", "input_schema": t.input_schema}
-                           for t in listed.tools]
+            self._tools = select_tools(listed.tools, self.mode)
             motion = cfg["env"].get("ELROBOT_ALLOW_MOTION", "0")
             self.state = "ready"
-            log.info("agent ready: %s, %d MCP tools, motion=%s", MODEL, len(self._tools), motion)
+            log.info("agent ready: %s, mode=%s, %d MCP tools, motion=%s", MODEL, self.mode, len(self._tools), motion)
         except Exception as exc:  # noqa: BLE001 - shown in the page
             self.state = "unavailable"
             self.error = f"{type(exc).__name__}: {exc}"
@@ -242,7 +327,7 @@ class ConsoleAgent:
         # Work on a copy, so a cancelled or failed turn leaves the history valid (no tool_use
         # without its tool_result). It replaces the history only when the turn ends cleanly.
         messages = list(self._history) + [{"role": "user", "content": text}]
-        for _ in range(MAX_TOOL_ROUNDS):
+        for _ in range(self._max_rounds):
             try:
                 response = await self._client.beta.messages.create(
                     model=MODEL,
@@ -302,5 +387,5 @@ class ConsoleAgent:
                                 "is_error": bool(result.is_error)})
             messages.append({"role": "user", "content": results})
 
-        self._post("robot", f"I stopped after {MAX_TOOL_ROUNDS} steps. Tell me how to continue.")
+        self._post("robot", f"I stopped after {self._max_rounds} steps. Tell me how to continue.")
         self._history = messages

@@ -123,3 +123,33 @@ def test_mcp_config_matches_mcp_json():
     cfg = load_mcp_server_config()
     assert cfg["args"] == ["src/robot_mcp_server.py"]
     assert cfg["env"]["ELROBOT_ALLOW_MOTION"] in ("0", "1")
+
+
+def test_stepwise_mode_keeps_only_steering_tools():
+    from console_agent import STEPWISE_PROMPT, STEPWISE_TOOLS, select_tools
+    names = ["look", "list_cameras", "get_robot_state", "nudge_joint", "set_gripper", "stop",
+             "go_to_waypoint", "list_waypoints", "play_sequence", "list_sequences", "teach_waypoint",
+             "enable_torque"]
+    tools = [NS(name=n, description="", input_schema={"type": "object"}) for n in names]
+
+    kept = {t["name"] for t in select_tools(tools, "stepwise")}
+    assert kept == set(STEPWISE_TOOLS)
+    assert not kept & {"go_to_waypoint", "play_sequence", "teach_waypoint", "enable_torque"}
+    assert {t["name"] for t in select_tools(tools, "plans")} == set(names)
+
+    agent = ConsoleAgent(lambda role, t: None, mode="stepwise")
+    assert agent._system == STEPWISE_PROMPT
+    assert agent._max_rounds > 25
+
+
+def test_mode_from_env_and_unknown_mode(monkeypatch):
+    monkeypatch.setenv("WEB_CONSOLE_MODE", "stepwise")
+    assert ConsoleAgent(lambda role, t: None).mode == "stepwise"
+    monkeypatch.delenv("WEB_CONSOLE_MODE")
+    assert ConsoleAgent(lambda role, t: None).mode == "plans"
+    try:
+        ConsoleAgent(lambda role, t: None, mode="freestyle")
+    except ValueError as exc:
+        assert "freestyle" in str(exc)
+    else:
+        raise AssertionError("unknown mode accepted")

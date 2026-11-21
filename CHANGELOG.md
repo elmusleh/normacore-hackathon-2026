@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Console stepwise mode (`./cli.sh console [port] --mode stepwise`, env `WEB_CONSOLE_MODE`): the person names a food and Claude steers the arm tick by tick (look, small `nudge_joint`, look) with no waypoints or recorded plans. Only six tools are exposed in this mode, up to 150 rounds per request. `./cli.sh console` now passes extra arguments to `src/web_console.py`.
+
 ### Changed
 - `config/elrobot.json`: `table` and `gripper` camera names swapped (table = port 3-5.2.2, gripper = port 3-5.2.4). The old mapping showed the gripper view as `table`; confirmed by the user 2026-11-21.
 - `.mcp.json`: `ELROBOT_ALLOW_MOTION` set to `"1"`, so Claude's MCP tools move the real arm (was dry-run).

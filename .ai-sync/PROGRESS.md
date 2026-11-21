@@ -46,6 +46,9 @@
 - [x] Console chat answered by Claude (`src/console_agent.py`): Messages API tool loop over the elrobot MCP server (spawned from .mcp.json); "stop"/STOP button bypasses Claude. Tested with fakes and a live MCP subprocess; NOT yet with a real API key
 - [x] Console request-to-action prompt (`CONSOLE_PROMPT` in `src/console_agent.py`, plan 4.3 draft): understand -> check waypoints/camera -> ask if ambiguous -> say plan -> act with look after each step; safety rules (serve standoff, stop on doubt, no teach/torque/nudge unless operator asks). Not yet tried with a real API key
 - [ ] Run the console chat with ANTHROPIC_API_KEY on the arm (motion off first, then on)
+- [x] Console stepwise mode: Claude steers tick by tick from the cameras, no waypoints (`--mode stepwise`, branch `feat/brain-claude-stepwise-control`). Starts live with 6 tools; NOT yet run on the arm
+- [ ] Run stepwise mode on the arm: "I want a grape" end to end, hand on the 12 V switch
+- [ ] MCP command connection goes stale after a Station restart (reads work, writes do not land): reconnect it
 
 ## Phase 4: Closed-Loop Recovery & Stress Testing — PENDING
 - [x] Arm debug tools: `hw demo` (follower sweep + report) and `hw leader` (master live view), 2026-11-21

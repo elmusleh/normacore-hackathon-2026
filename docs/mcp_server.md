@@ -69,6 +69,21 @@ viewer again; [calibration/](../calibration/) holds the ranges measured on 2026-
 - Do not run Claude Code with the `elrobot` server and the console chat on the arm at the same time:
   two controllers would send moves independently.
 
+### Stepwise mode: Claude steers every move (no waypoints)
+
+`./cli.sh console 8890 --mode stepwise` (or `WEB_CONSOLE_MODE=stepwise`). The person says the food they want;
+Claude then works in ticks: look at the cameras, one or two small `nudge_joint` moves (max 5% each, 1-2% near
+the face), look again. It grasps with `set_gripper`, lifts, turns to the person, approaches the mouth from the
+gripper camera and stops when the face fills about half the gripper image; the person leans in.
+
+- Claude only gets `look`, `list_cameras`, `get_robot_state`, `nudge_joint`, `set_gripper`, `stop`. Waypoints,
+  recorded plans, teaching and torque are removed in code (`STEPWISE_TOOLS` in `src/console_agent.py`).
+- Up to 150 tool rounds per request (plans mode: 25). Each tick takes a few seconds, so a full feed is minutes.
+- Joint directions and the gripper direction are not verified; the prompt tells Claude to learn them with 2%
+  test nudges. The face standoff is a prompt rule judged from the image, **not enforced in code**: keep a hand
+  on the 12 V switch and test on a teammate who agrees to it.
+- Default mode is still `plans` (recorded plans first).
+
 ## Motion is off until you turn it on
 
 `.mcp.json` sets `ELROBOT_ALLOW_MOTION` to `"0"`. Claude can look, read the arm and plan, but every

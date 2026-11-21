@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Reconnect the arm command channel after a Station restart — Priority 95% (Critical) [Best practices]
+   What: Make the MCP server notice that the Station restarted and open a fresh connection for motor commands, not only for readings.
+   Why: On 2026-11-21 the Station was restarted while the MCP server kept running. Readings still worked, but every move and even the "hold" from stop() silently went nowhere (the motors' goal register kept its old value). A stop that does nothing is the worst failure near a person.
+   How: In `src/elrobot_hardware.py`, after each `_sync_write` read back the goal register; if it did not change, close `self.client`, call `connect()` again and retry once, then report an error. Add a fake-Station test for it.
+   Status: ⏳ Unimplemented
+   Reason Deferred: It changes motion code, which needs the owner's OK first (AGENTS.md).
+
+2. Enforce the face standoff in code for stepwise mode — Priority 88% (High value) [Security]
+   What: Have local code, not Claude's judgement, refuse nudges that bring the gripper closer once the face in the gripper camera is big enough.
+   Why: In stepwise mode the 5-10 cm standoff is only a prompt rule. A wrong guess by the model about which joint moves toward the face could push food into someone's face.
+   How: Add a `face_size` check (for example MediaPipe face detection on the gripper frame) inside `RobotTools.nudge_joint`; when the face is wider than half the frame, allow only nudges that make it smaller, and return a clear refusal otherwise.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the mouth tracker (plan task 2.1) and a teammate in front of the camera to tune the size.
+
+3. Save each stepwise run as a replayable log — Priority 55% (Nice to have) [Best practices]
+   What: Record every tick of a stepwise run (camera frame, Claude's reason, the nudge, the joint positions) to `logs/`.
+   Why: Runs take minutes and fail in ways that are hard to remember. A log lets the team see where Claude got confused, and a good run can be turned into a recorded plan for the demo.
+   How: In `ConsoleAgent._run_turn`, append each tool call, its result and the latest robot state as one JSON line to `logs/stepwise-<time>.jsonl`, with frames saved next to it (logs are gitignored and stay local because frames show people).
+   Status: ⏳ Unimplemented
+   Reason Deferred: First see whether stepwise steering works at all on the arm.
+
 1. Teach and lock the 6 assistive feeding waypoints on the follower arm (`zone_a_hover`, `zone_a`, `serve`, `spoon_holder`, `bowl_scoop`, `serve_spoon`) — Priority 94% (Critical) [Best practices]
    What: Pose the physical follower arm by hand (with torque off) at the grape bowl, spoon holder, and a 7 cm standoff in front of the diner's mouth, and save each pose with `./cli.sh hw teach <name>`.
    Why: The camera-guided feeding controller (`./cli.sh feed`) maps detected food and mouth targets directly to these verified joint waypoints so the arm moves smoothly without inverse-kinematics guesswork near a person's face.

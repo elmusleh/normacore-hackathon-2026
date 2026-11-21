@@ -1,13 +1,22 @@
 ---
 last_agent: claude
 timestamp: 2026-11-21T17:30:00Z
-status: camera-feeding-pipeline-ready
+status: stepwise-console-mode-ready-untested-on-arm
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (Assistive Feeding)"
 current_task: "Camera-guided assistive feeding (grapes & spoon -> mouth) implemented and verified"
 stop_reason: ready-for-hardware-session
 hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
+
+## Latest session (2026-11-21, ~18:50, claude for Jafer): stepwise console mode + failed grapes run
+- Branch `feat/brain-claude-stepwise-control` (from `jafer` at `315c896`). Not pushed, no PR yet.
+- Camera names swapped in `config/elrobot.json` (table = port 3-5.2.2, gripper = 3-5.2.4), confirmed by the user; commit `315c896` on `jafer`.
+- Live `play_sequence("grapes")` via Claude Code MCP (user typed "go grapes"): arm did NOT move. Motors 3-8 timed out at step 1; current 0; goal registers kept the `choc_end` values even after the HOLD write. Cause (likely, not proven): the MCP server was started at 18:26, the Station restarted ~18:40, and the command connection stayed on the old Station while reads reconnect. Log: `logs/mcp-20261121-182602.log` (18:42:38). That means stop() over MCP did not reach the arm either. Fix for now: reconnect the MCP server (`/mcp`) or restart the console after any Station restart. Code fix: SUGGESTIONS.md #1 (needs owner OK, motion code).
+- New per the user: console `--mode stepwise` (`src/console_agent.py` `STEPWISE_PROMPT`, `STEPWISE_TOOLS`, `select_tools`; `src/web_console.py --mode`; `./cli.sh console 8890 --mode stepwise`). Person says a food; Claude steers by look + nudges, no waypoints/plans. Deviates from the plan doc section 2 (waypoints only) on the user's request; plans mode stays the default.
+- Verified: 106 tests pass; console starts live in stepwise mode with 6 MCP tools and motion=1. NOT tested on the arm (Station went down again at ~18:45: "no st3215/inference frames").
+- Face standoff in stepwise mode is a prompt rule only, not enforced in code.
+- Next: 1) Station up, start `./cli.sh console 8890 --mode stepwise` (fresh MCP server), teleop Self-controlled, hand on 12 V switch. 2) Say "I want a grape"; watch the first ticks, stop if a nudge goes the wrong way. 3) Note joint directions Claude finds and put them in the prompt or config. 4) Open a PR for this branch.
 
 ## Latest session (2026-11-21, ~18:00): Claude picks the recorded plan from the request
 - User request: "I want grapes" -> Claude decides which recorded plan to run and runs it.

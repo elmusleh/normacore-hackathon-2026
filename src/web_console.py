@@ -283,6 +283,9 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--no-stt", action="store_true", help="skip faster-whisper; use the browser's")
     parser.add_argument("--no-agent", action="store_true", help="chat only, no Claude")
+    parser.add_argument("--mode", choices=("plans", "stepwise"), default=os.environ.get("WEB_CONSOLE_MODE", "plans"),
+                        help="plans: recorded plans and waypoints (default); stepwise: Claude steers every "
+                             "move with look + small nudges, no waypoints (env WEB_CONSOLE_MODE)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -297,7 +300,9 @@ def main() -> None:
     agent_factory = None
     if not args.no_agent:
         from console_agent import ConsoleAgent  # noqa: WPS433
-        agent_factory = ConsoleAgent
+        mode = args.mode
+        agent_factory = lambda post: ConsoleAgent(post, mode=mode)  # noqa: E731
+        print(f"Agent mode: {mode}", flush=True)
         if not os.environ.get("ANTHROPIC_API_KEY"):
             print("Note: ANTHROPIC_API_KEY is not set; the chat cannot reach Claude.", flush=True)
     uvicorn.run(create_app(stt=stt, agent_factory=agent_factory), host=args.host, port=args.port,
