@@ -87,7 +87,7 @@ Cartesian moves (`pick_at`, `place_at`) are not ready. The Station only takes jo
    - Turn torque back on before any `goto`: `./cli.sh hw torque on`.
 2. **Teach a clear pose first.** Keep one waypoint above the table with the gripper open (`clear`). Route every move through it, so the arm never sweeps across the table.
 3. **Goto.** `./cli.sh hw goto clear`, then `./cli.sh hw goto <target>`. The tool prints the per-motor plan (present, target, delta, and whether clamped). Check the path is clear, then type `MOVE`.
-4. **Limits.** A single goto refuses any motor moving more than 600 steps unless you pass `--allow-large`. Keep large moves through `clear`.
+4. **Limits.** `hw goto` always goes to the waypoint (no step cap). Motors moving more than 1500 steps are marked `LARGE MOVE` in the plan; read it before typing `MOVE`. Goals are still clamped to the calibrated range, speed is capped and the overload guard runs. Keep large moves through `clear`.
 5. **Check.** After each goto the tool reports each motor's status. Any motor more than 12 steps from its target is listed and the command exits with an error. Look for an obstacle, then `./cli.sh logs`.
 
 Suggested waypoints for the sorting demo: `home`, `clear`, `pick_<n>` (one per object spot), `bin_a`, `bin_b`. Teach them in that order and test each with goto before the demo.
@@ -136,7 +136,7 @@ The mock table is still 400 × 300 mm. That is a separate simulation and does no
 | `calibration invalid` | Uncalibrated, or range wraps past zero | Calibrate in the Station console |
 | `reports fault status` | Servo error | `hw stop`, let it cool, check the cable. Don't force it |
 | `OVERLOAD` | Stalled under high current | Something is in the way, or the threshold is too low. Check, then probe again |
-| `moves larger than 600 steps` | Waypoint too far away | Route through `clear`, or `--allow-large` after checking |
+| `Refused: moves larger than ... steps` (MCP `go_to_waypoint` only) | Waypoint too far for Claude's per-leg cap (`agent.max_waypoint_delta_steps`) | Route through `clear`, or move with `./cli.sh hw goto` |
 | `SDK import failed` | `external/norma-core` missing or empty | Run `git submodule update --init --recursive`, then `./cli.sh sdk-check`. `NORMACORE_ROOT` can point elsewhere. |
 
 Share a failure: `./cli.sh hw bundle`, then send the file it prints. It contains logs, config and state. Check it first, since it includes `station.yaml`.

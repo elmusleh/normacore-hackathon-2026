@@ -58,8 +58,16 @@ viewer again; [calibration/](../calibration/) holds the ranges measured on 2026-
   `--no-stt`) the page uses the browser's speech recognition, which sends audio online (Chrome only).
 - The microphone only works when the page is opened as `localhost` (browsers block it on plain http
   from another machine).
-- Read-only: nothing on the page moves the arm. Chat messages are kept in memory at `/api/messages`
-  (GET `?after=<id>`, POST `{"role": "user"|"robot", "text": ...}`) for a future `listen`/`say` tool.
+- Chat goes to Claude (`claude-opus-5-5`, `src/console_agent.py`). The console starts its own copy of the
+  `elrobot` MCP server from `.mcp.json`, so the same tools and the same `ELROBOT_ALLOW_MOTION` switch apply
+  (with `"0"` Claude only describes moves). Tool calls show as grey lines in the chat.
+  Needs a Claude API key: `export ANTHROPIC_API_KEY=sk-ant-...` in the terminal before `./cli.sh console`
+  (never commit it). Without a key the cameras and speech-to-text still work.
+- **Stop:** typing or saying just "stop" / "wait" / "halt", or the red STOP button, cancels Claude's turn and
+  calls the MCP `stop` tool directly (holds the arm, torque stays on). A waypoint move that is already running
+  finishes first, because the MCP server runs one tool at a time; keep a hand on the power plug.
+- Do not run Claude Code with the `elrobot` server and the console chat on the arm at the same time:
+  two controllers would send moves independently.
 
 ## Motion is off until you turn it on
 
@@ -107,7 +115,7 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
 ## Limits (config/elrobot.json → `agent`)
 
 - `max_speed` 500: speed cap for every move Claude requests.
-- `max_waypoint_delta_steps` 600: any motor moving further in one leg is refused.
+- `max_waypoint_delta_steps` 1500: any motor moving further in one leg is refused.
 - `max_nudge_percent` 5: largest single nudge.
 - `clear_waypoint` "clear": the routing pose.
 

@@ -54,6 +54,8 @@ print_usage() {
     echo -e "  ${C_GREEN}hw teach <name>${C_RESET}     Save the current pose of all 8 motors as a waypoint"
     echo -e "  ${C_GREEN}hw goto <name>${C_RESET}      Move all motors to a waypoint (shows plan; type MOVE)"
     echo -e "  ${C_GREEN}hw waypoints${C_RESET}        List taught waypoints"
+    echo -e "  ${C_RED}hw demo [motors]${C_RESET}     Follower: sweep each motor, then all together; per-motor report"
+    echo -e "  ${C_GREEN}hw leader${C_RESET}           Leader (master) live view vs follower, range coverage (read only)"
     echo -e "  ${C_RED}hw stop${C_RESET}              Torque OFF on all motors (emergency)"
     echo -e "  ${C_CYAN}hw workspace${C_RESET}         Show workspace limits and whether they were measured"
     echo -e "  ${C_CYAN}hw bundle${C_RESET}            Pack logs, config and state for debugging or sharing"
@@ -156,6 +158,8 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
 
     console)
         PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        # Load secrets such as ANTHROPIC_API_KEY from .env (gitignored) if present.
+        if [ -f .env ]; then set -a; . ./.env; set +a; fi
         echo -e "${C_GREEN}[+] Starting ElRobot web console (cameras + voice chat)...${C_RESET}"
         exec "$PY" src/web_console.py --port "${1:-8890}"
         ;;

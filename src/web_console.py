@@ -7,14 +7,15 @@ from the Station exactly like the MCP `look` tool. Right: a chat box with a big 
 button. Speech is transcribed locally with faster-whisper (offline, plan stage 3); if that is
 not installed the page falls back to the browser's own speech recognition.
 
-Chat messages are kept in memory and served at /api/messages, so an MCP `listen`/`say` tool
-(plan 3.2 / 3.4) can read what was said and post replies later.
-
-Read-only: nothing here moves the arm. Needs the Station running (./cli.sh station).
+Chat messages go to Claude (src/console_agent.py), which answers and drives the arm through the
+same `elrobot` MCP server as Claude Code (motion only if .mcp.json sets ELROBOT_ALLOW_MOTION=1).
+"stop" in the chat, or the Stop button, holds the arm without going through Claude.
+Needs the Station running (./cli.sh station) and ANTHROPIC_API_KEY for the chat.
 
 Environment:
   WEB_CONSOLE_STT_MODEL   faster-whisper model (default large-v3-turbo on a GPU, small.en on CPU)
   WEB_CONSOLE_STT_PROMPT  words to expect, as a hint to Whisper (default: the demo foods and commands)
+  WEB_CONSOLE_MODEL       Claude model for the chat (default claude-opus-5-5)
   ELROBOT_STATION / ELROBOT_BUS / ELROBOT_CAMERA_QUEUES   same as the MCP server
 """
 
@@ -163,14 +164,17 @@ def _default_tools():
     return tools
 
 
-def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None) -> Starlette:
+def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
+               agent_factory=None) -> Starlette:
     """`tools` is a RobotTools (or a fake with .look/.call); `stt` a SpeechToText or None;
-    `station_up` a callable returning whether the Station accepts connections."""
+    `station_up` a callable returning whether the Station accepts connections;
+    `agent_factory(post)` builds the chat agent (ConsoleAgent), or None for no agent."""
     if tools is None:
         tools = _default_tools()
         station_up = station_up or station_reachable
     station_up = station_up or (lambda: True)
     chat = ChatLog()
+    agent_box: Dict[str, Any] = {"agent": None}
 
     async def index(_: Request):
         return FileResponse(PAGE, headers={"Cache-Control": "no-store"})
@@ -225,19 +229,41 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None) 
                 after = int(request.query_params.get("after", "0"))
             except ValueError:
                 after = 0
-            return JSONResponse({"messages": chat.after(after)})
+            agent = agent_box["agent"]
+            return JSONResponse({"messages": chat.after(after), "busy": bool(agent and agent.busy),
+                                 "agent": agent.state if agent else "off",
+                                 "agent_error": agent.error if agent else ""})
         body = await request.json()
         text = str(body.get("text", "")).strip()[:MAX_MESSAGE_CHARS]
         role = body.get("role", "user")
         if not text or role not in ("user", "robot"):
             return JSONResponse({"ok": False, "error": "need text and role user|robot"}, status_code=400)
-        return JSONResponse({"ok": True, "message": chat.add(role, text)})
+        msg = chat.add(role, text)
+        if role == "user" and agent_box["agent"] is not None:
+            await agent_box["agent"].submit(text)
+        return JSONResponse({"ok": True, "message": msg})
+
+    async def stop(_: Request):
+        agent = agent_box["agent"]
+        chat.add("user", "Stop (button)")
+        if agent is None:
+            chat.add("error", "No agent running, nothing to stop here. Use the power plug if the arm moves.")
+            return JSONResponse({"ok": False}, status_code=503)
+        await agent.emergency_stop()
+        return JSONResponse({"ok": True})
 
     @contextlib.asynccontextmanager
     async def lifespan(_app):
         if stt is not None:
             stt.start_loading()
-        yield
+        if agent_factory is not None:
+            agent_box["agent"] = agent_factory(chat.add)
+            await agent_box["agent"].start()
+        try:
+            yield
+        finally:
+            if agent_box["agent"] is not None:
+                await agent_box["agent"].close()
 
     return Starlette(routes=[
         Route("/", index),
@@ -246,6 +272,7 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None) 
         Route("/api/stt", stt_status),
         Route("/api/transcribe", transcribe, methods=["POST"]),
         Route("/api/messages", messages, methods=["GET", "POST"]),
+        Route("/api/stop", stop, methods=["POST"]),
     ], lifespan=lifespan)
 
 
@@ -255,6 +282,7 @@ def main() -> None:
                         help="bind address (the microphone only works on localhost or https)")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--no-stt", action="store_true", help="skip faster-whisper; use the browser's")
+    parser.add_argument("--no-agent", action="store_true", help="chat only, no Claude")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -266,7 +294,14 @@ def main() -> None:
     import uvicorn  # noqa: WPS433
     print(f"ElRobot console: http://{'localhost' if args.host == '127.0.0.1' else args.host}:{args.port}",
           flush=True)
-    uvicorn.run(create_app(stt=stt), host=args.host, port=args.port, log_level="warning")
+    agent_factory = None
+    if not args.no_agent:
+        from console_agent import ConsoleAgent  # noqa: WPS433
+        agent_factory = ConsoleAgent
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            print("Note: ANTHROPIC_API_KEY is not set; the chat cannot reach Claude.", flush=True)
+    uvicorn.run(create_app(stt=stt, agent_factory=agent_factory), host=args.host, port=args.port,
+                log_level="warning")
 
 
 if __name__ == "__main__":
