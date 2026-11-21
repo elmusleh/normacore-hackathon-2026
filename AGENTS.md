@@ -3,10 +3,17 @@
 This project uses `.ai-sync/` for cross-platform AI agent synchronization.
 
 ## On Start
-1. Run `git status` and `git pull --rebase` (on a clean tree). Note any modified files you did not touch; they belong to someone else.
-2. Read `.ai-sync/HANDOFF.md` — current state, what was done, what's next, who owns the hardware
-3. Read `.ai-sync/PROGRESS.md` — completed vs pending tasks
-4. Read `.ai-sync/PLAN.md` — the implementation plan (do not deviate)
+1. **Sync before you implement:** run `./cli.sh sync`. It fetches from origin and fast-forwards only when your tree is clean and the branch is behind. It never stashes, resets or force-pulls. Act on the exit code:
+   - `0`: in sync. Continue.
+   - `1`: offline. Continue on local code, and say so in your final message.
+   - `2`: uncommitted changes exist, so the pull was skipped. Do not edit files that are being changed upstream. Ask the owner before you pull.
+   - `3`: diverged, detached, or fast-forward refused. Stop and ask. Do not rebase on your own.
+   - `4`: no upstream. Nothing to pull. Continue.
+   The output also lists commits on `origin/main` since your branch split, with their files. Check those files before you edit them.
+2. Note any modified files you did not touch; they belong to someone else.
+3. Read `.ai-sync/HANDOFF.md` — current state, what was done, what's next, who owns the hardware
+4. Read `.ai-sync/PROGRESS.md` — completed vs pending tasks
+5. Read `.ai-sync/PLAN.md` — the implementation plan (do not deviate)
 
 ## During Work
 - Check off completed tasks in PROGRESS.md

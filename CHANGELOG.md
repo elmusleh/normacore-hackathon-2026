@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AGENTS.md`: every finished change is committed before reporting back (explicit paths, CHANGELOG entry, Conventional Commits). Added a team workflow: feature branches, pull requests, single hardware owner, calibration commits, and shared handoffs.
 - `AGENTS.md`: after each implementation, agents give 3 prioritized suggestions and record them in `SUGGESTIONS.md`.
 - `AGENTS.md`: added setup and safety pointers, where things live, a definition of done, testing, conventions, blocker reporting and privacy rules, plus shared-file etiquette for handoffs.
+- `scripts/agent_sync.sh` and `./cli.sh sync`: fetch from origin, then fast-forward only when the tree is clean and the branch is behind. Never stashes, resets or force-pulls. Lists commits on `origin/main` since the branch split. Exit codes separate offline, dirty, diverged and no-upstream states. `AGENTS.md` On Start now requires running it before implementing.
 - New `docs/team_setup.md` (new-machine setup, serial permissions, cameras, common problems) and `docs/bench_safety.md` (before, during and after motion tests, stop procedure).
 
 ### Added

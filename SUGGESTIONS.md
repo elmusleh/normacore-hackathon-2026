@@ -125,3 +125,24 @@
     How: Add a small test in `tests/` that reads each `docs/*.md` and `AGENTS.md`, extracts relative links, and fails if a target file does not exist.
     Status: ⏳ Unimplemented
     Reason Deferred: Useful but not urgent. The docs are new and few, so a manual check is enough for now.
+
+19. Add automated tests for the sync script's four outcomes — Priority 76% (High value) [Best practices]
+    What: Automatic tests that prove `scripts/agent_sync.sh` behaves correctly when it is behind, dirty, diverged or offline.
+    Why: The sync script decides whether a teammate's work gets pulled over an agent's edits. Its fast-forward, dirty-tree and diverged paths were not run in a real test yet, so a bug there could cause the very conflicts it is meant to prevent.
+    How: Add `tests/test_agent_sync.py` that builds a throwaway bare remote and two clones in a temporary folder, makes a commit in one clone, and runs the script in the other for each case. Check the exit code in each case.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Writing the test is not hard, but the first run was blocked. Scratch-repo tests need a go-ahead, so this stays on the list until it is approved.
+
+20. Run the sync check automatically when an agent session starts — Priority 68% (High value) [Best practices]
+    What: A session-start hook that runs `./cli.sh sync` as soon as an AI agent session opens, so the agent does not depend on remembering to do it.
+    Why: The rule in `AGENTS.md` only works if every agent follows it. A hook makes the sync happen every time and shows the result before any edit.
+    How: Add a `SessionStart` hook in the project's `.claude/settings.json` that runs `./cli.sh sync` and prints the output. Test it once on a clean branch.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Changes the agent tool configuration for everyone on the team. Needs a team decision first.
+
+21. Flag stale feature branches in continuous integration — Priority 50% (Nice to have) [Best practices]
+    What: An automatic check on each pull request that warns when the branch is far behind `main`.
+    Why: A long-stale branch is the main source of painful merge conflicts. An early warning gives the author time to rebase while the changes are still small.
+    How: Add a GitHub Actions workflow that runs `git rev-list --count HEAD..origin/main` on each pull request and posts a warning comment when the count is above a set limit, such as 20.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Needs the repository to use GitHub Actions and pull requests. Nice to have once the team is using pull requests regularly.

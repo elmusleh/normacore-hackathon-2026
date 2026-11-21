@@ -54,6 +54,9 @@ print_usage() {
     echo -e "  ${C_CYAN}logs [-f]${C_RESET}            Show the newest run log (-f follows it live)"
     echo -e "  ${C_CYAN}preflight${C_RESET}            Read-only ElRobot readiness check (writes logs/)"
     echo ""
+    echo -e "${C_BOLD}Team Sync:${C_RESET}"
+    echo -e "  ${C_CYAN}sync${C_RESET}                Fetch, then fast-forward if clean and behind (never stashes or force-pulls)"
+    echo ""
     echo -e "${C_BOLD}General Commands:${C_RESET}"
     echo -e "  ${C_CYAN}help${C_RESET}                Display this help menu"
     echo -e "${C_BOLD}${C_BLUE}================================================================${C_RESET}"
@@ -140,6 +143,11 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
 
     hw)
         python3 scripts/hw_day.py "$@"
+        ;;
+
+    sync)
+        # Fetch and fast-forward before implementing. Never stashes or force-pulls.
+        bash scripts/agent_sync.sh "$@"
         ;;
 
     preflight)
