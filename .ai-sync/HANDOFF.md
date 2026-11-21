@@ -9,6 +9,11 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-21, ~22:20, claude for Jafer): camera ports after hub replug
+- The udev rule with the OBSBOT line is installed, and the Station now captures the face camera.
+- At 22:12 the USB hub was replugged into another laptop port (3-5 -> 3-1), so the console showed all three cameras as "not plugged in". `config/elrobot.json` cameras now: table `port:3-1.2.2`, gripper `port:3-1.2.4`, face `port:3-1.3`. Table and gripper checked from frames; face is the only OBSBOT, and its frame was not viewed (privacy).
+- Next: reload the console page (the server reads the config on each request, so no restart should be needed). Keep the hub in this laptop port. See FINDINGS.md.
+
 ## Latest session (2026-11-21, ~21:50, claude for Jafer): face camera in the console
 - Request: add the third camera to the console. It is an OBSBOT Meet SE on USB port 3-5.3 (`lsusb` ID 3564:fefe). Jafer said it points at the person being fed, so it is named `face`.
 - Found: the Station was not capturing it. `list_cameras` showed only table and gripper, and the OBSBOT's `/dev/bus/usb` node was root-only because the udev rule only covered the KD-USB cameras (2c7f:4a60).

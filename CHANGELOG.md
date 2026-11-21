@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Camera ports in `config/elrobot.json` moved to `3-1.x` after the USB hub was replugged into another laptop port (table 3-1.2.2, gripper 3-1.2.4, face 3-1.3).
 - Third camera in the console: `face` (OBSBOT Meet SE on USB port 3-5.3, points at the person being fed) in `config/elrobot.json` → `cameras`. The console page shows table across the top with gripper and face below. The console prompts tell Claude `look("face")` shows the person. `scripts/99-normacore-cameras.rules` now also covers the OBSBOT (3564:fefe) so the Station can capture it; it needs reinstalling with sudo.
 - Teleop demonstration recorder for ACT: `./cli.sh demos record --skill pick --food grape` / `demos list` (`scripts/record_demos.py`, `src/demo_recorder.py`). Stores follower position (state), follower goal register (action), leader position and table/gripper camera frames at 30 per second in `data/demos/`; reads only. Runbook `docs/act_pick_skill.md`. `RobotTools.camera_queue()` split out of `look()`. `.venv-*/` gitignored (LeRobot goes in `.venv-lerobot`).
 - `hw envelope record` skips samples where a motor reads outside its calibrated range (a read glitch put motor 2 = 0 into the first recording).
