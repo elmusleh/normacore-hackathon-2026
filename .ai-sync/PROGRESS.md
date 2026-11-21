@@ -38,6 +38,9 @@
 - [ ] Validate camera stream overlay against real table measurements
 - [ ] Execute single-object natural language pick-and-place
 
+- [x] Web console `./cli.sh console` (`src/web_console.py`, `src/web/console.html`): table + gripper cameras on the left, chat with microphone (local faster-whisper STT) on the right. Tested offline; not yet with live camera frames
+- [ ] Connect the console chat to Claude: MCP `listen`/`say` tools reading/writing `/api/messages` (plan 3.2/3.4, owner D)
+
 ## Phase 4: Closed-Loop Recovery & Stress Testing — PENDING
 - [ ] Tune ST3215 gripper motor load thresholds
 - [ ] Rehearse judge perturbation test 5+ times consecutively

@@ -34,6 +34,7 @@ print_usage() {
     echo -e "  ${C_YELLOW}station${C_RESET}             Launch official pre-compiled Station binary (--web --tcp)"
     echo -e "  ${C_YELLOW}setup-serial${C_RESET}        Configure Linux USB permissions (dialout, udev rules) for ElRobot servos"
     echo -e "  ${C_YELLOW}mcp${C_RESET}                 Run Model Context Protocol (MCP) server for Claude / Codex"
+    echo -e "  ${C_YELLOW}console [port]${C_RESET}      Web console: live cameras + voice chat (Default: http://localhost:8890)"
     echo -e "  ${C_YELLOW}urdf${C_RESET}                Open official NormaCore online 3D URDF interactive viewer"
     echo ""
     echo -e "${C_BOLD}Hardware Day (ElRobot):${C_RESET}"
@@ -123,6 +124,12 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         if command -v xdg-open > /dev/null 2>&1; then
             xdg-open sample_calibrated_view.png &
         fi
+        ;;
+
+    console)
+        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        echo -e "${C_GREEN}[+] Starting ElRobot web console (cameras + voice chat)...${C_RESET}"
+        exec "$PY" src/web_console.py --port "${1:-8890}"
         ;;
 
     mcp)

@@ -42,6 +42,23 @@ viewer again; [calibration/](../calibration/) holds the ranges measured on 2026-
 3. Open Claude Code in this folder. It reads `.mcp.json` and asks to enable the `elrobot` server. Check with `/mcp`.
 4. Ask Claude: "look at the table and tell me what you see".
 
+## Web console (cameras + voice chat)
+
+`./cli.sh console`, then open http://localhost:8890 in Chrome or Firefox on the same laptop.
+
+- Left: the `table` and `gripper` cameras, read from the Station like `look` (about 8 fps each).
+  Each shows its frame age; amber means the camera has stalled. Needs the Station running.
+- Right: a chat box with a big microphone button. Click to talk, click again to stop (or hold Space).
+  The text goes into the box to check, then Send/Enter. Tick "Send right after speaking" to skip that.
+- Speech-to-text runs locally with faster-whisper (`small.en`, about 1 s per sentence on CPU). The first
+  start downloads the model (~500 MB) from Hugging Face, so do it once while online. Set
+  `WEB_CONSOLE_STT_MODEL=base.en` for a faster, less accurate model. Without faster-whisper (or with
+  `--no-stt`) the page uses the browser's speech recognition, which sends audio online (Chrome only).
+- The microphone only works when the page is opened as `localhost` (browsers block it on plain http
+  from another machine).
+- Read-only: nothing on the page moves the arm. Chat messages are kept in memory at `/api/messages`
+  (GET `?after=<id>`, POST `{"role": "user"|"robot", "text": ...}`) for a future `listen`/`say` tool.
+
 ## Motion is off until you turn it on
 
 `.mcp.json` sets `ELROBOT_ALLOW_MOTION` to `"0"`. Claude can look, read the arm and plan, but every
