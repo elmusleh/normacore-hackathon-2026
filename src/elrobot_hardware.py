@@ -365,10 +365,32 @@ class ElRobotHardware:
     # -- writes -------------------------------------------------------------
 
     async def set_torque(self, motor_ids: List[int], enable: bool) -> None:
-        """Enable or disable torque. Disabling makes the arm go limp."""
+        """Enable or disable torque with readback verification & retries. Disabling makes the arm go limp."""
         value = b"\x01" if enable else b"\x00"
-        self.log.info("torque %s on motors %s", "ON" if enable else "OFF", list(motor_ids))
-        await self._sync_write(RAM_TORQUE_ENABLE, [(mid, value) for mid in motor_ids])
+        ids = list(motor_ids)
+        self.log.info("torque %s on motors %s", "ON" if enable else "OFF", ids)
+        remaining = ids
+        for attempt in range(1, 5):
+            await self._sync_write(RAM_TORQUE_ENABLE, [(mid, value) for mid in remaining])
+            await asyncio.sleep(0.08)
+            snap = self.snapshot()
+            if not snap:
+                return
+            remaining = [mid for mid in ids if mid in snap and snap[mid].torque_on != enable]
+            if not remaining:
+                return
+            self.log.warning(
+                "torque %s attempt %d/4: motors %s did not confirm yet, retrying",
+                "ON" if enable else "OFF",
+                attempt,
+                remaining,
+            )
+        if remaining:
+            self.log.error(
+                "torque %s NOT confirmed on motors %s after 4 attempts (check Station teleop dropdown or 12V switch)",
+                "ON" if enable else "OFF",
+                remaining,
+            )
 
     async def move_motors(
         self,

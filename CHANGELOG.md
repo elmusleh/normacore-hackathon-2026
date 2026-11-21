@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added readback verification and automatic retries (up to 4×) to `ElRobotHardware.set_torque` (`src/elrobot_hardware.py`) so `./cli.sh hw stop` and `torque off` never leave individual ST3215 motors stuck ON if a broadcast sync-write packet is dropped.
 - Fixed `hw_day.py` bus selection in `scripts/reset_bench.py` and `src/digital_twin_server.py` to pass `ELROBOT_BUS` via environment variable instead of a pre-subcommand `--bus` flag.
 - Wired `./cli.sh reset` (zero-arg quick bench reset: relaxes leader torque when Station is running or applies manual camera exposure when stopped), replaced Mission Control's Swap button with a safe **Refresh Bench** button (`src/digital_twin.html`, `scripts/reset_bench.py`, `cli.sh`), and included `./cli.sh check` (`scripts/system_health.py`).
 - Added team bench recovery & Master/Slave role manager (`scripts/reset_bench.py`) and one-click **Relax Leader (Torque Off)** + **Swap Master / Slave** buttons in Mission Control (`src/digital_twin_server.py`, `src/digital_twin.html`) with live config-driven header serials.
