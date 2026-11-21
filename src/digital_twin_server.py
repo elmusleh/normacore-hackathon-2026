@@ -47,6 +47,7 @@ feeding_detector = FeedingVisionDetector(calibrator=mcp_server.calibrator)
 teleop_process: Optional[subprocess.Popen] = None
 teleop_lock = threading.Lock()
 latest_feeding_overlay_b64: Optional[str] = None
+latest_mouth_sample: Dict[str, Any] = {"mar": None, "width_px": None, "closed_mar": None}
 
 
 def _station_reachable(timeout_s: float = 0.25) -> bool:
@@ -363,9 +364,12 @@ class CameraHub:
                         "label": mouth.label,
                         "u_px": u,
                         "v_px": v,
+                        "width_px": w,
                         "confidence": round(float(mouth.confidence), 2),
                         "extra": extra,
                     }
+                    latest_mouth_sample["mar"] = mar
+                    latest_mouth_sample["width_px"] = w
                     standoff_txt = "STOP: AT STANDOFF" if at_standoff else f"{extra.get('standoff_cm', '?')}cm (SAFE)"
                     parts.append(f"[{detector_name}] Mouth {mouth_tag}{mar_tag} — {standoff_txt}")
             else:
@@ -520,6 +524,8 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                 "target_zones": getattr(station, "target_zones", {}),
                 "selected_cameras": dict(camera_hub.selected),
                 "waypoints": sorted(load_waypoints().keys()),
+                "feeding_calibration": feeding_detector.get_calibration(),
+                "latest_mouth_sample": dict(latest_mouth_sample),
             }
             self._send_json(payload)
             return
@@ -549,6 +555,76 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                         "cameras": saved,
                         "output": f"Saved defaults to config/elrobot.json: table={saved.get('table')}, person={saved.get('person')}",
                     }
+
+                elif action == "calibrate_user":
+                    mode = cmd.get("mode", "save_manual")
+                    cur_mar = latest_mouth_sample.get("mar")
+                    cur_w = latest_mouth_sample.get("width_px")
+
+                    if mode == "capture_closed":
+                        if cur_mar is None:
+                            res = {"status": "ERROR_NO_FACE", "output": "No live face detected — look at Person Cam first."}
+                        else:
+                            latest_mouth_sample["closed_mar"] = float(cur_mar)
+                            res = {
+                                "status": "CLOSED_MOUTH_CAPTURED",
+                                "closed_mar": round(float(cur_mar), 3),
+                                "output": f"Captured closed-mouth MAR = {cur_mar:.3f}. Now open comfortably and click '2. Open Mouth'.",
+                            }
+                    elif mode == "capture_open":
+                        if cur_mar is None:
+                            res = {"status": "ERROR_NO_FACE", "output": "No live face detected — look at Person Cam first."}
+                        else:
+                            closed = float(latest_mouth_sample.get("closed_mar") or 0.02)
+                            open_m = float(cur_mar)
+                            if open_m <= closed + 0.04:
+                                res = {"status": "ERROR_TOO_CLOSE_MAR", "output": f"Open MAR ({open_m:.2f}) is too close to closed ({closed:.2f}). Open wider and try again."}
+                            else:
+                                new_thr = round(max(0.10, min(0.60, closed + 0.55 * (open_m - closed))), 3)
+                                cal = feeding_detector.set_calibration(mar_open_threshold=new_thr)
+                                cfg = load_config()
+                                cfg["feeding_vision"] = cal
+                                save_config(cfg)
+                                res = {
+                                    "status": "USER_MAR_CALIBRATED",
+                                    "calibration": cal,
+                                    "output": f"Calibrated MAR threshold = {new_thr:.3f} (closed={closed:.2f}, open={open_m:.2f}) and saved to config/elrobot.json.",
+                                }
+                    elif mode == "capture_distance":
+                        if not cur_w:
+                            res = {"status": "ERROR_NO_FACE", "output": "No live face detected — sit in eating position first."}
+                        else:
+                            new_w = max(40, min(260, int(round(float(cur_w) * 1.25))))
+                            cal = feeding_detector.set_calibration(standoff_mouth_width_px=new_w)
+                            cfg = load_config()
+                            cfg["feeding_vision"] = cal
+                            save_config(cfg)
+                            res = {
+                                "status": "USER_DISTANCE_CALIBRATED",
+                                "calibration": cal,
+                                "output": f"Calibrated standoff width = {new_w}px (from eating width {cur_w}px) and saved to config/elrobot.json.",
+                            }
+                    elif mode == "reset_defaults":
+                        cal = feeding_detector.set_calibration(mar_open_threshold=0.26, standoff_mouth_width_px=95)
+                        cfg = load_config()
+                        cfg["feeding_vision"] = cal
+                        save_config(cfg)
+                        res = {"status": "CALIBRATION_RESET", "calibration": cal, "output": "Reset user calibration to defaults (MAR=0.26, Standoff=95px)."}
+                    else:
+                        mar_val = cmd.get("mar_open_threshold")
+                        w_val = cmd.get("standoff_mouth_width_px")
+                        cal = feeding_detector.set_calibration(
+                            mar_open_threshold=float(mar_val) if mar_val is not None else None,
+                            standoff_mouth_width_px=int(w_val) if w_val is not None else None,
+                        )
+                        cfg = load_config()
+                        cfg["feeding_vision"] = cal
+                        save_config(cfg)
+                        res = {
+                            "status": "USER_CALIBRATION_SAVED",
+                            "calibration": cal,
+                            "output": f"Saved user calibration to config/elrobot.json: MAR={cal['mar_open_threshold']}, Standoff={cal['standoff_mouth_width_px']}px.",
+                        }
 
                 # --- 1. CLI Execution Integration ---
                 elif action == "run_cli":

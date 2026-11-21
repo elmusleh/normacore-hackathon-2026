@@ -187,6 +187,15 @@ def test_mouth_state_tracker_and_feeding_safety_fsm():
     assert fsm.step(face_detected=True, stop_requested=True) == "EMERGENCY_HOLD"
     assert fsm.reason == "stop_requested"
 
+    # 4. User calibration updates live thresholds cleanly
+    from src.feeding_vision import FeedingVisionDetector
+    det = FeedingVisionDetector()
+    cal = det.set_calibration(mar_open_threshold=0.22, standoff_mouth_width_px=80)
+    assert cal["mar_open_threshold"] == 0.22
+    assert cal["standoff_mouth_width_px"] == 80
+    assert det.mouth_tracker.mar_threshold == 0.22
+    assert det.standoff_mouth_width_px == 80
+
 
 if __name__ == "__main__":
     pytest.main(["-v", "tests/test_pipeline.py"])

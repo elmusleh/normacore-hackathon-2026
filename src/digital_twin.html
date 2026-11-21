@@ -300,6 +300,27 @@
                 </div>
             </div>
 
+            <!-- User Mouth & Distance Calibration -->
+            <div class="panel-section">
+                <div class="section-title">
+                    <span>User Mouth &amp; Distance Calibration</span>
+                    <span id="cal-live-pill" style="color: #34d399; font-weight: 600;">MAR: 0.26 | 95px</span>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="sendAction('calibrate_user', {mode: 'capture_closed'})">1. Capture Closed</button>
+                    <button class="btn btn-green" onclick="sendAction('calibrate_user', {mode: 'capture_open'})">2. Capture Open</button>
+                </div>
+                <div class="btn-group" style="margin-top: 6px;">
+                    <button class="btn btn-secondary" onclick="sendAction('calibrate_user', {mode: 'capture_distance'})">📏 Set Eating Distance</button>
+                    <button class="btn btn-secondary" onclick="sendAction('calibrate_user', {mode: 'reset_defaults'})">↺ Reset Defaults</button>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 8px; align-items: center;">
+                    <input id="cal-mar-input" type="number" step="0.01" min="0.05" max="0.80" placeholder="MAR (0.26)" style="background: #000; border: 1px solid var(--border); color: #fff; padding: 5px 6px; border-radius: 4px; font-size: 11px; width: 85px;">
+                    <input id="cal-width-input" type="number" step="1" min="30" max="300" placeholder="Standoff px" style="background: #000; border: 1px solid var(--border); color: #fff; padding: 5px 6px; border-radius: 4px; font-size: 11px; flex: 1;">
+                    <button class="btn btn-green" onclick="saveManualCalibration()">Save</button>
+                </div>
+            </div>
+
             <!-- Assistive Feeding -->
             <div class="panel-section">
                 <div class="section-title">
@@ -389,6 +410,16 @@
 
                 if (data.slave_bus) document.getElementById('hdr-slave').textContent = data.slave_bus;
                 if (data.master_bus) document.getElementById('hdr-master').textContent = data.master_bus;
+
+                if (data.feeding_calibration) {
+                    const cal = data.feeding_calibration;
+                    const pill = document.getElementById('cal-live-pill');
+                    if (pill) pill.textContent = `MAR: ${cal.mar_open_threshold} | ${cal.standoff_mouth_width_px}px`;
+                    const marEl = document.getElementById('cal-mar-input');
+                    const wEl = document.getElementById('cal-width-input');
+                    if (marEl && document.activeElement !== marEl && !marEl.value) marEl.value = cal.mar_open_threshold;
+                    if (wEl && document.activeElement !== wEl && !wEl.value) wEl.value = cal.standoff_mouth_width_px;
+                }
 
                 const wpBox = document.getElementById('waypoint-chips');
                 const wps = data.waypoints || [];
@@ -513,6 +544,15 @@
             const name = input.value.trim() || 'point_1';
             await sendAction('teach', { name });
             input.value = '';
+        }
+
+        async function saveManualCalibration() {
+            const marVal = parseFloat(document.getElementById('cal-mar-input')?.value);
+            const wVal = parseInt(document.getElementById('cal-width-input')?.value, 10);
+            const params = { mode: 'save_manual' };
+            if (!Number.isNaN(marVal)) params.mar_open_threshold = marVal;
+            if (!Number.isNaN(wVal)) params.standoff_mouth_width_px = wVal;
+            await sendAction('calibrate_user', params);
         }
     </script>
 </body>

@@ -231,9 +231,32 @@ class FeedingVisionDetector:
         self.calibrator = calibrator or self._default_calibrator()
         self._face_cascade = self._load_cascade("haarcascade_frontalface_default.xml")
         self._smile_cascade = self._load_cascade("haarcascade_smile.xml")
-        self.mouth_tracker = MouthStateTracker()
+        fv_cfg = load_config().get("feeding_vision", {})
+        mar_thr = float(fv_cfg.get("mar_open_threshold", MAR_OPEN_THRESHOLD))
+        self.standoff_mouth_width_px: int = int(fv_cfg.get("standoff_mouth_width_px", STANDOFF_MOUTH_WIDTH_PX))
+        self.mouth_tracker = MouthStateTracker(mar_threshold=mar_thr)
         self.safety_fsm = FeedingSafetyFSM()
         self._landmarker = self._load_mediapipe_landmarker()
+
+    def set_calibration(
+        self,
+        *,
+        mar_open_threshold: Optional[float] = None,
+        standoff_mouth_width_px: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Update live mouth-open MAR threshold and standoff pixel width."""
+        if mar_open_threshold is not None:
+            self.mouth_tracker.mar_threshold = round(max(0.05, min(0.80, float(mar_open_threshold))), 3)
+            self.mouth_tracker.open_streak = 0
+        if standoff_mouth_width_px is not None:
+            self.standoff_mouth_width_px = max(30, min(300, int(standoff_mouth_width_px)))
+        return self.get_calibration()
+
+    def get_calibration(self) -> Dict[str, Any]:
+        return {
+            "mar_open_threshold": round(float(self.mouth_tracker.mar_threshold), 3),
+            "standoff_mouth_width_px": int(self.standoff_mouth_width_px),
+        }
 
     @staticmethod
     def _load_mediapipe_landmarker():
@@ -406,7 +429,7 @@ class FeedingVisionDetector:
                     tracked = self.mouth_tracker.update(raw_u, raw_v, raw_w, mar)
                     mu, mv, mw = tracked["u_px"], tracked["v_px"], tracked["width_px"]
                     mh = int(round(raw_h))
-                    at_standoff = mw >= STANDOFF_MOUTH_WIDTH_PX
+                    at_standoff = mw >= self.standoff_mouth_width_px
                     x_mm, y_mm = self.pixel_to_mm(mu, mv)
                     x_mm = max(-160.0, min(160.0, x_mm))
                     y_mm = max(110.0, min(260.0, y_mm))

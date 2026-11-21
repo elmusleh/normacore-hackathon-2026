@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added per-user live Mouth & Distance Calibration in Mission Control (`src/digital_twin.html`, `src/digital_twin_server.py`, `src/feeding_vision.py`): 1-click **1. Capture Closed**, **2. Capture Open**, **Set Eating Distance**, **Reset Defaults**, and manual `MAR`/`Standoff px` inputs persisted to `config/elrobot.json` (`feeding_vision`).
 - Tuned `MAR_OPEN_THRESHOLD` to `0.26` from live OBSBOT bench testing (closed `0.00–0.02`, open `0.30–0.50`) and prevented `detect_mouth()` in `src/feeding_vision.py` from falling through to noisy OpenCV skin-tone heuristics when MediaPipe `FaceLandmarker` is active and sees no face (eliminates false yellow box on windows/background and ensures clean face-loss watchdog behavior).
 - Implemented MediaPipe `FaceLandmarker` lip-landmark mouth tracking (`MouthStateTracker` with MAR, EMA smoothing, 3-frame mouth-open debounce, and 0.5 s face-loss watchdog) and deterministic `FeedingSafetyFSM` in `src/feeding_vision.py`, wired live MAR/lip overlays into Mission Control (`src/digital_twin_server.py`), documented the plan in `docs/FEEDING_FSM_MEDIAPIPE_PLAN.md`, and added unit tests in `tests/test_pipeline.py`.
 - Added readback verification and automatic retries (up to 4×) to `ElRobotHardware.set_torque` (`src/elrobot_hardware.py`) so `./cli.sh hw stop` and `torque off` never leave individual ST3215 motors stuck ON if a broadcast sync-write packet is dropped.
