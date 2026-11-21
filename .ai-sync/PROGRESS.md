@@ -13,19 +13,21 @@
 - [x] Structure repository (`docs/`, `src/`, `scripts/`, `tests/`, `archive/`)
 - [x] Create team onboarding `README.md`, `GUIDELINES.md`, `PREFERENCES.md`
 
-## Phase 2: Saturday Morning Hardware Onboarding — PENDING
-- [ ] Connect ElRobot USB serial cable and execute `./scripts/setup_usb_serial.sh`
-- [ ] Launch NormaCore Station Web console and verify joint zero positions
+## Phase 2: Saturday Morning Hardware Onboarding — COMPLETE
+- [x] Connect ElRobot USB serial cable and execute `./scripts/setup_usb_serial.sh`
+- [x] Launch NormaCore Station Web console and verify joint zero positions
+- [x] First physical hardware move to safe clearance height / live teleoperation
 - [ ] Place 4 AprilTag markers at workspace corners and calibrate camera
-- [ ] First physical hardware move to safe clearance height
 
-## Phase 3: Agent Integration & Tabletop Primitives — PARTIAL
-- [x] Joint-level hardware bridge to the Station SDK written (`src/elrobot_hardware.py`), unit-tested offline (44 tests pass in total). Not yet run against a real arm.
-- [x] Read-only preflight script (`scripts/hardware_preflight.py`); connection path verified against the real `bin/station` binary (no robot attached, so no frames).
+## Phase 3: Agent Integration & Tabletop Primitives — IN PROGRESS
+- [x] Joint-level hardware bridge to the Station SDK written (`src/elrobot_hardware.py`), unit-tested offline (44 tests pass in total).
+- [x] Read-only preflight script (`scripts/hardware_preflight.py`); verified against live follower arm `5B61037051` and leader arm `5B61034962`.
+- [x] Live master/slave 50Hz teleoperation sync tool implemented and tested (`scripts/teleop_sync.py`, `./cli.sh teleop`).
 - [x] Run logging with per-run files and `latest` links (`src/elrobot_log.py`), and `logs/` bundles via `./cli.sh hw bundle`
 - [x] Hardware-day checklist and safe commands in `./cli.sh hw` (`scripts/hw_day.py`)
 - [ ] Run preflight with the ElRobot powered and USB connected; confirm motors 1–8 and calibration
 - [x] Motor identification wizard, torque on/off, overload guard, current probe, waypoints (teach/goto), workspace config (`scripts/hw_day.py`, `src/elrobot_hardware.py`, `src/elrobot_config.py`)
+- [x] Camera-guided assistive feeding vision detector & slave arm controller for grape bowl, spoon, and person mouth target (`src/feeding_vision.py`, `scripts/camera_feed_arm.py`, `./cli.sh feed`)
 - [ ] Identify motors on the arm (`./cli.sh hw identify`) and confirm directions
 - [ ] Probe current per motor and save thresholds (`./cli.sh hw probe-current <m>`)
 - [ ] Teach home and clear poses, then test goto both ways

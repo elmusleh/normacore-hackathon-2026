@@ -62,6 +62,7 @@ telemetry_dumps/
 captures/*.png
 captures/*.jpg
 !sample_calibrated_view.png
+sample_feeding_view.jpg
 
 # IDEs & Text Editors
 .idea/
@@ -86,7 +87,9 @@ Thumbs.db
 
 # External vendors and local binaries
 bin/
-external/
+# external/ is ignored except the NormaCore submodule, which is pinned in .gitmodules
+external/*
+!external/norma-core
 
 # ElRobot hardware-day local state (checklist progress). Config in config/ is committed.
 data/

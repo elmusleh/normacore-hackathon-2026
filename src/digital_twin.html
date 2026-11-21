@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NormaCore Digital Twin — ElRobot 7+1 DOF Tabletop</title>
+    <title>NormaCore Digital Twin — ElRobot Tabletop Mission Control</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         :root {
-            --bg-dark: #0f1117;
-            --panel-bg: #181b24;
-            --border: #2a2f3d;
+            --bg-dark: #0a0c10;
+            --panel-bg: #141721;
+            --panel-card: #1c212e;
+            --border: #2a3142;
             --accent: #3b82f6;
             --accent-green: #10b981;
             --accent-amber: #f59e0b;
             --accent-red: #ef4444;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -30,7 +31,7 @@
         header {
             background: var(--panel-bg);
             border-bottom: 1px solid var(--border);
-            padding: 12px 24px;
+            padding: 10px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -58,127 +59,157 @@
         }
         .main-layout {
             display: grid;
-            grid-template-columns: 1fr 420px;
+            grid-template-columns: 1fr 400px;
             flex: 1;
+            height: calc(100vh - 55px);
             overflow: hidden;
         }
-        .viewport-container {
-            position: relative;
-            background: #090a0f;
-            width: 100%;
-            height: 100%;
+        .left-viewport {
+            display: grid;
+            grid-template-rows: 1fr 240px;
+            border-right: 1px solid var(--border);
+            background: #000;
         }
-        #three-canvas {
+        #canvas-container {
+            position: relative;
             width: 100%;
             height: 100%;
-            display: block;
         }
         .viewport-overlay {
             position: absolute;
-            top: 16px;
-            left: 16px;
-            background: rgba(24, 27, 36, 0.85);
-            backdrop-filter: blur(8px);
+            top: 12px;
+            left: 12px;
+            background: rgba(20, 23, 33, 0.85);
+            backdrop-filter: blur(4px);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px 16px;
+            border-radius: 6px;
+            padding: 8px 14px;
             font-size: 12px;
             pointer-events: none;
         }
-        .sidebar {
+        .camera-panel {
             background: var(--panel-bg);
-            border-left: 1px solid var(--border);
+            border-top: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            padding: 10px;
+            gap: 12px;
+        }
+        .camera-frame {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .camera-frame img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .right-sidebar {
+            background: var(--panel-bg);
             display: flex;
             flex-direction: column;
             overflow-y: auto;
+            border-left: 1px solid var(--border);
         }
-        .sidebar-section {
+        .panel-section {
+            padding: 12px 14px;
             border-bottom: 1px solid var(--border);
-            padding: 16px;
         }
-        .sidebar-section h3 {
-            font-size: 12px;
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-muted);
-            margin-bottom: 12px;
-        }
-        .camera-preview {
-            width: 100%;
-            height: 220px;
-            background: #000;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            object-fit: contain;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .telemetry-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            font-size: 12px;
+            gap: 6px;
         }
-        .telemetry-item {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 8px;
-            border-radius: 4px;
+        .telemetry-card {
+            background: var(--panel-card);
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
         }
         .telemetry-label {
-            color: var(--text-muted);
             font-size: 10px;
+            color: var(--text-muted);
         }
         .telemetry-value {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
-            color: var(--accent);
             margin-top: 2px;
+            color: var(--text-main);
         }
         .btn-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 4px;
         }
-        button {
+        .btn {
             background: #2563eb;
             color: #fff;
             border: none;
-            padding: 10px 14px;
+            padding: 8px 10px;
             border-radius: 6px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s ease;
+            text-align: center;
+        }
+        .btn:hover { background: #1d4ed8; }
+        .btn-green { background: #059669; }
+        .btn-green:hover { background: #047857; }
+        .btn-amber { background: #d97706; }
+        .btn-amber:hover { background: #b45309; }
+        .btn-red { background: #dc2626; }
+        .btn-red:hover { background: #b91c1c; }
+        .btn-secondary { background: #334155; }
+        .btn-secondary:hover { background: #1e293b; }
+        .cli-input-box {
             display: flex;
-            align-items: center;
-            justify-content: center;
             gap: 6px;
+            margin-top: 6px;
         }
-        button:hover { background: #1d4ed8; }
-        button:active { transform: translateY(1px); }
-        button.btn-warn { background: #d97706; }
-        button.btn-warn:hover { background: #b45309; }
-        button.btn-danger { background: #dc2626; }
-        button.btn-danger:hover { background: #b91c1c; }
-        button.btn-outline {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-main);
-        }
-        button.btn-outline:hover { background: rgba(255, 255, 255, 0.05); }
-        .log-box {
-            background: #0d0f14;
+        .cli-input-box input {
+            flex: 1;
+            background: #000;
             border: 1px solid var(--border);
             border-radius: 6px;
-            padding: 10px;
-            height: 180px;
-            overflow-y: auto;
-            font-size: 11px;
-            line-height: 1.5;
+            color: #fff;
+            padding: 6px 10px;
             font-family: monospace;
-            color: #cbd5e1;
+            font-size: 12px;
         }
-        .log-entry { margin-bottom: 4px; }
-        .log-info { color: #60a5fa; }
+        .log-box {
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 11px;
+            height: 140px;
+            overflow-y: auto;
+            font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .log-entry { line-height: 1.3; }
+        .log-info { color: #94a3b8; }
         .log-success { color: #34d399; }
         .log-warn { color: #fbbf24; }
         .log-danger { color: #f87171; }
@@ -188,200 +219,208 @@
     <header>
         <div class="header-title">
             <span class="status-dot"></span>
-            <h2>NormaCore Digital Twin</h2>
+            <h2>NormaCore Mission Control</h2>
             <span class="badge">ElRobot 7+1 DOF</span>
-            <span class="badge" style="background: #14532d; color: #86efac;">Simulation Mode</span>
+            <span class="badge" id="teleop-status-badge" style="background: #374151;">Teleop: IDLE</span>
         </div>
-        <div style="font-size: 12px; color: var(--text-muted);">
-            NormaCore Station: <strong>localhost:8888</strong> (TCP) · <strong>8889</strong> (Web)
+        <div style="display: flex; gap: 10px; font-size: 12px;">
+            <span>Master: <strong style="color: #60a5fa;">5B61034962</strong></span>
+            <span>Slave: <strong style="color: #34d399;">5B61037051</strong></span>
         </div>
     </header>
 
     <div class="main-layout">
-        <!-- 3D Tabletop Viewport -->
-        <div class="viewport-container">
-            <canvas id="three-canvas"></canvas>
-            <div class="viewport-overlay">
-                <div><strong>3D Interactive Twin</strong> (Click & Drag to Rotate · Scroll to Zoom)</div>
-                <div style="color: var(--text-muted); margin-top: 4px;">Table: 400×300mm · Reach: 430mm · ST3215 Bus Servos</div>
+        <!-- Left: 3D Twin & Overhead Calibrated Camera -->
+        <div class="left-viewport">
+            <div id="canvas-container">
+                <div class="viewport-overlay">
+                    <strong>Interactive 3D Digital Twin</strong><br>
+                    <span style="color: var(--text-muted);">Left-click rotate | Right-click pan | Scroll zoom</span>
+                </div>
+            </div>
+            <div class="camera-panel">
+                <div class="camera-frame">
+                    <img id="camera-feed" src="" alt="Live Tabletop Camera (Calibrated)">
+                    <div style="position: absolute; bottom: 4px; left: 6px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 2px 6px; border-radius: 3px;">
+                        Overhead Camera + Metric Grid
+                    </div>
+                </div>
+                <div>
+                    <div class="section-title">Quick Arm Waypoints</div>
+                    <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                        <button class="btn btn-secondary" onclick="sendAction('home')">Home Pose</button>
+                        <button class="btn btn-secondary" onclick="sendAction('pick', {x: -60, y: 180})">Pick Object</button>
+                        <button class="btn btn-secondary" onclick="sendAction('place', {x: -130, y: 210})">Place Bin</button>
+                    </div>
+                    <div class="section-title">Teach Current Pose</div>
+                    <div style="display: flex; gap: 6px;">
+                        <input id="teach-name" type="text" placeholder="Waypoint name (e.g. hover)" style="background: #000; border: 1px solid var(--border); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; flex: 1;">
+                        <button class="btn btn-secondary" onclick="teachWaypoint()">Teach</button>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Sidebar Controls & Camera -->
-        <div class="sidebar">
-            <!-- Calibrated Vision Feed -->
-            <div class="sidebar-section">
-                <h3>Overhead Vision (Calibrated Grid)</h3>
-                <img id="camera-feed" class="camera-preview" src="/api/camera" alt="Camera Feed">
+        <!-- Right: Hardware, CLI Runner & Testing Controls -->
+        <div class="right-sidebar">
+            <!-- Assistive Feeding (Camera -> Slave Arm) -->
+            <div class="panel-section">
+                <div class="section-title">
+                    <span>Assistive Feeding (/dev/video4 -> Slave)</span>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-green" onclick="sendAction('feed_grapes')">🍇 Feed Grapes (Bowl -> Mouth)</button>
+                    <button class="btn btn-amber" onclick="sendAction('feed_spoon')">🥄 Feed with Spoon (Scoop -> Mouth)</button>
+                </div>
+            </div>
+
+            <!-- Teleop Control -->
+            <div class="panel-section">
+                <div class="section-title">
+                    <span>Teleop Sync (Master -> Slave)</span>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-green" id="btn-teleop-start" onclick="sendAction('teleop_start')">▶ Start Teleop (50Hz)</button>
+                    <button class="btn btn-amber" id="btn-teleop-stop" onclick="sendAction('teleop_stop')">⏹ Stop Teleop</button>
+                </div>
+                <button class="btn btn-red" style="width: 100%; margin-top: 6px;" onclick="sendAction('estop')">⚠️ EMERGENCY STOP (Torque Off)</button>
+            </div>
+
+            <!-- Integrated CLI Runner -->
+            <div class="panel-section">
+                <div class="section-title">CLI Runner & Hardware Commands</div>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="runCli('preflight')">Preflight Check</button>
+                    <button class="btn btn-secondary" onclick="runCli('hw motors')">Live Motors</button>
+                    <button class="btn btn-secondary" onclick="runCli('hw waypoints')">List Waypoints</button>
+                    <button class="btn btn-secondary" onclick="runCli('sdk-check')">SDK Check</button>
+                </div>
+                <div class="cli-input-box">
+                    <input id="cli-input" type="text" placeholder="e.g. hw identify, hw jog 2 50, test" onkeydown="if(event.key==='Enter') executeCustomCli()">
+                    <button class="btn btn-secondary" onclick="executeCustomCli()">Run</button>
+                </div>
+            </div>
+
+            <!-- Testing & Autonomous Stage Demo -->
+            <div class="panel-section">
+                <div class="section-title">Testing & Autonomous Judge Demos</div>
+                <button class="btn btn-amber" style="width: 100%; margin-bottom: 6px;" onclick="runAutonomousDemo()">
+                    🏆 Run Judge Perturbation Recovery Demo
+                </button>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="sendAction('run_tests')">Run Full Pytest Suite</button>
+                    <button class="btn btn-secondary" onclick="sendAction('perturb')">Simulate Perturbation</button>
+                </div>
             </div>
 
             <!-- Telemetry -->
-            <div class="sidebar-section">
-                <h3>Kinematics & Telemetry</h3>
+            <div class="panel-section">
+                <div class="section-title">Real-time Telemetry</div>
                 <div class="telemetry-grid">
-                    <div class="telemetry-item">
-                        <div class="telemetry-label">End Effector (X, Y, Z)</div>
-                        <div class="telemetry-value" id="val-xyz">0.0, 140.0, 120.0 mm</div>
+                    <div class="telemetry-card">
+                        <div class="telemetry-label">End-Effector (X, Y, Z)</div>
+                        <div class="telemetry-value" id="val-xyz">-- mm</div>
                     </div>
-                    <div class="telemetry-item">
-                        <div class="telemetry-label">Gripper Status</div>
-                        <div class="telemetry-value" id="val-gripper">OPEN (1.00)</div>
+                    <div class="telemetry-card">
+                        <div class="telemetry-label">Gripper State</div>
+                        <div class="telemetry-value" id="val-gripper">--</div>
                     </div>
-                    <div class="telemetry-item">
-                        <div class="telemetry-label">Gripper Motor Load</div>
+                    <div class="telemetry-card">
+                        <div class="telemetry-label">Gripper Load</div>
                         <div class="telemetry-value" id="val-load">0.00 / 1.00</div>
                     </div>
-                    <div class="telemetry-item">
+                    <div class="telemetry-card">
                         <div class="telemetry-label">Held Object</div>
                         <div class="telemetry-value" id="val-held">None</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Interactive Actions -->
-            <div class="sidebar-section">
-                <h3>Interactive Actions</h3>
-                <div class="btn-group">
-                    <button onclick="runAutonomousDemo()" style="background: #059669;">
-                        ▶ Run Autonomous Recovery Demo
-                    </button>
-                    <button class="btn-warn" onclick="sendAction('perturb', {object_id: 'blue_cube_01', x: -30, y: 195})">
-                        ⚡ Simulate Judge Perturbation (Slide Cube)
-                    </button>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <button class="btn-outline" onclick="sendAction('pick', {x: -60, y: 180})">Pick Blue Cube</button>
-                        <button class="btn-outline" onclick="sendAction('place', {x: -130, y: 210})">Place Left Bin</button>
-                    </div>
-                    <button class="btn-outline" onclick="sendAction('home')">Reset Arm to Home</button>
-                </div>
-            </div>
-
-            <!-- Event Logs -->
-            <div class="sidebar-section" style="flex: 1;">
-                <h3>System Logs & MCP Stream</h3>
-                <div class="log-box" id="log-box">
-                    <div class="log-entry log-info">[INIT] Digital Twin initialized.</div>
-                    <div class="log-entry">[READY] Listening for MCP tool calls...</div>
-                </div>
+            <!-- Event Stream -->
+            <div class="panel-section" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="section-title">Live Terminal & Event Log</div>
+                <div class="log-box" id="log-box"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- 1. Three.js 3D Tabletop Setup ---
-        const canvas = document.getElementById('three-canvas');
-        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-        renderer.shadowMap.enabled = true;
-
+        // --- 1. Three.js Digital Twin Setup ---
+        const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0f1117);
+        scene.background = new THREE.Color(0x0a0c10);
 
-        const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
-        camera.position.set(0, 380, 360);
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 2000);
+        camera.position.set(0, 220, 480);
         camera.lookAt(0, 160, 20);
 
-        // Lights
-        const ambLight = new THREE.AmbientLight(0xffffff, 0.7);
-        scene.add(ambLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(100, 400, 200);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        dirLight.position.set(100, 300, 200);
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // Workbench Table (400x300mm)
-        const tableGeo = new THREE.BoxGeometry(400, 10, 300);
-        const tableMat = new THREE.MeshStandardMaterial({ color: 0x222634, roughness: 0.8 });
+        // Table
+        const tableGeo = new THREE.BoxGeometry(600, 10, 450);
+        const tableMat = new THREE.MeshStandardMaterial({ color: 0x1e222d, roughness: 0.8 });
         const table = new THREE.Mesh(tableGeo, tableMat);
-        table.position.set(0, -5, 170);
-        table.receiveShadow = true;
+        table.position.set(0, -5, 180);
         scene.add(table);
 
-        // Grid on table
-        const gridHelper = new THREE.GridHelper(360, 18, 0x3b82f6, 0x1f293d);
-        gridHelper.position.set(0, 0.1, 170);
-        scene.add(gridHelper);
+        const grid = new THREE.GridHelper(500, 25, 0x3b82f6, 0x1e293b);
+        grid.position.set(0, 0, 180);
+        scene.add(grid);
 
-        // Target Bins
-        function createBin(x, y, color, label) {
-            const binGeo = new THREE.BoxGeometry(70, 20, 70);
-            const binMat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.6 });
-            const bin = new THREE.Mesh(binGeo, binMat);
-            bin.position.set(x, 10, y);
-            scene.add(bin);
-            return bin;
-        }
-        createBin(-130, 210, 0x3b82f6, 'Left Bin');
-        createBin(130, 210, 0x10b981, 'Right Bin');
+        // Robot Base & Links
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x2563eb });
+        const linkMat = new THREE.MeshStandardMaterial({ color: 0x475569 });
+        const tipMat = new THREE.MeshStandardMaterial({ color: 0x10b981 });
 
-        // 3D Objects
-        const objectMeshes = {};
-        function createObjectMesh(id, color, rad) {
-            const geo = new THREE.CylinderGeometry(rad, rad, rad * 1.5, 16);
-            const mat = new THREE.MeshStandardMaterial({ color, metalness: 0.2, roughness: 0.4 });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.castShadow = true;
-            scene.add(mesh);
-            objectMeshes[id] = mesh;
-            return mesh;
-        }
-        createObjectMesh('blue_cube_01', 0x2563eb, 12);
-        createObjectMesh('green_tool_01', 0x10b981, 14);
-        createObjectMesh('red_cylinder_01', 0xef4444, 11);
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(35, 45, 15, 32), baseMat);
+        base.position.set(0, 7.5, 0);
+        scene.add(base);
 
-        // Simplified 7-DOF Robotic Arm Visualization (Base + Link segments + End Effector)
-        const armGroup = new THREE.Group();
-        scene.add(armGroup);
-
-        const baseGeo = new THREE.CylinderGeometry(30, 35, 20, 32);
-        const baseMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5 });
-        const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-        baseMesh.position.set(0, 10, 0);
-        armGroup.add(baseMesh);
-
-        // End-Effector / Gripper Mesh
-        const eeGeo = new THREE.SphereGeometry(10, 16, 16);
-        const eeMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
-        const eeMesh = new THREE.Mesh(eeGeo, eeMat);
-        eeMesh.position.set(0, 120, 140);
-        armGroup.add(eeMesh);
-
-        // Segment cylinder connecting base to EE
-        const linkGeo = new THREE.CylinderGeometry(6, 6, 1, 16);
-        const linkMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
-        const linkMesh = new THREE.Mesh(linkGeo, linkMat);
-        armGroup.add(linkMesh);
+        const link1 = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 120, 16), linkMat);
+        const link2 = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 120, 16), linkMat);
+        const link3 = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 80, 16), linkMat);
+        const eeTip = new THREE.Mesh(new THREE.SphereGeometry(12, 16, 16), tipMat);
+        scene.add(link1, link2, link3, eeTip);
 
         function updateArmGeometry(x, y, z) {
-            eeMesh.position.set(x, z, y);
-            
-            // Connect base (0, 20, 0) to EE
-            const start = new THREE.Vector3(0, 20, 0);
-            const end = new THREE.Vector3(x, z, y);
-            const dist = start.distanceTo(end);
-            linkMesh.scale.set(1, dist, 1);
-            linkMesh.position.copy(start).lerp(end, 0.5);
-            linkMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.clone().sub(start).normalize());
+            const shoulder = new THREE.Vector3(0, 30, 0);
+            const target = new THREE.Vector3(x, z, y);
+            eeTip.position.copy(target);
+
+            const mid1 = new THREE.Vector3().lerpVectors(shoulder, target, 0.35);
+            mid1.y += 40;
+            const mid2 = new THREE.Vector3().lerpVectors(shoulder, target, 0.70);
+            mid2.y += 20;
+
+            alignCylinder(link1, shoulder, mid1);
+            alignCylinder(link2, mid1, mid2);
+            alignCylinder(link3, mid2, target);
         }
 
-        // Orbit Interaction
-        let isDragging = false;
-        let prevMousePos = { x: 0, y: 0 };
-        canvas.addEventListener('mousedown', (e) => { isDragging = true; prevMousePos = { x: e.clientX, y: e.clientY }; });
-        window.addEventListener('mouseup', () => { isDragging = false; });
-        window.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            const deltaX = e.clientX - prevMousePos.x;
-            const deltaY = e.clientY - prevMousePos.y;
-            camera.position.x += deltaX * 0.5;
-            camera.position.y -= deltaY * 0.5;
-            camera.lookAt(0, 160, 20);
-            prevMousePos = { x: e.clientX, y: e.clientY };
-        });
-        canvas.addEventListener('wheel', (e) => {
-            camera.position.z += e.deltaY * 0.2;
-            camera.lookAt(0, 160, 20);
-        });
+        function alignCylinder(mesh, p1, p2) {
+            const dir = new THREE.Vector3().subVectors(p2, p1);
+            const len = dir.length();
+            mesh.scale.set(1, len / 120, 1);
+            mesh.position.copy(new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5));
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+        }
 
         function animate() {
             requestAnimationFrame(animate);
@@ -389,7 +428,7 @@
         }
         animate();
 
-        // --- 2. Live Telemetry Polling & Sync ---
+        // --- 2. Live Polling & Action Handling ---
         function appendLog(msg, type = 'info') {
             const box = document.getElementById('log-box');
             const div = document.createElement('div');
@@ -403,36 +442,35 @@
             try {
                 const res = await fetch('/api/state');
                 const data = await res.json();
-                
-                // Update Telemetry UI
+
+                const badge = document.getElementById('teleop-status-badge');
+                if (data.teleop_active) {
+                    badge.textContent = 'Teleop: ACTIVE (50Hz)';
+                    badge.style.background = '#065f46';
+                    badge.style.color = '#34d399';
+                } else {
+                    badge.textContent = 'Teleop: IDLE';
+                    badge.style.background = '#374151';
+                    badge.style.color = '#9ca3af';
+                }
+
                 const p = data.arm_pose;
                 document.getElementById('val-xyz').textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)} mm`;
                 document.getElementById('val-gripper').textContent = data.gripper_state > 0.5 ? 'OPEN' : 'CLOSED';
                 document.getElementById('val-load').textContent = `${data.gripper_load.toFixed(2)} / 1.00`;
                 document.getElementById('val-held').textContent = data.held_object || 'None';
 
-                // Update 3D Arm
                 updateArmGeometry(p.x, p.y, p.z);
 
-                // Update 3D Objects
-                for (const [id, obj] of Object.entries(data.objects)) {
-                    if (objectMeshes[id]) {
-                        objectMeshes[id].position.set(obj.x, obj.z, obj.y);
-                    }
-                }
-
-                // Update Camera Snapshot
                 if (data.camera_base64) {
-                    document.getElementById('camera-feed').src = 'data:image/png;base64,' + data.camera_base64;
+                    document.getElementById('camera-feed').src = 'data:image/jpeg;base64,' + data.camera_base64;
                 }
-            } catch (err) {
-                // server offline or reconnecting
-            }
+            } catch (err) {}
         }
         setInterval(fetchState, 500);
 
         async function sendAction(action, params = {}) {
-            appendLog(`Command sent: ${action} ${JSON.stringify(params)}`, 'info');
+            appendLog(`Action: ${action}`, 'info');
             try {
                 const res = await fetch('/api/command', {
                     method: 'POST',
@@ -440,17 +478,44 @@
                     body: JSON.stringify({ action, ...params })
                 });
                 const data = await res.json();
-                appendLog(`Result: ${data.status} (${JSON.stringify(data)})`, data.status.includes('ERROR') ? 'danger' : 'success');
+                const isErr = data.status && (data.status.includes('ERROR') || data.status.includes('FAILED'));
+                appendLog(`Response: ${data.status}`, isErr ? 'danger' : 'success');
+                if (data.output) {
+                    appendLog(data.output, 'info');
+                }
                 fetchState();
             } catch (err) {
-                appendLog(`Error: ${err.message}`, 'danger');
+                appendLog(`Network Error: ${err.message}`, 'danger');
             }
+        }
+
+        async function runCli(commandStr) {
+            appendLog(`$ ./cli.sh ${commandStr}`, 'warn');
+            await sendAction('run_cli', { command: commandStr });
+        }
+
+        async function executeCustomCli() {
+            const input = document.getElementById('cli-input');
+            const cmd = input.value.trim();
+            if (cmd) {
+                await runCli(cmd);
+                input.value = '';
+            }
+        }
+
+        async function teachWaypoint() {
+            const input = document.getElementById('teach-name');
+            const name = input.value.trim() || 'waypoint_1';
+            await sendAction('teach', { name });
+            input.value = '';
         }
 
         async function runAutonomousDemo() {
             appendLog('--- STARTING AUTONOMOUS STAGE DEMO ---', 'warn');
             await sendAction('run_demo');
         }
+
+        appendLog('Mission Control UI Loaded. Station connected.', 'success');
     </script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 This is the walkthrough for bringing the ElRobot up on the real arm through the NormaCore Station. Work top to bottom. `./cli.sh hw` always shows where you are.
 
-Sources (checked 2026-11-20): official repo `norma-core/norma-core` in `external/norma-core/`. ElRobot README, URDF joint limits (`hardware/elrobot/simulation/elrobot_follower.urdf`), and the teleop example for register map and safety margins.
+Sources (checked 2026-11-20): official repo `norma-core/norma-core` in `external/norma-core/` (git submodule, pinned to `5f4f805`). ElRobot README, URDF joint limits (`hardware/elrobot/simulation/elrobot_follower.urdf`), and the teleop example for register map and safety margins.
 
 ## Where things live
 
@@ -137,6 +137,6 @@ The mock table is still 400 × 300 mm. That is a separate simulation and does no
 | `reports fault status` | Servo error | `hw stop`, let it cool, check the cable. Don't force it |
 | `OVERLOAD` | Stalled under high current | Something is in the way, or the threshold is too low. Check, then probe again |
 | `Refused: moves larger than ... steps` (MCP `go_to_waypoint` only) | Waypoint too far for Claude's per-leg cap (`agent.max_waypoint_delta_steps`) | Route through `clear`, or move with `./cli.sh hw goto` |
-| `SDK import failed` | `external/norma-core` missing | Set `NORMACORE_ROOT`, or re-check the download |
+| `SDK import failed` | `external/norma-core` missing or empty | Run `git submodule update --init --recursive`, then `./cli.sh sdk-check`. `NORMACORE_ROOT` can point elsewhere. |
 
 Share a failure: `./cli.sh hw bundle`, then send the file it prints. It contains logs, config and state. Check it first, since it includes `station.yaml`.

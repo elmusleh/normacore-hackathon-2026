@@ -1,11 +1,27 @@
 ---
-last_agent: claude
-timestamp: 2026-11-21T15:00:00Z
-status: ready-for-hardware
-current_phase: "Phase 3: Agent Integration & Tabletop Primitives (partial)"
-current_task: "Real-arm MCP server built and tested offline; first session on the arm pending"
-stop_reason: needs-physical-arm
+last_agent: antigravity
+timestamp: 2026-11-21T15:46:00Z
+status: camera-feeding-pipeline-ready
+current_phase: "Phase 3: Agent Integration & Tabletop Primitives (Assistive Feeding)"
+current_task: "Camera-guided assistive feeding (grapes & spoon -> mouth) implemented and verified"
+stop_reason: ready-for-hardware-session
+hardware_owner: "steve"
+previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
+
+## Latest session (2026-11-21 afternoon): Camera-Guided Assistive Feeding (`./cli.sh feed`)
+
+- **What Changed:**
+  - Implemented `src/feeding_vision.py` (`FeedingVisionDetector` and `run_camera_feeding_cycle`): captures frames from `/dev/video4` (overhead tabletop camera, with fallback to `/dev/video2` or `MockStation`), detects the **bowl with grapes**, **spoon holder**, and **person's mouth** (with 5–10 cm standoff protection), draws live bounding boxes and feeding vector overlays, and orchestrates slave arm motions via `RobotTools` and `KinematicsSafetyEngine`.
+  - Added CLI runner script `scripts/camera_feed_arm.py` and `./cli.sh feed [grapes|spoon]`. By default runs in safe dry-run mode (not tested on the physical arm during this run because USB hub devices `/dev/video4` & `/dev/ttyACM*` disconnected mid-session); pass `--live-motion` when the arm is powered and USB hub is seated.
+  - Integrated one-click **🍇 Feed Grapes (Bowl -> Mouth)** and **🥄 Feed with Spoon (Scoop -> Mouth)** buttons and live detection overlay into the Mission Control Web Dashboard (`src/digital_twin.html`, `src/digital_twin_server.py`).
+  - Added unit and integration test `test_camera_feeding_vision_and_orchestration` in `tests/test_pipeline.py` (68 passed).
+- **Files Changed:** `src/feeding_vision.py` (new), `scripts/camera_feed_arm.py` (new), `cli.sh`, `src/digital_twin_server.py`, `src/digital_twin.html`, `tests/test_pipeline.py`, `.gitignore`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/PROGRESS.md`, `.ai-sync/HANDOFF.md`.
+- **Build Status:** `python3 -m pytest tests/` (68 passed, 1 skipped), `bash -n cli.sh` (OK), `py_compile` (OK). Not tested on the physical arm in this run (USB hub dropped `/dev/video4`, `/dev/video2`, `/dev/ttyACM0`, `/dev/ttyACM1`).
+- **Next Steps:**
+  1. Re-seat the USB hub cable so `/dev/video4` and `/dev/ttyACM0`–`1` reappear.
+  2. Teach the physical feeding waypoints (`./cli.sh hw teach zone_a_hover`, `zone_a`, `serve`, `spoon_holder`, `bowl_scoop`, `serve_spoon`).
+  3. Run `./cli.sh feed grapes --live-motion` (with one hand on the 12 V switch) or click **🍇 Feed Grapes** in `./cli.sh start`.
 
 ## Change (2026-11-21, 16:40): goto cap raised 600 -> 1500 steps
 - User request: `clear` <-> `grape_hover` needs ~777 steps on motor 2 and ~743 on motor 6, so the 600 cap refused it.
@@ -69,6 +85,55 @@ stop_reason: needs-physical-arm
 5. Set `ELROBOT_ALLOW_MOTION` to "1" in `.mcp.json` and run a single pick-and-place.
 
 ## What Was Completed (previous session)
+
+1. **Hardware Onboarding & Verification:**
+   - Identified follower arm bus `5B61037051` and leader/master arm bus `5B61034962`.
+   - Confirmed all 8 motors are visible, calibrated, and in clean 0x0 status via live Station.
+   - Updated `config/elrobot.json` with bus `5B61037051`.
+2. **Master -> Slave Real-time Teleop Sync:**
+   - Implemented `scripts/teleop_sync.py` and `./cli.sh teleop`.
+   - Tested live at 50Hz: mirrors joints 1-8 from Master (`5B61034962`) to Slave (`5B61037051`) with overload current protection (`threshold=150`).
+3. **Unified Web Mission Control (`./cli.sh start`):**
+   - Single command to boot Station daemon and the Web Mission Control at `http://localhost:8080`.
+   - Web UI integrates:
+     * One-click Teleop Start / Stop toggle
+     * Big Red Emergency E-Stop (cuts motor torque immediately)
+     * Live tabletop camera view with metric millimeter grid overlay
+     * Interactive 3D WebGL Digital Twin
+     * Quick waypoint buttons (`Home`, `Pick`, `Place`)
+     * One-click Judge Perturbation Recovery demo and Pytest execution
+4. **Cameras & Environment:**
+   - Downgraded user numpy to `numpy<2` (1.26.4) to resolve OpenCV ABI compatibility.
+   - Probed UVC cameras on `/dev/video2` and `/dev/video4`.
+   - Generated 4-corner AprilTags calibration sheet (`docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`).
+
+## Work In Progress
+
+- Tabletop camera homography calibration (place AprilTags in view of `/dev/video2` or `/dev/video4` and run `scripts/calibrate_camera.py`).
+- Teaching Cartesian pick/place waypoints for autonomous Claude/Codex agent execution.
+
+## Next Steps
+
+1. Run `./cli.sh teleop` for master-slave teleoperation demonstration.
+2. Place AprilTags on tabletop and complete homography calibration.
+3. Teach `home`, `pick`, and `place` waypoints using `./cli.sh hw teach <name>`.
+4. Test MCP server (`./cli.sh mcp`) connected to live Station runtime.
+
+## Files Modified/Created
+
+- `scripts/teleop_sync.py` (new): 50Hz master/slave mirroring with current overload guard.
+- `cli.sh`: added `teleop` command.
+- `config/elrobot.json`: locked follower bus serial to `5B61037051`.
+- `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`: printable marker sheet.
+- `.ai-sync/HANDOFF.md`, `.ai-sync/PROGRESS.md`, `CHANGELOG.md`, `SUGGESTIONS.md`.
+
+## Build Status
+
+- `python3 -m pytest tests/`: 44 passed.
+- `bash -n cli.sh`: OK.
+- `py_compile scripts/teleop_sync.py`: OK.
+
+## What Was Completed
 
 Hardware bridge, preflight, run logging and the hardware-day tool are all in place. This pass covered the four "not ready" items from the previous summary:
 
