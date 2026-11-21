@@ -16,7 +16,16 @@ hardware_owner: "steve"
 2. **Master -> Slave Real-time Teleop Sync:**
    - Implemented `scripts/teleop_sync.py` and `./cli.sh teleop`.
    - Tested live at 50Hz: mirrors joints 1-8 from Master (`5B61034962`) to Slave (`5B61037051`) with overload current protection (`threshold=150`).
-3. **Cameras & Environment:**
+3. **Unified Web Mission Control (`./cli.sh start`):**
+   - Single command to boot Station daemon and the Web Mission Control at `http://localhost:8080`.
+   - Web UI integrates:
+     * One-click Teleop Start / Stop toggle
+     * Big Red Emergency E-Stop (cuts motor torque immediately)
+     * Live tabletop camera view with metric millimeter grid overlay
+     * Interactive 3D WebGL Digital Twin
+     * Quick waypoint buttons (`Home`, `Pick`, `Place`)
+     * One-click Judge Perturbation Recovery demo and Pytest execution
+4. **Cameras & Environment:**
    - Downgraded user numpy to `numpy<2` (1.26.4) to resolve OpenCV ABI compatibility.
    - Probed UVC cameras on `/dev/video2` and `/dev/video4`.
    - Generated 4-corner AprilTags calibration sheet (`docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`).

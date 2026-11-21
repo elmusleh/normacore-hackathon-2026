@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `./cli.sh start`: single-command unified launcher that boots the Station daemon and serves the Mission Control Web UI at `http://localhost:8080`.
+- Web Mission Control Dashboard (`src/digital_twin.html` & `src/digital_twin_server.py`):
+  * Real-time Master/Slave teleop toggle (50Hz)
+  * Emergency E-Stop button (cuts motor torque)
+  * Live camera stream with metric mm grid overlay
+  * Quick waypoint actions (Home, Pick, Place)
+  * One-click Judge Perturbation Recovery demo and test suite trigger
 - `scripts/teleop_sync.py` and `./cli.sh teleop`: live 50Hz master/slave mirroring script mapping joint movements from Leader (`5B61034962`) to Follower (`5B61037051`) with overload protection and graceful torque shutdown on exit.
 - `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`: printable PDF containing standard 36h11 fiducial markers for overhead camera homography calibration.
 

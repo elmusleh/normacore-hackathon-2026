@@ -23,10 +23,14 @@ print_usage() {
     print_header
     echo -e "${C_BOLD}Usage:${C_RESET} ./cli.sh <command> [options]"
     echo ""
+    echo -e "${C_BOLD}Mission Control (Web & Unified):${C_RESET}"
+    echo -e "  ${C_CYAN}start [port]${C_RESET}        Launch unified Mission Control Web Dashboard & daemons (Default: 8080)"
+    echo -e "  ${C_GREEN}teleop${C_RESET}              Run Master -> Slave teleoperation loop in terminal"
+    echo -e "  ${C_YELLOW}station${C_RESET}             Launch official NormaCore Station binary (--web --tcp)"
+    echo ""
     echo -e "${C_BOLD}Testing & Simulation Commands:${C_RESET}"
     echo -e "  ${C_GREEN}test [filter]${C_RESET}       Run pytest test suite (e.g. ./cli.sh test test_kinematics)"
     echo -e "  ${C_GREEN}demo${C_RESET}                Run autonomous judge-perturbation recovery demo in terminal"
-    echo -e "  ${C_GREEN}digital-twin [port]${C_RESET} Launch 3D WebGL Digital Twin server (Default: http://localhost:8080)"
     echo -e "  ${C_GREEN}view-camera${C_RESET}         Capture and save fresh calibrated camera image to sample_calibrated_view.png"
     echo -e "  ${C_GREEN}apriltags${C_RESET}           Generate printable/screen-displayable 4-corner AprilTags sheet"
     echo ""
@@ -79,6 +83,25 @@ case "$COMMAND" in
     demo)
         echo -e "${C_GREEN}[+] Running Autonomous Recovery Demo...${C_RESET}"
         python3 src/agent_prompts.py
+        ;;
+
+    start|mission-control)
+        PORT="${1:-8080}"
+        echo -e "${C_CYAN}[+] Launching Unified NormaCore Mission Control (http://localhost:${PORT})...${C_RESET}"
+        
+        # Check if station is already running; if not, launch it
+        if ! ss -tulpn | grep -q ":8888"; then
+            echo -e "${C_YELLOW}[+] Starting background NormaCore Station daemon...${C_RESET}"
+            ./bin/station --web --tcp > /dev/null 2>&1 &
+            sleep 2
+        else
+            echo -e "${C_GREEN}[OK] NormaCore Station daemon already active on port 8888.${C_RESET}"
+        fi
+
+        if command -v xdg-open > /dev/null 2>&1; then
+            (sleep 1 && xdg-open "http://localhost:${PORT}") &
+        fi
+        python3 src/digital_twin_server.py "$PORT"
         ;;
 
     digital-twin)
