@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Check the start pose before each demo episode — Priority 75% (High value) [Best practices]
+   What: Before Enter starts an episode, show how far the follower is from the start anchor (for example `arm_rest`) and warn if it is far off.
+   Why: ACT learns much faster from 60-100 demos when every episode starts from the same pose; mixed starts waste demonstrations.
+   How: In `scripts/record_demos.py`, add `--start-anchor arm_rest`, read it from `config/envelope.json` anchors, print the largest motor difference before each episode, and warn above about 60 steps.
+   Status: ⏳ Unimplemented
+   Reason Deferred: First confirm the recorder works live and which start pose the team wants.
+
+2. Keep demo frames private and deletable — Priority 65% (Nice to have) [Security]
+   What: Write down who may copy `data/demos/`, and add `./cli.sh demos delete <episode>` for removing an episode where a person is visible.
+   Why: The table camera can show people sitting at the table. Training data tends to get copied to other laptops or uploaded, and frames of people should not leave the team.
+   How: Add a short "Privacy" paragraph to `docs/act_pick_skill.md` and a delete subcommand that removes one episode folder after a confirmation.
+   Status: ⏳ Unimplemented
+   Reason Deferred: No episodes are recorded yet.
+
+3. Preview an episode as a short video — Priority 50% (Nice to have) [Professionalism]
+   What: `./cli.sh demos preview <episode>` writes an MP4 of the camera frames with the joint values printed on them.
+   Why: Bad demos (shaky, a missed grasp, a camera frozen) are easy to spot in a 10-second clip and hard to spot in numbers; removing them improves the trained model.
+   How: Use PyAV (already in `.venv` for the console) to encode `frames/<camera>/*.jpg` at the recorded rate into `logs/preview-<episode>.mp4`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Useful once the first real episodes exist.
+
 1. Slow down and shrink nudges near the face anchor in code — Priority 85% (High value) [Security]
    What: When the arm is close to the recorded `face_standoff` anchor, let `nudge_joint` allow only 1-2% nudges at low speed, whatever Claude asks for.
    Why: The action space stops the arm going where the operator never went, but near the face the speed and step size are still Claude's choice. The plan requires code limits near a person (safety rule 4).
