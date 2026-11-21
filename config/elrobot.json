@@ -19,8 +19,8 @@
     "measured": false
   },
   "cameras": {
-    "table": "port:3-2.4",
-    "gripper": "port:3-2.2"
+    "table": "port:3-5.2.4",
+    "gripper": "port:3-5.2.2"
   },
   "camera_settings": {
     "table": {
@@ -28,6 +28,16 @@
     },
     "gripper": {
       "exposure": 14
+    }
+  },
+  "foods": {
+    "grapes": {
+      "sequence": "grapes",
+      "note": "picks one grape from the bowl and brings it to the person's mouth, then returns"
+    },
+    "chocolate": {
+      "sequence": "choc",
+      "note": "picks one piece of chocolate and brings it to the person's mouth, then returns"
     }
   }
 }
