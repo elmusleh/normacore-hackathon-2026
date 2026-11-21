@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `hw envelope record` skips samples where a motor reads outside its calibrated range (a read glitch put motor 2 = 0 into the first recording).
+- `config/envelope.json`: first action space, 1027 follower poses and 8 anchors, recorded with the leader arm 2026-11-21.
 - Action space recorded with the leader arm: `./cli.sh hw envelope record` samples the follower while a person drives it with teleop and marks named anchors (`config/envelope.json`, `src/action_space.py`). `nudge_joint` refuses nudges that would leave the recorded space (margin `agent.envelope_margin_steps`, 80 steps) unless they move back toward it; stepwise console mode requires a recording. New MCP tool `get_action_space` gives Claude the recorded ranges, anchors and the nudges that reach them.
 - Console stepwise mode (`./cli.sh console [port] --mode stepwise`, env `WEB_CONSOLE_MODE`): the person names a food and Claude steers the arm tick by tick (look, small `nudge_joint`, look) with no waypoints or recorded plans. Only six tools are exposed in this mode, up to 150 rounds per request. `./cli.sh console` now passes extra arguments to `src/web_console.py`.
 
