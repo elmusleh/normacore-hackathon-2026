@@ -23,8 +23,31 @@ python3 -m pytest tests/ -q
 ```
 Expect all tests to pass (44 at the last review). If not, stop and fix before going further.
 
-## 4. Station binary
-`bin/` is gitignored, so the binary is not in the repo. Download the Station release as described in [NormaCore_Repositories_and_Tooling.md](NormaCore_Repositories_and_Tooling.md) and place it at `bin/station`, then make it executable with `chmod +x bin/station`.
+## 4. NormaCore SDK and Station binary (must match)
+Both must come from NormaCore release **0.1.0-beta.10 (build 5f4f805)**. A mismatch can cause protocol or protobuf errors that look like hardware faults. Neither folder is in git (both are gitignored), so every machine needs the same copy.
+
+**a. SDK (`external/norma-core/`)**
+1. Get `norma-core-main.tar.gz` from the team's shared drive. Ask the team lead for the location.
+2. Check it is the right archive:
+   ```bash
+   sha256sum external/norma-core-main.tar.gz
+   # must print 0fb314f9ca41158bc42b9836467b162f0d5256e4118e56bfe6072eb93f17d829
+   ```
+3. Extract it and rename the folder:
+   ```bash
+   tar -xzf external/norma-core-main.tar.gz -C external/
+   mv external/norma-core-main external/norma-core
+   ```
+Do not regenerate `target/gen_python` (the generated protobuf code) with a different `protoc`.
+
+**b. Station binary (`bin/station`)**
+Download release v0.1.0-beta.10 as described in [NormaCore_Repositories_and_Tooling.md](NormaCore_Repositories_and_Tooling.md), place it at `bin/station`, then run `chmod +x bin/station`. Check it with `./bin/station --version`. It must print `0.1.0-beta.10 (5f4f805)`.
+
+**c. Verify both together**
+```bash
+./cli.sh sdk-check        # must end with RESULT: PASS
+```
+Run this after any SDK or Station change, and before a bench session. Do not start the Station if it fails. Record the result in `HANDOFF.md` if it fails.
 
 ## 5. Serial permissions (once per machine)
 ```bash
@@ -60,5 +83,6 @@ Record which serial number is which arm in `HANDOFF.md` once it is confirmed. As
 | Cameras missing after a USB drop | Reseat the cable, or try another port. Then restart the Station, because it does not recover on its own. |
 | Station exited | Restart it with `./cli.sh station`. Check `logs/station/` for the last error. |
 | Port 8888 not listening | The Station is not running. |
+| `./cli.sh sdk-check` fails | The SDK and Station are from different releases. Follow section 4 again, using the team's archive and binary. |
 
 If none of these fix it, record the symptom and the log path in `HANDOFF.md` under Blockers.

@@ -146,3 +146,24 @@
     How: Add a GitHub Actions workflow that runs `git rev-list --count HEAD..origin/main` on each pull request and posts a warning comment when the count is above a set limit, such as 20.
     Status: ⏳ Unimplemented
     Reason Deferred: Needs the repository to use GitHub Actions and pull requests. Nice to have once the team is using pull requests regularly.
+
+22. Pin the NormaCore SDK as a git submodule at commit 5f4f805 — Priority 84% (High value) [Best practices]
+    What: Make the SDK a git submodule of this repository, pointing at the exact NormaCore commit that matches the Station binary, so `git` fetches the same code on every machine.
+    Why: The SDK is currently a manual copy outside git. A teammate can end up with a different version, and the only check is `./cli.sh sdk-check`. A submodule records the exact commit in git, so a mismatch becomes a visible git change instead of a silent difference.
+    How: Confirm commit `5f4f805` exists upstream (it does: `norma-core/norma-core`, 2026-08-09). Then run `git submodule add https://github.com/norma-core/norma-core external/norma-core`, check out `5f4f805` inside it, commit the submodule pointer, and update `docs/team_setup.md` so teammates run `git submodule update --init`. Keep the tarball and checksum as a backup.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Changes the repository structure and the setup steps for every teammate. It needs the owner's approval before it is done. The tarball plus `sdk-check` is the fallback until then.
+
+23. Record the Station binary's checksum next to the SDK's — Priority 55% (Nice to have) [Security]
+    What: Store the SHA-256 of `bin/station` in the check script, so `sdk-check` also proves the binary is the one the team agreed on.
+    Why: The check currently confirms the version string the binary prints. A replaced binary that prints the same version would pass. A checksum closes that gap.
+    How: Run `sha256sum bin/station` on a known-good machine, add the value as a constant in `scripts/sdk_check.py`, and add a check that compares it.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Only useful once the team's Station binary is fixed and shared. Doing it now would lock in a binary that may still change.
+
+24. Guard the generated protobuf code against accidental regeneration — Priority 40% (Optional) [Professionalism]
+    What: A check that fails if `external/norma-core/target/gen_python` differs from the team's known copy.
+    Why: Regenerating the protobuf code with a different `protoc` version can break the message format quietly. A check catches that before a bench session.
+    How: Store a checksum of the generated folder's file list in `scripts/sdk_check.py` and compare it on each run.
+    Status: ⏳ Unimplemented
+    Reason Deferred: Low risk while nobody regenerates the code. Worth doing once the SDK is pinned (suggestion 22).

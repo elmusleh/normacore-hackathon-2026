@@ -56,6 +56,7 @@ print_usage() {
     echo ""
     echo -e "${C_BOLD}Team Sync:${C_RESET}"
     echo -e "  ${C_CYAN}sync${C_RESET}                Fetch, then fast-forward if clean and behind (never stashes or force-pulls)"
+    echo -e "  ${C_CYAN}sdk-check${C_RESET}           Read-only: SDK and Station must both be release 0.1.0-beta.10 (5f4f805)"
     echo ""
     echo -e "${C_BOLD}General Commands:${C_RESET}"
     echo -e "  ${C_CYAN}help${C_RESET}                Display this help menu"
@@ -148,6 +149,11 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
     sync)
         # Fetch and fast-forward before implementing. Never stashes or force-pulls.
         bash scripts/agent_sync.sh "$@"
+        ;;
+
+    sdk-check)
+        # Read-only: SDK version, imports, Station build and archive checksum must match.
+        python3 scripts/sdk_check.py "$@"
         ;;
 
     preflight)
