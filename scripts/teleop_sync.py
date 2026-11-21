@@ -65,13 +65,20 @@ async def identify_arms(client: Any) -> tuple[str, str]:
     serials = [b.get_bus().get_serial_number() for b in buses if b.get_bus()]
     logger.info(f"Connected arm buses: {serials}")
 
-    # Standard hackathon convention:
-    # 5B61034962 is Leader (Master)
-    # 5B61037051 is Follower (Slave)
-    # If different serials, fallback to calibration analysis
-    if "5B61034962" in serials and "5B61037051" in serials:
-        return "5B61034962", "5B61037051"
-    
+    # Load confirmed roles from config/elrobot.json (bus = Follower/Slave, leader_bus = Leader/Master)
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+        from elrobot_config import load_config
+        cfg = load_config().get("station", {})
+        cfg_follower = cfg.get("bus", "5B61034962")
+        cfg_leader = cfg.get("leader_bus", "5B61037051")
+    except Exception:
+        cfg_follower = "5B61034962"
+        cfg_leader = "5B61037051"
+
+    if cfg_leader in serials and cfg_follower in serials:
+        return cfg_leader, cfg_follower
+
     # Return first as leader, second as follower if unknown
     return serials[0], serials[1]
 
@@ -110,14 +117,22 @@ async def run_teleop_sync(leader_bus: str | None = None, follower_bus: str | Non
     )
     protections = ProtectionTable()
 
-    # Step 1: Read follower motor IDs and enable torque on Follower only
-    # (Master remains limp so the human can move it)
+    # Step 1: Explicitly disable torque on Leader (Master) so it is always smooth/free-moving,
+    # even if a teammate left torque ON earlier.
+    leader_b = next((b for b in (reader.latest.get_buses() or []) if b.get_bus() and b.get_bus().get_serial_number() == leader_bus), None)
+    if not leader_b:
+        raise RuntimeError(f"Leader bus {leader_bus} not found")
+    l_motor_ids = [m.get_id() for m in (leader_b.get_motors() or [])]
+    logger.info(f"Disabling torque on Leader/Master ({leader_bus}) motors: {l_motor_ids}")
+    await set_torque(client, leader_bus, l_motor_ids, enable=False)
+
+    # Step 2: Read follower motor IDs and enable torque on Follower (Slave) only
     follower_b = next((b for b in (reader.latest.get_buses() or []) if b.get_bus() and b.get_bus().get_serial_number() == follower_bus), None)
     if not follower_b:
         raise RuntimeError(f"Follower bus {follower_bus} not found")
-    
+
     f_motor_ids = [m.get_id() for m in (follower_b.get_motors() or [])]
-    logger.info(f"Enabling holding torque on Follower ({follower_bus}) motors: {f_motor_ids}")
+    logger.info(f"Enabling holding torque on Follower/Slave ({follower_bus}) motors: {f_motor_ids}")
     await set_torque(client, follower_bus, f_motor_ids, enable=True)
 
     loop = asyncio.get_running_loop()
@@ -183,8 +198,8 @@ def main():
     leader = args.leader
     follower = args.follower
     if args.swap:
-        leader = "5B61037051"
-        follower = "5B61034962"
+        leader = "5B61034962"
+        follower = "5B61037051"
 
     try:
         asyncio.run(run_teleop_sync(leader, follower))

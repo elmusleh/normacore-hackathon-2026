@@ -566,12 +566,20 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                 elif action == "teleop_start":
                     with teleop_lock:
                         if teleop_process is None or teleop_process.poll() is not None:
+                            st_cfg = load_config().get("station", {})
+                            leader_bus = st_cfg.get("leader_bus", "5B61037051")
+                            follower_bus = st_cfg.get("bus", "5B61034962")
                             teleop_process = subprocess.Popen(
-                                [sys.executable, "scripts/teleop_sync.py"],
+                                [
+                                    sys.executable,
+                                    "scripts/teleop_sync.py",
+                                    "--leader", leader_bus,
+                                    "--follower", follower_bus,
+                                ],
                                 stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL,
                             )
-                            res = {"status": "TELEOP_STARTED"}
+                            res = {"status": "TELEOP_STARTED", "leader": leader_bus, "follower": follower_bus}
                         else:
                             res = {"status": "TELEOP_ALREADY_RUNNING"}
 

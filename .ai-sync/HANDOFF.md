@@ -12,6 +12,7 @@ previous_session: antigravity 2026-11-21T17:25 — commit-and-push-policy-update
 ## Latest session (2026-11-21 evening): Dual Live Camera Dropdowns & Hardware Bring-Up
 
 - **What Changed:**
+  - Fixed inverted Leader/Follower roles in `scripts/teleop_sync.py` to read `leader_bus` (`5B61037051`) and `bus` (`5B61034962`) from `config/elrobot.json`, and enforced explicit `set_torque(..., enable=False)` on the Leader arm before enabling Follower torque on every teleop start. Updated `teleop_start` in `src/digital_twin_server.py` to pass `--leader` and `--follower` explicitly.
   - Raised `usb-video.resize_target` in `station.yaml` from `224` to `480` and restarted Station (`http://localhost:8889`) and Mission Control (`http://localhost:8080`). Note: `sudo apt-get install v4l-utils` requires interactive sudo password from the user to apply manual exposure (`./cli.sh cameras`).
   - Stacked `Table Cam` above `Person Cam` in `src/digital_twin.html` and added a **Save Default** button (`save_camera_defaults` in `src/digital_twin_server.py`) that persists the chosen cameras to `config/elrobot.json`.
   - Merged `origin/main` into `feat/agent-commit-and-push-policy` (bringing in `config/waypoints.json` with `clear` and `grape_hover`, `src/console_agent.py`, updated `scripts/hw_day.py`, and `src/web_console.py`).

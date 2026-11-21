@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Fixed inverted Master/Slave defaults in `scripts/teleop_sync.py` to load `leader_bus` (`5B61037051`) and follower `bus` (`5B61034962`) from `config/elrobot.json`, and enforced explicit `torque OFF` on the Leader arm before every teleop session (`scripts/teleop_sync.py`, `src/digital_twin_server.py`).
 - Raised `usb-video.resize_target` in `station.yaml` from `224` to `480` for clearer Station camera frames.
 - Stacked dual camera layout (`Table Cam` above `Person Cam`) and one-click **Save Default** button in Mission Control (`src/digital_twin.html`, `src/digital_twin_server.py`) that persists the selected camera mappings into `config/elrobot.json`.
 - Replaced the offline Three.js `<canvas>` mockup in Mission Control (`src/digital_twin.html`) with full-size dual live camera views (`Table Cam` + `Person Cam`), saved waypoint badges from `config/waypoints.json`, and clean role-specific real detections only (removed fake fallback `BOWL`/`SPOON`/`MOUTH` placeholder overlays in `src/digital_twin_server.py`).
