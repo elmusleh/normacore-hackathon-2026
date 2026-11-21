@@ -5,6 +5,8 @@ status: ready-for-hardware
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (partial)"
 current_task: "Real-arm MCP server built and tested offline; first session on the arm pending"
 stop_reason: needs-physical-arm
+hardware_owner: "steve"
+previous_session: antigravity 2026-11-21T11:35 — hardware-verified-teleop-active; master/slave teleop sync verified live; cameras probed
 ---
 
 ## Latest session (2026-11-21 evening): web console
@@ -41,6 +43,55 @@ stop_reason: needs-physical-arm
 5. Set `ELROBOT_ALLOW_MOTION` to "1" in `.mcp.json` and run a single pick-and-place.
 
 ## What Was Completed (previous session)
+
+1. **Hardware Onboarding & Verification:**
+   - Identified follower arm bus `5B61037051` and leader/master arm bus `5B61034962`.
+   - Confirmed all 8 motors are visible, calibrated, and in clean 0x0 status via live Station.
+   - Updated `config/elrobot.json` with bus `5B61037051`.
+2. **Master -> Slave Real-time Teleop Sync:**
+   - Implemented `scripts/teleop_sync.py` and `./cli.sh teleop`.
+   - Tested live at 50Hz: mirrors joints 1-8 from Master (`5B61034962`) to Slave (`5B61037051`) with overload current protection (`threshold=150`).
+3. **Unified Web Mission Control (`./cli.sh start`):**
+   - Single command to boot Station daemon and the Web Mission Control at `http://localhost:8080`.
+   - Web UI integrates:
+     * One-click Teleop Start / Stop toggle
+     * Big Red Emergency E-Stop (cuts motor torque immediately)
+     * Live tabletop camera view with metric millimeter grid overlay
+     * Interactive 3D WebGL Digital Twin
+     * Quick waypoint buttons (`Home`, `Pick`, `Place`)
+     * One-click Judge Perturbation Recovery demo and Pytest execution
+4. **Cameras & Environment:**
+   - Downgraded user numpy to `numpy<2` (1.26.4) to resolve OpenCV ABI compatibility.
+   - Probed UVC cameras on `/dev/video2` and `/dev/video4`.
+   - Generated 4-corner AprilTags calibration sheet (`docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`).
+
+## Work In Progress
+
+- Tabletop camera homography calibration (place AprilTags in view of `/dev/video2` or `/dev/video4` and run `scripts/calibrate_camera.py`).
+- Teaching Cartesian pick/place waypoints for autonomous Claude/Codex agent execution.
+
+## Next Steps
+
+1. Run `./cli.sh teleop` for master-slave teleoperation demonstration.
+2. Place AprilTags on tabletop and complete homography calibration.
+3. Teach `home`, `pick`, and `place` waypoints using `./cli.sh hw teach <name>`.
+4. Test MCP server (`./cli.sh mcp`) connected to live Station runtime.
+
+## Files Modified/Created
+
+- `scripts/teleop_sync.py` (new): 50Hz master/slave mirroring with current overload guard.
+- `cli.sh`: added `teleop` command.
+- `config/elrobot.json`: locked follower bus serial to `5B61037051`.
+- `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`: printable marker sheet.
+- `.ai-sync/HANDOFF.md`, `.ai-sync/PROGRESS.md`, `CHANGELOG.md`, `SUGGESTIONS.md`.
+
+## Build Status
+
+- `python3 -m pytest tests/`: 44 passed.
+- `bash -n cli.sh`: OK.
+- `py_compile scripts/teleop_sync.py`: OK.
+
+## What Was Completed
 
 Hardware bridge, preflight, run logging and the hardware-day tool are all in place. This pass covered the four "not ready" items from the previous summary:
 

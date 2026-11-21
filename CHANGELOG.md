@@ -12,10 +12,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Camera frames from Station `usbvideo/<hash>` queues (`src/elrobot_camera.py`), and `read_recent`/`read_first` queue reads in the hardware bridge.
 - `gripper`, `cameras` and `agent` sections in `config/elrobot.json` defaults.
 - `tests/test_robot_mcp.py` (14 tests: fake arm, camera decode against the SDK, tool registration). Guide `docs/mcp_server.md`.
+- `./cli.sh start`: single-command unified launcher that boots the Station daemon and serves the Mission Control Web UI at `http://localhost:8080`.
+- Web Mission Control Dashboard (`src/digital_twin.html` & `src/digital_twin_server.py`):
+  * Real-time Master/Slave teleop toggle (50Hz)
+  * Emergency E-Stop button (cuts motor torque)
+  * Live camera stream with metric mm grid overlay
+  * Quick waypoint actions (Home, Pick, Place)
+  * One-click Judge Perturbation Recovery demo and test suite trigger
+- `scripts/teleop_sync.py` and `./cli.sh teleop`: live 50Hz master/slave mirroring script mapping joint movements from Leader (`5B61034962`) to Follower (`5B61037051`) with overload protection and graceful torque shutdown on exit.
+- `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`: printable PDF containing standard 36h11 fiducial markers for overhead camera homography calibration.
 
 ### Changed
 - `.mcp.json` and `./cli.sh mcp` now run the real-arm server from `.venv`. Previously `.mcp.json` pointed at `src/mcp_server.py`, which is not an MCP server, so no tools registered.
 - `requirements.txt`: `mcp>=2.0.0`, numpy no longer capped below 2 (no 1.x wheels for Python 3.13).
+- `config/elrobot.json`: set default follower serial bus to `5B61037051`.
+- `cli.sh`: integrated `teleop` command.
+- Downgraded numpy to `<2` (1.26.4) to fix OpenCV ABI compatibility on Python 3.12.
+- `AGENTS.md`: every finished change is committed before reporting back (explicit paths, CHANGELOG entry, Conventional Commits). Added a team workflow: feature branches, pull requests, single hardware owner, calibration commits, and shared handoffs.
+- `AGENTS.md`: after each implementation, agents give 3 prioritized suggestions and record them in `SUGGESTIONS.md`.
+- `AGENTS.md`: added setup and safety pointers, where things live, a definition of done, testing, conventions, blocker reporting and privacy rules, plus shared-file etiquette for handoffs.
+- `external/norma-core` is now a git submodule of NormaCore (`norma-core/norma-core`), pinned to commit `5f4f805` (release 0.1.0-beta.10). Replaces the manually unpacked archive. `.gitignore` ignores `external/*` except the submodule.
+- `FINDINGS.md`: new file for verified observations, each with evidence and status. Rules stay in `GUIDELINES.md`, and ideas in `SUGGESTIONS.md`. `AGENTS.md` now lists where each kind of information belongs.
+- `scripts/sdk_check.py`: fails clearly when `external/norma-core` is the old unpacked copy, not the submodule. The old copy differs from `5f4f805` in about 50 files, so it is not supported.
+- `docs/team_setup.md`: the submodule is the only supported SDK source. The guide shows how to move an old unpacked copy aside.
+- `SUGGESTIONS.md`: restored the protobuf-regeneration guard as suggestion 27. It was removed by mistake, since it was never implemented.
+- `scripts/sdk_check.py` and `./cli.sh sdk-check`: read-only check that the SDK submodule is at the pinned commit with no local edits, that its version and two Python imports work, and that `bin/station` reports build 5f4f805. Never moves the arm.
+- `scripts/agent_sync.sh` (`./cli.sh sync`) also runs `git submodule update --init --recursive` after a pull.
+- `docs/team_setup.md`: clone with `--recurse-submodules`; section 4 is now the submodule pin plus the Station binary; new troubleshooting rows for an empty or dirty submodule.
+- `AGENTS.md`, `docs/elrobot_hardware_bridge.md`, `docs/NormaCore_Repositories_and_Tooling.md`: SDK location and pin updated. SDK pin changes must be their own approved commit.
+- `scripts/agent_sync.sh` and `./cli.sh sync`: fetch from origin, then fast-forward only when the tree is clean and the branch is behind. Never stashes, resets or force-pulls. Lists commits on `origin/main` since the branch split. Exit codes separate offline, dirty, diverged and no-upstream states. `AGENTS.md` On Start now requires running it before implementing.
+- New `docs/team_setup.md` (new-machine setup, serial permissions, cameras, common problems) and `docs/bench_safety.md` (before, during and after motion tests, stop procedure).
 
 ### Added (earlier)
 - Master CLI runner `cli.sh` providing commands for `test`, `demo`, `digital-twin`, `station`, `setup-serial`, `apriltags`, `view-camera`, `mcp`, and `urdf`.
