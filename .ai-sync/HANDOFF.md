@@ -1,13 +1,21 @@
 ---
 last_agent: claude
-timestamp: 2026-11-21T17:30:00Z
-status: stepwise-console-mode-ready-untested-on-arm
+timestamp: 2026-11-22T00:20:00
+status: apriltag-ik-calibration-ready-untested-on-arm
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (Assistive Feeding)"
-current_task: "Camera-guided assistive feeding (grapes & spoon -> mouth) implemented and verified"
+current_task: "AprilTag table frame + URDF IK (ACT dropped); bench calibration next"
 stop_reason: ready-for-hardware-session
 hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
+
+## Latest session (2026-11-22, ~00:20, claude for Jafer): AprilTag table frame + IK, ACT dropped
+- Decision by Jafer: reset the approach. ACT imitation learning is dropped. One AprilTag per table corner defines a table frame in mm; the arm moves to Cartesian (TCP) targets via URDF inverse kinematics. Plan doc has a decision banner; docs/act_pick_skill.md marked superseded.
+- Found and fixed: the tag sheet in docs (and the PDF made from it) were NOT AprilTags (hand-typed 8x8 grids), so they could never be detected. `scripts/generate_apriltags.py` now uses OpenCV's 36h11 bits, 80 mm default. **Reprint the tags.** New placement (seen from the person): 0 front-left, 1 front-right, 2 back-right, 3 back-left.
+- New, branch `feat/vision-apriltag-ik` (from `feat/console-face-camera`, not pushed): `src/tag_calibration.py`, `src/arm_kinematics.py`, `scripts/calib.py` (`./cli.sh calib layout|camera|zero|touch|fit|where|reach|pixel|show`), `docs/tcp_calibration.md`, `tests/test_calibration.py`, `tests/test_apriltags.py`. All read-only; `calib reach` only prints joint steps. No motion code changed.
+- Verified: 138 tests pass. Synthetic camera views: tags found also at 299x224, pixel -> table error < 3 mm; IK < 2 mm in ~10 ms; synthetic joint-zero/direction fit recovers directions and zeros within 8 steps. NOT run live: the Station did not answer a read-only `look('table')` within 25 s at ~23:50.
+- Next (hardware owner steve for steps 4-6): 1) Reprint tags (`./cli.sh apriltags`), tape them, measure centres + diagonals. 2) `./cli.sh calib layout ...`. 3) Station up, `./cli.sh calib camera`, check overlay, `--write`. 4) Arm in URDF zero pose, `calib zero --write`. 5) Touch each tag twice in two arm poses (`calib touch <id>`). 6) `calib fit --refine --write`; check `calib where` against the tape. 7) Commit `config/calibration.json` as a calibration commit. 8) Then write the Cartesian move command (needs Steve's review; motion code).
+- Hardware owner: steve (unchanged).
 
 ## Latest session (2026-11-21, ~22:35, claude for Jafer): camera picture enhancement
 - Request: "the camera still looks bad; enhance it so the robot reliably detects food". Branch `feat/console-face-camera` (not pushed).

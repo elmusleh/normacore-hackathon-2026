@@ -3,6 +3,15 @@
 **Read this first if you are a teammate or an AI agent working in this repo.** It replaces the earlier
 Cartesian pick_at/place_at plan. **Diagrams:** [FEEDING_ASSISTANT_DIAGRAMS.md](FEEDING_ASSISTANT_DIAGRAMS.md). Last updated 2026-11-21 (Saturday afternoon). Demo is Sunday.
 
+> **Decision 2026-11-21 late (Jafer): the ACT imitation-learning approach is dropped.** Motion now
+> targets come from one calibrated **table frame**: 4 AprilTags (36h11, IDs 0-3) on the table corners
+> give camera pixel -> table mm, fingertip touches give the arm base pose and joint zeros, and URDF
+> inverse kinematics turns a table point (x, y, z) into joint steps. Runbook: [tcp_calibration.md](tcp_calibration.md),
+> command `./cli.sh calib`. Where section 2 below says "no x/y/z control", this decision replaces it
+> once the calibration is measured (`config/calibration.json`, all `measured` flags true) and a
+> Cartesian move command has been reviewed by the hardware owner. Waypoints and recorded plans stay
+> as the fallback.
+
 ## 1. The goal
 
 An assistive feeding robot for a person who cannot move their arms. The person **says** what they want,

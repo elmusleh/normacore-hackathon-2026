@@ -17,7 +17,7 @@
 - [x] Connect ElRobot USB serial cable and execute `./scripts/setup_usb_serial.sh`
 - [x] Launch NormaCore Station Web console and verify joint zero positions
 - [x] First physical hardware move to safe clearance height / live teleoperation
-- [ ] Place 4 AprilTag markers at workspace corners and calibrate camera
+- [ ] Place 4 AprilTag markers at workspace corners and calibrate camera (code ready: `./cli.sh calib`, docs/tcp_calibration.md; reprint the tags first, the old sheet was not real AprilTags)
 
 ## Phase 3: Agent Integration & Tabletop Primitives — IN PROGRESS
 - [x] Joint-level hardware bridge to the Station SDK written (`src/elrobot_hardware.py`), unit-tested offline (44 tests pass in total).
@@ -53,9 +53,13 @@
 - [ ] Record the action space (teleop on, console closed) with anchors above_grape, lifted, face_standoff; commit config/envelope.json
 - [ ] Run stepwise mode on the arm: "I want a grape" end to end, hand on the 12 V switch
 - [x] ACT demo recorder `./cli.sh demos record` (reads only), runbook docs/act_pick_skill.md. NOT yet run against the live Station
-- [ ] Record 60-100 demos each: pick grape, pick chocolate
-- [ ] Convert demos to a LeRobot dataset and train ACT per skill (.venv-lerobot)
-- [ ] Policy runner with safety filter + MCP run_skill(skill, food); evaluate 20 attempts per food
+- [-] DROPPED 2026-11-21 (owner decision): record ACT demos, train ACT, policy runner. Replaced by AprilTag calibration + IK below
+- [x] AprilTag generator prints real 36h11 tags (`./cli.sh apriltags`, 80 mm default)
+- [x] Table frame + URDF FK/IK + base/joint-zero fit, read-only CLI `./cli.sh calib` (tested offline only)
+- [ ] Bench calibration per docs/tcp_calibration.md: layout, camera, zero, touches, fit --refine; commit config/calibration.json
+- [ ] Check `calib where` against the tape measure at 3+ spots (target: within ~1 cm)
+- [ ] Cartesian move command (table x,y,z -> IK -> clamped joint goals via move_and_watch), reviewed by the hardware owner
+- [ ] Vision: food pixel from the table camera -> table mm -> reach above it, fingers down
 - [ ] MCP command connection goes stale after a Station restart (reads work, writes do not land): reconnect it
 
 ## Phase 4: Closed-Loop Recovery & Stress Testing — PENDING

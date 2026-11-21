@@ -9,11 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - AprilTag table frame and TCP kinematics, reads only (`./cli.sh calib`, `scripts/calib.py`, runbook `docs/tcp_calibration.md`). `src/tag_calibration.py` detects 36h11 tags 0-3 (OpenCV aruco, upscales the Station's small frames), fits the pixel -> table-mm homography from tape-measured tag centres, checks it against the printed tag size, warns on a mirrored layout and draws a grid overlay into `data/calibration/`. `src/arm_kinematics.py` parses the follower URDF (motors 1-7) for forward kinematics, damped least squares IK with retries and an optional fingers-down constraint, steps <-> radians per motor, the arm base pose in the table frame from fingertip touches (2D Kabsch + z offset), and a fit of motor 2-4 zeros and motor 1-4 directions. Calibration lives in `config/calibration.json`. `calib reach` prints the joint steps for a table point; nothing moves the arm yet. The tag sheet now places tag 0 front-left, 1 front-right, 2 back-right, 3 back-left (seen from the person), so the table frame is right-handed with z up. Tests: `tests/test_calibration.py`.
-
-### Fixed
-- `scripts/generate_apriltags.py` (`./cli.sh apriltags`) printed hand-typed patterns that are not AprilTags (8x8 inner grid; real 36h11 is 6x6), so no detector could read them. This includes `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`. The generator now takes the bits from OpenCV's 36h11 dictionary, defaults to an 80 mm black square (`--size-mm`) so tags stay readable in the Station's 299x224 frames, and keeps a white margin. Reprint the tags. Test: `tests/test_apriltags.py`.
-
-### Added
 - Camera picture enhancement for food detection (`src/frame_enhance.py`): `look()` (MCP tool and console tiles) now denoises, white-balances against the table, applies auto gamma, CLAHE local contrast and light sharpening (~9 ms per 299x224 frame). Settings in `config/elrobot.json` → `camera_enhance` (defaults in `src/elrobot_config.py`, per-camera overrides). `look(raw=True)` / `/frame/<cam>?raw=1` return the untouched frame. Each look reports `exposure` (mean, pure-white and black share) and an `exposure_warning` when the camera is over- or underexposed. ACT demo recordings stay raw.
 - `./cli.sh cameras --tune [name] [--write]`: sweeps exposure on a camera (Station stopped), measures each picture and recommends (or saves) the best exposure. `camera_settings.<name>.controls` applies any other V4L2 control (gain, white balance, backlight compensation); controls a camera lacks are skipped.
 - Camera ports in `config/elrobot.json` moved to `3-1.x` after the USB hub was replugged into another laptop port (table 3-1.2.2, gripper 3-1.2.4, face 3-1.3).
@@ -29,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.mcp.json`: `ELROBOT_ALLOW_MOTION` set to `"1"`, so Claude's MCP tools move the real arm (was dry-run).
 
 ### Fixed
+- `scripts/generate_apriltags.py` (`./cli.sh apriltags`) printed hand-typed patterns that are not AprilTags (8x8 inner grid; real 36h11 is 6x6), so no detector could read them. This includes `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`. The generator now takes the bits from OpenCV's 36h11 dictionary, defaults to an 80 mm black square (`--size-mm`) so tags stay readable in the Station's 299x224 frames, and keeps a white margin. Reprint the tags. Test: `tests/test_apriltags.py`.
 - Leader/follower serial roles were swapped in `scripts/teleop_sync.py` (it drove the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` and `docs/team_setup.md`. Confirmed on the arm 2026-11-21: follower `5B61034962`, leader `5B61037051`.
 
 ### Added

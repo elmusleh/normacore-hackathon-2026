@@ -1,5 +1,8 @@
 # ACT pick skill: grape or chocolate (imitation learning)
 
+> **Superseded 2026-11-21 late:** the team dropped ACT in favour of AprilTag calibration + IK
+> ([tcp_calibration.md](tcp_calibration.md)). Kept for history; the recorder still works.
+
 Decided 2026-11-21 (Jafer, Christian): Claude keeps deciding **what** to pick from the chat
 ("I want grapes" -> grape). A learned **ACT** policy does the **moving**, trained on leader-arm
 demonstrations. One ACT model per skill. First skills: `pick grape`, `pick chocolate`.

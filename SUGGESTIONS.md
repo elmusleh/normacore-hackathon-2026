@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Add a hard table-height floor to every IK target — Priority 92% (Critical) [Security]
+   What: Before any Cartesian move, check that every point on the planned path stays a few millimetres above the table and inside the tag rectangle, and refuse the move otherwise.
+   Why: A wrong joint zero or a typo in a target can send the fingertips into the table or the bowl. The arm already hit the table once (motor 2, 2026-11-21). A check in code catches this before a motor moves, whatever Claude or a person asks for.
+   How: In `src/arm_kinematics.py`, add a function that samples FK along the straight line in joint space from the current pose to the IK goal (e.g. 20 steps) and returns the lowest fingertip z in the table frame. In the future Cartesian move command, refuse when it is below `workspace.z_table_floor_mm` or outside the tag rectangle plus a margin. Add a unit test with a target below the table.
+   Status: ⏳ Unimplemented
+   Reason Deferred: There is no Cartesian move command yet; add the check in the same change that adds it.
+
+2. Re-check the camera calibration automatically on every look — Priority 72% (High value) [Best practices]
+   What: Each time the table camera is used for coordinates, detect the four tags again and compare their pixel positions with the ones saved at calibration time.
+   Why: If someone bumps the camera or a tag, every coordinate silently shifts by centimetres. A quick check turns that into a clear warning ("camera moved 14 px, run calib camera") instead of a missed grape.
+   How: `config/calibration.json` already stores `camera.centers_px`. Write a small function in `src/tag_calibration.py` that runs `detect_tags`, scales to the saved image size, and returns the largest shift in pixels; call it before `pixel_to_table` in the vision code and warn above ~5 px.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the first real camera calibration to pick a sensible threshold.
+
+3. Save each bench calibration run as a small report — Priority 45% (Nice to have) [Professionalism]
+   What: When `calib fit --write` runs, also write a dated text report (points, per-point errors, joint zeros, overlay path) into `docs/calibration_runs/`.
+   Why: Judges and teammates can see how accurate the arm really is, and if accuracy gets worse later you can compare against the earlier run instead of guessing.
+   How: In `scripts/calib.py` `cmd_fit`, after saving, format the printed numbers into a Markdown file named by date. No camera images in it (people can appear in frames); link to `data/calibration/` only by file name.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Only useful once real touch points exist.
+
 1. Put a matte, darker cloth on the table — Priority 88% (High value) [Best practices]
    What: Replace the bright white table cover with a matte mid-grey or dark-blue cloth or card.
    Why: On white, 47-62% of the table and gripper pictures are pure white (measured 2026-11-21), and a pale green grape almost disappears. No software can recover pure-white pixels; a darker, non-shiny surface gives the grape and bowls clear edges for Claude and for the ACT policy.
