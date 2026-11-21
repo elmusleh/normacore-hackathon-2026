@@ -373,50 +373,70 @@ class CameraHub:
                     standoff_txt = "STOP: AT STANDOFF" if at_standoff else f"{extra.get('standoff_cm', '?')}cm (SAFE)"
                     parts.append(f"[{detector_name}] Mouth {mouth_tag}{mar_tag} — {standoff_txt}")
             else:
-                # Table camera: only draw real detections (never fake fallback placeholders)
-                bowl = feeding_detector.detect_grape_bowl(frame)
-                if bowl and not (bowl.extra or {}).get("fallback", False):
-                    u, v, w, h = bowl.u_px, bowl.v_px, bowl.width_px, bowl.height_px
-                    cv2.rectangle(annotated_bgr, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), (180, 60, 240), 2)
-                    cv2.putText(
-                        annotated_bgr,
-                        f"BOWL ({int(bowl.confidence * 100)}%)",
-                        (max(8, u - 45), max(22, v - h // 2 - 8)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        (180, 60, 240),
-                        2,
-                    )
-                    det_dict["grape_bowl"] = {
-                        "label": bowl.label,
-                        "u_px": u,
-                        "v_px": v,
-                        "confidence": round(float(bowl.confidence), 2),
-                        "extra": dict(bowl.extra or {}),
-                    }
-                    parts.append(f"bowl ({int(bowl.confidence * 100)}%)")
-
-                spoon = feeding_detector.detect_spoon(frame)
-                if spoon and not (spoon.extra or {}).get("fallback", False):
-                    u, v, w, h = spoon.u_px, spoon.v_px, spoon.width_px, spoon.height_px
-                    cv2.rectangle(annotated_bgr, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), (50, 210, 100), 2)
-                    cv2.putText(
-                        annotated_bgr,
-                        f"SPOON ({int(spoon.confidence * 100)}%)",
-                        (max(8, u - 45), max(22, v - h // 2 - 8)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        (50, 210, 100),
-                        2,
-                    )
-                    det_dict["spoon"] = {
-                        "label": spoon.label,
-                        "u_px": u,
-                        "v_px": v,
-                        "confidence": round(float(spoon.confidence), 2),
-                        "extra": dict(spoon.extra or {}),
-                    }
-                    parts.append(f"spoon ({int(spoon.confidence * 100)}%)")
+                # Table camera: prefer MediaPipe ObjectDetector (zero false positives on robot wires!)
+                if feeding_detector._object_detector is not None:
+                    mp_targets = feeding_detector.detect_table_objects(frame)
+                    for idx, t in enumerate(mp_targets):
+                        u, v, w, h = t.u_px, t.v_px, t.width_px, t.height_px
+                        extra = dict(t.extra or {})
+                        color = (180, 60, 240) if t.label == "bowl" else (50, 210, 100)
+                        cv2.rectangle(annotated_bgr, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), color, 2)
+                        tag = f"{t.label.upper()} ({int(t.confidence * 100)}%)"
+                        if extra.get("food_piece_count"):
+                            tag += f" [{extra['food_piece_count']} pcs]"
+                        cv2.putText(
+                            annotated_bgr,
+                            tag,
+                            (max(8, u - w // 2), max(22, v - h // 2 - 6)),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            color,
+                            2,
+                        )
+                        if extra.get("best_food_px"):
+                            fu, fv, fw, fh = extra["best_food_px"]
+                            cv2.circle(annotated_bgr, (fu, fv), 5, (0, 255, 255), -1)
+                            cv2.rectangle(
+                                annotated_bgr,
+                                (fu - fw // 2, fv - fh // 2),
+                                (fu + fw // 2, fv + fh // 2),
+                                (0, 255, 255),
+                                1,
+                            )
+                        det_dict[f"{t.label}_{idx}"] = {
+                            "label": t.label,
+                            "u_px": u,
+                            "v_px": v,
+                            "confidence": t.confidence,
+                            "extra": extra,
+                        }
+                        if extra.get("food_piece_count"):
+                            parts.append(f"[mediapipe] {t.label} ({int(t.confidence * 100)}%, {extra['food_piece_count']} food pcs)")
+                        else:
+                            parts.append(f"[mediapipe] {t.label} ({int(t.confidence * 100)}%)")
+                else:
+                    # Fallback if MediaPipe ObjectDetector model is missing
+                    bowl = feeding_detector.detect_grape_bowl(frame)
+                    if bowl and not (bowl.extra or {}).get("fallback", False):
+                        u, v, w, h = bowl.u_px, bowl.v_px, bowl.width_px, bowl.height_px
+                        cv2.rectangle(annotated_bgr, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), (180, 60, 240), 2)
+                        cv2.putText(
+                            annotated_bgr,
+                            f"BOWL ({int(bowl.confidence * 100)}%)",
+                            (max(8, u - 45), max(22, v - h // 2 - 8)),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            (180, 60, 240),
+                            2,
+                        )
+                        det_dict["grape_bowl"] = {
+                            "label": bowl.label,
+                            "u_px": u,
+                            "v_px": v,
+                            "confidence": round(float(bowl.confidence), 2),
+                            "extra": dict(bowl.extra or {}),
+                        }
+                        parts.append(f"bowl ({int(bowl.confidence * 100)}%)")
 
         if parts:
             summary = ", ".join(parts)

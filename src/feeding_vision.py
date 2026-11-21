@@ -47,6 +47,11 @@ MAR_OPEN_THRESHOLD = 0.26
 MOUTH_OPEN_DEBOUNCE_FRAMES = 3
 FACE_WATCHDOG_TIMEOUT_S = 0.5
 DEFAULT_FACE_LANDMARKER_MODEL = Path(__file__).resolve().parent.parent / "data" / "face_landmarker.task"
+DEFAULT_OBJECT_DETECTOR_MODEL = Path(__file__).resolve().parent.parent / "data" / "efficientdet_lite0.tflite"
+TABLE_RELEVANT_LABELS = {
+    "bowl", "cup", "spoon", "fork", "knife", "bottle",
+    "apple", "orange", "banana", "broccoli", "carrot", "cake", "donut", "sandwich", "pizza",
+}
 
 # MediaPipe FaceLandmarker lip landmark indices
 LM_UPPER_INNER_LIP = 13
@@ -237,6 +242,26 @@ class FeedingVisionDetector:
         self.mouth_tracker = MouthStateTracker(mar_threshold=mar_thr)
         self.safety_fsm = FeedingSafetyFSM()
         self._landmarker = self._load_mediapipe_landmarker()
+        self._object_detector = self._load_mediapipe_object_detector()
+
+    @staticmethod
+    def _load_mediapipe_object_detector():
+        """Load MediaPipe ObjectDetector (EfficientDet-Lite0) if available in data/."""
+        if not DEFAULT_OBJECT_DETECTOR_MODEL.is_file():
+            return None
+        try:
+            from mediapipe.tasks import python as mp_python
+            from mediapipe.tasks.python import vision as mp_vision
+
+            opts = mp_vision.ObjectDetectorOptions(
+                base_options=mp_python.BaseOptions(model_asset_path=str(DEFAULT_OBJECT_DETECTOR_MODEL)),
+                score_threshold=0.25,
+                max_results=10,
+            )
+            return mp_vision.ObjectDetector.create_from_options(opts)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("MediaPipe ObjectDetector unavailable, using OpenCV fallback: %s", exc)
+            return None
 
     def set_calibration(
         self,
@@ -303,6 +328,89 @@ class FeedingVisionDetector:
         x_mm = ((u - 320) / 280.0) * 200.0
         y_mm = 80.0 + ((440 - v) / 400.0) * 200.0
         return round(x_mm, 1), round(y_mm, 1)
+
+    def detect_table_objects(self, bgr: np.ndarray) -> List[DetectedTarget]:
+        """Detect real bowls, utensils, and food items via MediaPipe ObjectDetector.
+
+        Inside any detected 'bowl', also locates the largest distinct food piece
+        (grape, chocolate piece, etc.) via inner-ROI contrast segmentation.
+        Returns an empty list when MediaPipe is loaded and sees no real tabletop items
+        (avoiding false positives on robot wires/background).
+        """
+        if self._object_detector is None:
+            return []
+        try:
+            import mediapipe as mp
+
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+            mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+            result = self._object_detector.detect(mp_img)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("MediaPipe detect_table_objects failed: %s", exc)
+            return []
+
+        targets: List[DetectedTarget] = []
+        h_img, w_img = bgr.shape[:2]
+
+        for det in result.detections or []:
+            if not det.categories:
+                continue
+            cat = det.categories[0]
+            name = (cat.category_name or "").lower()
+            score = round(float(cat.score), 2)
+            if name not in TABLE_RELEVANT_LABELS:
+                continue
+
+            bb = det.bounding_box
+            x0 = max(0, int(bb.origin_x))
+            y0 = max(0, int(bb.origin_y))
+            bw = max(1, int(bb.width))
+            bh = max(1, int(bb.height))
+            u = min(w_img - 1, x0 + bw // 2)
+            v = min(h_img - 1, y0 + bh // 2)
+            x_mm, y_mm = self.pixel_to_mm(u, v)
+
+            extra: Dict[str, Any] = {"detector": "mediapipe", "category": name}
+
+            # Inside a detected bowl, look for distinct food pieces (grapes / chocolate pieces)
+            if name == "bowl" and bw >= 24 and bh >= 24:
+                pad_x = max(4, int(bw * 0.15))
+                pad_y = max(4, int(bh * 0.15))
+                rx0, ry0 = min(w_img - 1, x0 + pad_x), min(h_img - 1, y0 + pad_y)
+                rx1, ry1 = max(rx0 + 1, min(w_img, x0 + bw - pad_x)), max(ry0 + 1, min(h_img, y0 + bh - pad_y))
+                roi = bgr[ry0:ry1, rx0:rx1]
+                if roi.size > 0:
+                    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                    # Dark/colored pieces (chocolate, purple/green grapes) contrast against a light bowl
+                    _, thresh = cv2.threshold(gray_roi, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+                    cnts, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    roi_area = float(roi.shape[0] * roi.shape[1])
+                    pieces = []
+                    for c in cnts:
+                        a = cv2.contourArea(c)
+                        if 25.0 <= a <= roi_area * 0.45:
+                            px, py, pw, ph = cv2.boundingRect(c)
+                            pieces.append((a, rx0 + px + pw // 2, ry0 + py + ph // 2, pw, ph))
+                    pieces.sort(key=lambda item: item[0], reverse=True)
+                    if pieces:
+                        _, fu, fv, fw, fh = pieces[0]
+                        extra["food_piece_count"] = len(pieces)
+                        extra["best_food_px"] = (int(fu), int(fv), int(fw), int(fh))
+
+            targets.append(
+                DetectedTarget(
+                    label=name,
+                    u_px=u,
+                    v_px=v,
+                    x_mm=x_mm,
+                    y_mm=y_mm,
+                    width_px=bw,
+                    height_px=bh,
+                    confidence=score,
+                    extra=extra,
+                )
+            )
+        return targets
 
     def detect_grape_bowl(self, bgr: np.ndarray) -> Optional[DetectedTarget]:
         """Locate the bowl with grapes by color segmentation (purple/dark-red/blue-green cluster) or circle contour."""
