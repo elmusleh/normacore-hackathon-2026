@@ -125,8 +125,10 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         ;;
 
     mcp)
-        echo -e "${C_CYAN}[+] Starting MCP server (stdin/stdout)...${C_RESET}"
-        python3 src/mcp_server.py
+        # stdout carries the MCP protocol, so messages go to stderr.
+        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        echo -e "${C_CYAN}[+] Starting ElRobot MCP server (stdio, motion ${ELROBOT_ALLOW_MOTION:-0})...${C_RESET}" >&2
+        exec "$PY" src/robot_mcp_server.py
         ;;
 
     urdf)

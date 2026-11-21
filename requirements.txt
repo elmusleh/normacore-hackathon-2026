@@ -2,7 +2,7 @@
 # Python 3.10+ compatible
 
 # Core Numerics & Vision
-numpy>=1.26.0,<2.0.0
+numpy>=1.26.0
 opencv-python>=4.8.0.76
 Pillow>=10.2.0
 
@@ -11,7 +11,7 @@ pyserial>=3.5
 protobuf>=4.25.0
 
 # AI Agent & Model Context Protocol
-mcp>=1.0.0
+mcp>=2.0.0  # MCPServer API (FastMCP was renamed in 2.x)
 
 # Testing & Verification
 pytest>=7.4.0

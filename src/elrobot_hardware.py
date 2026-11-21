@@ -340,6 +340,28 @@ class ElRobotHardware:
         self.log.debug("snapshot: motors on bus %s; ElRobot motors read %s", seen, sorted(readings))
         return readings
 
+    async def read_recent(self, queue_id: str, back: int = 1, timeout_s: float = 3.0) -> Optional[bytes]:
+        """Raw bytes of the entry `back` places from the end of a queue (1 = newest). Read-only.
+
+        Returns None if the queue has no such entry. Used for camera frames, which live in
+        their own `usbvideo/<hash>` queues next to st3215/inference.
+        """
+        qr = self.client.read_from_tail(queue_id, offset=int(back).to_bytes(8, "little"),
+                                        limit=1, step=1, buf_size=1)
+        entry = await asyncio.wait_for(qr.data.get(), timeout=timeout_s)
+        if entry is None:
+            if qr.err is not None:
+                self.log.debug("read_recent %s back=%d: %r", queue_id, back, qr.err)
+            return None
+        return bytes(entry.Data)
+
+    async def read_first(self, queue_id: str, timeout_s: float = 3.0) -> Optional[bytes]:
+        """Raw bytes of the oldest entry in a queue. Read-only."""
+        qr = self.client.read_from_offset(queue_id, offset=(0).to_bytes(8, "little"),
+                                          limit=1, step=1, buf_size=1)
+        entry = await asyncio.wait_for(qr.data.get(), timeout=timeout_s)
+        return None if entry is None else bytes(entry.Data)
+
     # -- writes -------------------------------------------------------------
 
     async def set_torque(self, motor_ids: List[int], enable: bool) -> None:
@@ -549,6 +571,12 @@ class ElRobotHardwareSync:
 
     def snapshot(self) -> Dict[int, MotorReading]:
         return self._run(self._hw.read())
+
+    def read_recent(self, queue_id: str, back: int = 1, timeout_s: float = 3.0) -> Optional[bytes]:
+        return self._run(self._hw.read_recent(queue_id, back, timeout_s), timeout=timeout_s + 2)
+
+    def read_first(self, queue_id: str, timeout_s: float = 3.0) -> Optional[bytes]:
+        return self._run(self._hw.read_first(queue_id, timeout_s), timeout=timeout_s + 2)
 
     def set_torque(self, motor_ids: List[int], enable: bool) -> None:
         self._run(self._hw.set_torque(motor_ids, enable))

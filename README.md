@@ -40,7 +40,7 @@ You can test the entire pipeline on your laptop **right now** before touching ph
 ```
 
 ### 4. Connect to Claude Code / Cursor / Codex via MCP
-This repo includes a pre-configured `.mcp.json` file. When you open this folder in Claude Code or Cursor, the tools (`get_calibrated_view`, `pick_at`, `place_at`, `verify_grasp`, `reset_home`) are automatically registered!
+`.mcp.json` registers the `elrobot` server ([src/robot_mcp_server.py](src/robot_mcp_server.py)) for the **real arm**: `look`, `get_robot_state`, `go_to_waypoint`, `set_gripper`, `nudge_joint`, `stop` and more. It needs `.venv` with `mcp>=2` and a running Station. Motion is off until `ELROBOT_ALLOW_MOTION=1`. Setup and tool list: [docs/mcp_server.md](docs/mcp_server.md). The Cartesian simulator tools (`pick_at`, `place_at`) live in `src/mcp_server.py` and run only in the offline demo.
 
 ---
 

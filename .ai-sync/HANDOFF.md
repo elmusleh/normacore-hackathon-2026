@@ -1,13 +1,28 @@
 ---
 last_agent: claude
-timestamp: 2026-11-20T23:10:00Z
+timestamp: 2026-11-21T12:00:00Z
 status: ready-for-hardware
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (partial)"
-current_task: "Hardware-day tooling complete and tested offline; first run on the real arm pending"
+current_task: "Real-arm MCP server built and tested offline; first session on the arm pending"
 stop_reason: needs-physical-arm
 ---
 
-## What Was Completed
+## Latest session (2026-11-21, jaferub's laptop)
+
+- Environment: `bin/station` (v0.1.0-beta.10, asset is `station-linux-amd64.tar.gz`, not x86_64) and `external/norma-core` (commit 6b494f7) set up. `.venv` with `mcp` 2.3, pytest, numpy 2, pillow. Run tests with `.venv/bin/python -m pytest tests/` (58 pass).
+- Built the real MCP server: `src/robot_mcp_server.py` (stdio, mcp 2.x `MCPServer`), logic in `src/robot_tools.py`, camera decoding in `src/elrobot_camera.py`. `.mcp.json` now runs it. Guide: `docs/mcp_server.md`.
+- The old `src/mcp_server.py` was never an MCP server (plain class); it stays for the offline simulator demo and tests.
+- Verified over stdio with a real MCP client: 10 tools register; without a Station, tools return a clear connection error.
+- Station facts found: cameras are `usbvideo/<md5>` queues of JPEG frames (resize_target 224 by default); teleop is built into the Station viewer (follower bus card dropdown → leader serial); ElRobot auto-calibration needs >= 7.0 V, so the 5 V leader is calibrated by hand.
+
+### Next steps
+1. Station + arm connected: in Claude Code, `/mcp` → elrobot connected; `get_robot_state`, `list_cameras`, `look`.
+2. Name cameras in `config/elrobot.json` → `cameras`; raise `resize_target` in `station.yaml` to ~480.
+3. Verify gripper direction (`./cli.sh hw identify 8`), set `gripper.open_at` and `verified`.
+4. Teach `clear`, `home`, `pick_<n>_hover`/`pick_<n>`, `bin_a`, `bin_b`. Probe gripper current.
+5. Set `ELROBOT_ALLOW_MOTION` to "1" in `.mcp.json` and run a single pick-and-place.
+
+## What Was Completed (previous session)
 
 Hardware bridge, preflight, run logging and the hardware-day tool are all in place. This pass covered the four "not ready" items from the previous summary:
 

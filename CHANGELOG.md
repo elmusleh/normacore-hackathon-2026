@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Real MCP server for the physical arm, `src/robot_mcp_server.py` (mcp 2.x `MCPServer`, stdio), with tool logic in `src/robot_tools.py`: `look`, `list_cameras`, `get_robot_state`, `list_waypoints`, `go_to_waypoint`, `nudge_joint`, `set_gripper`, `stop`, `enable_torque`, `teach_waypoint`. Motion is off unless `ELROBOT_ALLOW_MOTION=1`; waypoint moves route through `clear`; nudges capped at 5%; Claude cannot turn torque off. Gripper stall while closing is reported as `holding_object`.
+- Camera frames from Station `usbvideo/<hash>` queues (`src/elrobot_camera.py`), and `read_recent`/`read_first` queue reads in the hardware bridge.
+- `gripper`, `cameras` and `agent` sections in `config/elrobot.json` defaults.
+- `tests/test_robot_mcp.py` (14 tests: fake arm, camera decode against the SDK, tool registration). Guide `docs/mcp_server.md`.
+
+### Changed
+- `.mcp.json` and `./cli.sh mcp` now run the real-arm server from `.venv`. Previously `.mcp.json` pointed at `src/mcp_server.py`, which is not an MCP server, so no tools registered.
+- `requirements.txt`: `mcp>=2.0.0`, numpy no longer capped below 2 (no 1.x wheels for Python 3.13).
+
+### Added (earlier)
 - Master CLI runner `cli.sh` providing commands for `test`, `demo`, `digital-twin`, `station`, `setup-serial`, `apriltags`, `view-camera`, `mcp`, and `urdf`.
 - Interactive 3D WebGL Digital Twin (`src/digital_twin.html` and `src/digital_twin_server.py`) with Three.js tabletop visualization, live camera feeds, kinematics telemetry, and perturbation triggers.
 - Unit test for Digital Twin assets in `tests/test_pipeline.py`.
