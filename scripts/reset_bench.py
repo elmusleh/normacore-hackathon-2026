@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -68,9 +69,11 @@ def relax_leader() -> int:
     cfg = load_config()
     leader = cfg.get("station", {}).get("leader_bus", "5B61037051")
     print(f"Disabling torque on Leader (Master) arm {leader}...")
+    env = {**os.environ, "ELROBOT_BUS": leader}
     res = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "hw_day.py"), "--bus", leader, "torque", "off"],
+        [sys.executable, str(ROOT / "scripts" / "hw_day.py"), "torque", "off"],
         cwd=str(ROOT),
+        env=env,
     )
     return res.returncode
 

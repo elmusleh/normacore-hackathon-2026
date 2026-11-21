@@ -597,11 +597,13 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                 elif action == "relax_leader":
                     st_cfg = load_config().get("station", {})
                     leader_bus = st_cfg.get("leader_bus", "5B61037051")
+                    env = {**os.environ, "ELROBOT_BUS": leader_bus}
                     run_res = subprocess.run(
-                        [sys.executable, "scripts/hw_day.py", "--bus", leader_bus, "torque", "off"],
+                        [sys.executable, "scripts/hw_day.py", "torque", "off"],
                         capture_output=True,
                         text=True,
                         timeout=15,
+                        env=env,
                     )
                     output = run_res.stdout + ("\n" + run_res.stderr if run_res.stderr else "")
                     res = {

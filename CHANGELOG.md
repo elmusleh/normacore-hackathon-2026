@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Fixed `hw_day.py` bus selection in `scripts/reset_bench.py` and `src/digital_twin_server.py` to pass `ELROBOT_BUS` via environment variable instead of a pre-subcommand `--bus` flag.
 - Wired `./cli.sh reset` (zero-arg quick bench reset: relaxes leader torque when Station is running or applies manual camera exposure when stopped), replaced Mission Control's Swap button with a safe **Refresh Bench** button (`src/digital_twin.html`, `scripts/reset_bench.py`, `cli.sh`), and included `./cli.sh check` (`scripts/system_health.py`).
 - Added team bench recovery & Master/Slave role manager (`scripts/reset_bench.py`) and one-click **Relax Leader (Torque Off)** + **Swap Master / Slave** buttons in Mission Control (`src/digital_twin_server.py`, `src/digital_twin.html`) with live config-driven header serials.
 - Fixed inverted Master/Slave defaults in `scripts/teleop_sync.py` to load `leader_bus` (`5B61037051`) and follower `bus` (`5B61034962`) from `config/elrobot.json`, and enforced explicit `torque OFF` on the Leader arm before every teleop session (`scripts/teleop_sync.py`, `src/digital_twin_server.py`).
