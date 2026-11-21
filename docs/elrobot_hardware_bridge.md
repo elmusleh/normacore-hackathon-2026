@@ -30,6 +30,9 @@ Config is separate from progress, so clearing progress never deletes your joint 
 | `./cli.sh hw teach <name>` | Save the current pose of all 8 motors | No |
 | `./cli.sh hw waypoints` | List waypoints | No |
 | `./cli.sh hw goto <name> [--speed N]` | Move all 8 motors to a waypoint, shows the plan first. Type `MOVE` | Yes |
+| `./cli.sh hw record <seq>` | Record a sequence: pose the arm, name the step (Enter = `<seq>_<n>`), repeat, `q` to finish. Saves each pose as a waypoint and the order in `config/sequences.json` | No |
+| `./cli.sh hw play <seq> [--pause S] [--speed N]` | Go through every waypoint of a sequence (or `hw play a b c`). Shows the whole plan, ONE `MOVE` prompt | Yes |
+| `./cli.sh hw sequences` | List recorded sequences | No |
 | `./cli.sh hw workspace` | Show workspace limits and whether they were measured | No |
 | `./cli.sh hw map <m> <joint> <dir>` | Record one motor by hand, instead of `identify` | No |
 | `./cli.sh preflight` | Read-only readiness check | No |
@@ -92,7 +95,17 @@ Cartesian moves (`pick_at`, `place_at`) are not ready. The Station only takes jo
 
 Suggested waypoints for the sorting demo: `home`, `clear`, `pick_<n>` (one per object spot), `bin_a`, `bin_b`. Teach them in that order and test each with goto before the demo.
 
-Vision decides which waypoint to use. Waypoints are joint positions, so they only stay valid while the arm base and the table do not move. Re-teach after any move of the arm or table.
+### Sequences (feeding run)
+
+Record the whole feeding path once, then play it with a single `MOVE`:
+
+1. `./cli.sh hw record feed`. For each step, pose the arm (torque off by hand, or with the leader arm while teleop is on), then type a name and press Enter. Typing an existing name such as `clear` lets you reuse its saved pose. The gripper (motor 8) is part of every pose, so record separate steps for open and closed, for example `clear`, `grape_hover`, `grape` (open), `grape_grip` (closed), `grape_lift`, `serve`, `serve_release` (open), `clear`.
+2. Turn teleop off in the Station viewer and run `./cli.sh hw torque on`.
+3. `./cli.sh hw play feed`. The tool prints every leg (biggest move, `LARGE MOVE`, clamped motors), checks that teleop is off, then asks for `MOVE` once.
+4. At each waypoint it waits until the arm has really stopped (no motor moves more than 2 steps for 0.5 s; gives up after 5 s), checks every motor is within `--tolerance` steps of the target (default 40: joints carrying the arm's weight stop 20-35 steps short with low current; a motor that has stopped that close counts as arrived and is reported as "stopped short"), then pauses `--pause` seconds (default 1.5) before the next leg.
+5. Any problem (overload, fault, timeout, not at target, arm not settling) holds the arm and stops the sequence. Ctrl-C also holds the arm. `./cli.sh hw stop` turns torque off.
+
+ Waypoints are joint positions, so they only stay valid while the arm base and the table do not move. Re-teach after any move of the arm or table.
 
 ## Step 11: Measure the workspace
 
