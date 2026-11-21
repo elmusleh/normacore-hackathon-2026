@@ -20,7 +20,8 @@
   },
   "cameras": {
     "table": "port:3-5.2.2",
-    "gripper": "port:3-5.2.4"
+    "gripper": "port:3-5.2.4",
+    "face": "port:3-5.3"
   },
   "camera_settings": {
     "table": {
