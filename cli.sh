@@ -25,6 +25,7 @@ print_usage() {
     echo ""
     echo -e "${C_BOLD}Mission Control (Web & Unified):${C_RESET}"
     echo -e "  ${C_CYAN}start [port]${C_RESET}        Launch unified Mission Control Web Dashboard & daemons (Default: 8080)"
+    echo -e "  ${C_GREEN}feed [grapes|spoon]${C_RESET} Run camera-guided assistive feeding (detects grape bowl -> mouth via /dev/video4)"
     echo -e "  ${C_GREEN}teleop${C_RESET}              Run Master -> Slave teleoperation loop in terminal"
     echo -e "  ${C_YELLOW}station${C_RESET}             Launch official NormaCore Station binary (--web --tcp)"
     echo ""
@@ -179,6 +180,13 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         echo -e "${C_GREEN}[+] Starting Master -> Slave Real-time Sync...${C_RESET}"
         shift || true
         python3 scripts/teleop_sync.py "$@"
+        ;;
+
+    feed)
+        MODE="${1:-grapes}"
+        shift || true
+        echo -e "${C_GREEN}[+] Running Camera-Guided Assistive Feeding (${MODE})...${C_RESET}"
+        python3 scripts/camera_feed_arm.py --mode "$MODE" "$@"
         ;;
 
     hw)

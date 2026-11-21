@@ -27,6 +27,7 @@
 - [x] Hardware-day checklist and safe commands in `./cli.sh hw` (`scripts/hw_day.py`)
 - [ ] Run preflight with the ElRobot powered and USB connected; confirm motors 1–8 and calibration
 - [x] Motor identification wizard, torque on/off, overload guard, current probe, waypoints (teach/goto), workspace config (`scripts/hw_day.py`, `src/elrobot_hardware.py`, `src/elrobot_config.py`)
+- [x] Camera-guided assistive feeding vision detector & slave arm controller for grape bowl, spoon, and person mouth target (`src/feeding_vision.py`, `scripts/camera_feed_arm.py`, `./cli.sh feed`)
 - [ ] Identify motors on the arm (`./cli.sh hw identify`) and confirm directions
 - [ ] Probe current per motor and save thresholds (`./cli.sh hw probe-current <m>`)
 - [ ] Teach home and clear poses, then test goto both ways

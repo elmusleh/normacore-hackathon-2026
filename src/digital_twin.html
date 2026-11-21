@@ -263,6 +263,17 @@
 
         <!-- Right: Hardware, CLI Runner & Testing Controls -->
         <div class="right-sidebar">
+            <!-- Assistive Feeding (Camera -> Slave Arm) -->
+            <div class="panel-section">
+                <div class="section-title">
+                    <span>Assistive Feeding (/dev/video4 -> Slave)</span>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-green" onclick="sendAction('feed_grapes')">🍇 Feed Grapes (Bowl -> Mouth)</button>
+                    <button class="btn btn-amber" onclick="sendAction('feed_spoon')">🥄 Feed with Spoon (Scoop -> Mouth)</button>
+                </div>
+            </div>
+
             <!-- Teleop Control -->
             <div class="panel-section">
                 <div class="section-title">

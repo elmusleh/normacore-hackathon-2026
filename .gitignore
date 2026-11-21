@@ -62,6 +62,7 @@ telemetry_dumps/
 captures/*.png
 captures/*.jpg
 !sample_calibrated_view.png
+sample_feeding_view.jpg
 
 # IDEs & Text Editors
 .idea/
