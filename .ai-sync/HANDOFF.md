@@ -9,6 +9,14 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Change (2026-11-21, 21:30, claude on Jan's Mac, branch `jan`): goal agent for the console (prompts/04-agent.md)
+
+- **What:** `src/goal_agent.py`, `GoalAgent(ConsoleAgent)`, now the console default (`./cli.sh console`; old agent: `--agent chat`). Each chat message is a goal. Loop per iteration: describe every live camera with its own vision call (parallel, goal included) -> one `robot` JSON object (state, waypoints, config subset, motion_allowed, camera texts, iteration, last_action) -> one planning call (text only) that calls exactly one tool (`go_to_waypoint`, `nudge_joint`, `set_gripper`, `enable_torque`, `ziel_erreicht`, `aufgeben`, `frage_stellen`; each with a required `begruendung` that is stripped before the MCP call) -> run it via MCP. `ziel_erreicht` needs an independent structured yes/no check with fresh pictures. Ends on confirmed goal, aufgeben, MAX_ITERATIONS (20), stop word/STOP button, new goal (cancels + `stop`), API error/refusal, or dry_run. Summary with tokens per call kind.
+- **Decisions:** reuses ConsoleAgent's MCP start, worker and emergency stop (subclass). Planner is stateless per call (compact history: last 4 steps in full), so no thinking-block replay. `claude-opus-5-5` rejects forced `tool_choice`, so the planner uses `auto` + `disable_parallel_tool_use`; a reply without a tool costs one iteration and is fed back. Vision effort `low`, planning/check `medium` (env-overridable). Full descriptions and robot objects go to `logs/goal-<time>.log`. `cli.sh console` now passes extra options (`./cli.sh console [port] [--agent chat]`).
+- **Build status:** 106 tests pass (+11 in `tests/test_goal_agent.py`, fake Claude + fake MCP). Live (real cameras, real API, motion NOT executed): three cameras described, planner proposed `go_to_waypoint(grape_hover, via_clear=false)`. A full run with motion has NOT been done.
+- **Next:** with someone at the power switch, run a simple goal with motion on; teach `grape`, `box_hover`, `box`, `serve`. Vision descriptions sometimes come back in English, sometimes German (prompt is English, goal German); harmless for the planner.
+- **Careful:** `.mcp.json` is locally set to `ELROBOT_ALLOW_MOTION: "1"` on Jan's Mac; it was not committed.
+
 ## Change (2026-11-21, 21:00, claude on Jan's Mac, branch `jan`): cameras work on macOS
 
 - **Problem:** the console showed "camera 'table' (port:3-2.4) is not plugged in" on macOS although the Station recorded all cameras. `usb_ports()` reads `/sys/bus/usb`, which only exists on Linux, so every camera counted as unplugged.

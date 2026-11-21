@@ -284,6 +284,9 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--no-stt", action="store_true", help="skip OpenAI speech-to-text; use the browser's")
     parser.add_argument("--no-agent", action="store_true", help="chat only, no Claude")
+    parser.add_argument("--agent", choices=("goal", "chat"), default="goal",
+                        help="goal: pursue each message as a goal, with camera descriptions per step "
+                             "(src/goal_agent.py, default); chat: free tool loop (src/console_agent.py)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -300,8 +303,13 @@ def main() -> None:
           flush=True)
     agent_factory = None
     if not args.no_agent:
-        from console_agent import ConsoleAgent  # noqa: WPS433
-        agent_factory = ConsoleAgent
+        if args.agent == "goal":
+            from goal_agent import GoalAgent  # noqa: WPS433
+            agent_factory = GoalAgent
+        else:
+            from console_agent import ConsoleAgent  # noqa: WPS433
+            agent_factory = ConsoleAgent
+        print(f"Agent: {args.agent}", flush=True)
         if not os.environ.get("ANTHROPIC_API_KEY"):
             print("Note: ANTHROPIC_API_KEY is not set; the chat cannot reach Claude.", flush=True)
     uvicorn.run(create_app(stt=stt, agent_factory=agent_factory), host=args.host, port=args.port,
