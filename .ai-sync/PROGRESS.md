@@ -40,7 +40,8 @@
 - [ ] Validate camera stream overlay against real table measurements
 - [ ] Execute single-object natural language pick-and-place
 
-- [x] Web console `./cli.sh console` (`src/web_console.py`, `src/web/console.html`): table + gripper cameras on the left, chat with microphone (local faster-whisper STT) on the right. Tested offline; not yet with live camera frames
+- [x] Web console `./cli.sh console` (`src/web_console.py`, `src/web/console.html`): table + gripper cameras on the left, chat with microphone on the right. Tested offline; not yet with live camera frames
+- [x] Console speech-to-text switched from local faster-whisper to OpenAI `gpt-transcribe` via `src/speech.py` (de + en, keywords; `OPENAI_API_KEY` from `.env`). Push-to-talk kept; no wake word / stop words. Live-tested with a synthetic German sentence (macOS `say`), not yet with a person in the room
 - [x] Console chat answered by Claude (`src/console_agent.py`): Messages API tool loop over the elrobot MCP server (spawned from .mcp.json); "stop"/STOP button bypasses Claude. Tested with fakes and a live MCP subprocess; NOT yet with a real API key
 - [x] Console request-to-action prompt (`CONSOLE_PROMPT` in `src/console_agent.py`, plan 4.3 draft): understand -> check waypoints/camera -> ask if ambiguous -> say plan -> act with look after each step; safety rules (serve standoff, stop on doubt, no teach/torque/nudge unless operator asks). Not yet tried with a real API key
 - [ ] Run the console chat with ANTHROPIC_API_KEY on the arm (motion off first, then on)

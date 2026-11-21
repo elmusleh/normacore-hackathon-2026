@@ -43,8 +43,12 @@ MIN_UTTERANCE_S = 0.1  # a fast "Stopp"/"Halt" can be under 0.3 s of detected sp
 _client = None
 
 
-def transcribe(path: str) -> str:
-    """Transcribe an audio file with gpt-transcribe and return the text."""
+def transcribe(path: str, model: str = MODEL, keywords: list[str] | None = None) -> str:
+    """Transcribe an audio file with gpt-transcribe and return the text.
+
+    `model` and `keywords` default to this module's settings; the web console
+    (src/web_console.py) passes its own keyword list.
+    """
     global _client
     if _client is None:
         from openai import OpenAI
@@ -52,10 +56,10 @@ def transcribe(path: str) -> str:
         _client = OpenAI(timeout=15.0, max_retries=1)
     with open(path, "rb") as f:
         result = _client.audio.transcriptions.create(
-            model=MODEL,
+            model=model,
             file=f,
             languages=LANGUAGES,
-            keywords=KEYWORDS,
+            keywords=KEYWORDS if keywords is None else keywords,
         )
     return result.text.strip()
 

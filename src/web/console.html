@@ -245,7 +245,7 @@ $("text").addEventListener("keydown", (e) => {
 
 // ---------------------------------------------------------------- speech to text
 const mic = $("mic"), status = $("mic-status");
-let engine = null;          // "server" (faster-whisper) | "browser" (Web Speech API)
+let engine = null;          // "server" (OpenAI gpt-transcribe) | "browser" (Web Speech API)
 let recording = false, busy = false;
 let recorder = null, chunks = [], stream = null, recognizer = null;
 
@@ -276,7 +276,7 @@ async function chooseEngine() {
     let s = { state: "unavailable" };
     try { s = await (await fetch("/api/stt")).json(); } catch (_) {}
     if (s.state === "ready") {
-      engine = "server"; $("engine").textContent = `Local speech-to-text (${s.model}, ${s.device === "cuda" ? "GPU" : "CPU"})`;
+      engine = "server"; $("engine").textContent = `OpenAI ${s.model} (sends audio to OpenAI)`;
       mic.disabled = false; setStatus("Click the microphone and speak.");
       return;
     }
@@ -290,7 +290,7 @@ async function chooseEngine() {
       mic.disabled = false; setStatus("Click the microphone and speak.");
     } else {
       engine = null; mic.disabled = true;
-      setStatus("No speech-to-text: install faster-whisper (see docs) or use Chrome.", true);
+      setStatus("No speech-to-text: set OPENAI_API_KEY in .env and restart the console, or use Chrome.", true);
     }
     return;
   }
@@ -302,7 +302,7 @@ async function startServerRecording() {
     return;
   }
   try {
-    // Browser noise suppression tends to garble speech for Whisper; raw audio works better.
+    // Browser noise suppression tends to garble speech for transcription; raw audio works better.
     stream = await navigator.mediaDevices.getUserMedia({ audio: {
       channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
   } catch (e) {

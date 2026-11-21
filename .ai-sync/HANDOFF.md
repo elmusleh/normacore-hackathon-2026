@@ -9,6 +9,15 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Change (2026-11-21, 18:45, claude on Jan's Mac, branch `jan`): console speech-to-text -> OpenAI gpt-transcribe
+
+- **What changed:** `SpeechToText` in `src/web_console.py` no longer loads faster-whisper. It decodes the browser recording with PyAV, writes a 16 kHz mono WAV with `speech.write_wav` and calls `speech.transcribe` (`src/speech.py`: `gpt-transcribe`, `languages=["de","en"]`, keywords). `speech.transcribe` gained optional `model`/`keywords` arguments; its CLI behaviour is unchanged.
+- **Decisions:** state is `ready` when `OPENAI_API_KEY` is set (`./cli.sh console` loads `.env`), else `error` and the page falls back to the browser's speech recognition. `WEB_CONSOLE_STT_PROMPT` is gone; `WEB_CONSOLE_STT_KEYWORDS` (comma-separated) replaces the default keyword list (`speech.KEYWORDS` + English demo words). `WEB_CONSOLE_STT_MODEL` overrides the model (default `gpt-transcribe`). Error messages are scrubbed of `sk-...` strings. Wake word "Robo", stop words and silero-vad listening from `speech.py` were deliberately NOT ported: the console stays push-to-talk; stop = "stop" in chat or the Stop button.
+- **Dependencies:** `faster-whisper` removed, `openai>=3.57` and `av>=12` added to `requirements.txt`. Re-run `uv pip install -r requirements.txt` (or pip) in `.venv`.
+- **Files:** `src/web_console.py`, `src/web/console.html` (engine label, no-STT hint), `src/speech.py`, `requirements.txt`, `docs/mcp_server.md`, `tests/test_web_console.py` (+6 tests, mocked OpenAI client, no network).
+- **Build status:** `pytest tests/` 91 passed. Live check: console on port 8899, `/api/stt` ready, a `say`-generated German sentence transcribed correctly in 1.8 s.
+- **Next:** try it in the room with a real voice (noise, distance); add new foods to `WEB_CONSOLE_STT_KEYWORDS` or `speech.KEYWORDS`.
+
 ## Latest session (2026-11-21 afternoon): Camera-Guided Assistive Feeding (`./cli.sh feed`)
 
 - **What Changed:**

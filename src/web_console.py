@@ -4,8 +4,9 @@
 
 Left: the `table` and `gripper` cameras (names from config/elrobot.json -> cameras), read
 from the Station exactly like the MCP `look` tool. Right: a chat box with a big microphone
-button. Speech is transcribed locally with faster-whisper (offline, plan stage 3); if that is
-not installed the page falls back to the browser's own speech recognition.
+button. Speech is transcribed with OpenAI gpt-transcribe, the same call as src/speech.py
+(languages de + en, a keyword list). Needs OPENAI_API_KEY (from .env); without it the page falls
+back to the browser's own speech recognition. The audio is sent to OpenAI.
 
 Chat messages go to Claude (src/console_agent.py), which answers and drives the arm through the
 same `elrobot` MCP server as Claude Code (motion only if .mcp.json sets ELROBOT_ALLOW_MOTION=1).
@@ -13,8 +14,10 @@ same `elrobot` MCP server as Claude Code (motion only if .mcp.json sets ELROBOT_
 Needs the Station running (./cli.sh station) and ANTHROPIC_API_KEY for the chat.
 
 Environment:
-  WEB_CONSOLE_STT_MODEL   faster-whisper model (default large-v3-turbo on a GPU, small.en on CPU)
-  WEB_CONSOLE_STT_PROMPT  words to expect, as a hint to Whisper (default: the demo foods and commands)
+  OPENAI_API_KEY          OpenAI key for speech-to-text (./cli.sh console loads it from .env)
+  WEB_CONSOLE_STT_MODEL   OpenAI transcription model (default gpt-transcribe)
+  WEB_CONSOLE_STT_KEYWORDS  comma-separated words to expect; replaces the default list
+                          (src/speech.py KEYWORDS plus the English demo foods and commands)
   WEB_CONSOLE_MODEL       Claude model for the chat (default claude-opus-5-5)
   ELROBOT_STATION / ELROBOT_BUS / ELROBOT_CAMERA_QUEUES   same as the MCP server
 """
@@ -26,6 +29,7 @@ import contextlib
 import io
 import logging
 import os
+import re
 import socket
 import sys
 import threading
@@ -42,6 +46,7 @@ from starlette.responses import FileResponse, JSONResponse, Response  # noqa: E4
 from starlette.routing import Route  # noqa: E402
 
 from elrobot_config import load_config  # noqa: E402
+import speech  # noqa: E402 - src/speech.py: the gpt-transcribe call and WAV writer
 
 log = logging.getLogger("elrobot.console")
 
@@ -49,9 +54,11 @@ PAGE = Path(__file__).resolve().parent / "web" / "console.html"
 DEFAULT_PORT = 8890
 MAX_AUDIO_BYTES = 10 * 1024 * 1024
 MAX_MESSAGE_CHARS = 2000
-# Whisper is much better at short commands when told which words to expect.
-DEFAULT_STT_PROMPT = ("Requests to a feeding robot: I want a grape. Some rice, please. Cheese. "
-                      "Use the spoon. Another one. Stop. Wait. I'm done.")
+# Short commands transcribe better when the model is told which words to expect: the keywords
+# from src/speech.py plus the English demo foods and commands the console used before.
+DEMO_KEYWORDS = ["grape", "rice", "cheese", "spoon", "another one", "stop", "wait", "done"]
+DEFAULT_STT_MODEL = speech.MODEL
+DEFAULT_STT_KEYWORDS = list(dict.fromkeys(speech.KEYWORDS + DEMO_KEYWORDS))
 STATION_PORT = 8888  # the Station's TCP port (the SDK default)
 
 
@@ -68,63 +75,57 @@ def station_reachable() -> bool:
 
 # -- speech to text -----------------------------------------------------------
 
-class SpeechToText:
-    """faster-whisper, loaded once in the background so the first click is not slow."""
+_SECRET = re.compile(r"sk-[A-Za-z0-9_*.-]+")
 
-    def __init__(self, model_name: Optional[str] = None, prompt: str = DEFAULT_STT_PROMPT):
-        self.model_name = model_name or ""  # empty: chosen when loading, by GPU or CPU
-        self.prompt = prompt
-        self.device = ""
-        self.state = "idle"  # idle | loading | ready | unavailable
-        self.error = ""
-        self._model = None
-        self._lock = threading.Lock()
+
+def redact(text: str) -> str:
+    """Remove anything that looks like an OpenAI key (error messages can echo part of it)."""
+    return _SECRET.sub("sk-***", text)
+
+
+class SpeechToText:
+    """OpenAI gpt-transcribe, through the same call as src/speech.py.
+
+    Nothing to load: the state is `ready` when OPENAI_API_KEY is set, otherwise `error`, and
+    the page then falls back to the browser's speech recognition.
+    """
+
+    def __init__(self, model_name: Optional[str] = None, keywords: Optional[List[str]] = None):
+        self.model_name = model_name or DEFAULT_STT_MODEL
+        self.keywords = list(DEFAULT_STT_KEYWORDS if keywords is None else keywords)
+        self.device = "openai"
+        if os.environ.get("OPENAI_API_KEY"):
+            self.state = "ready"  # ready | error
+            self.error = ""
+        else:
+            self.state = "error"
+            self.error = "OPENAI_API_KEY is not set (put it in .env)"
 
     def start_loading(self) -> None:
-        if self.state != "idle":
-            return
-        self.state = "loading"
-        threading.Thread(target=self._load, name="stt-load", daemon=True).start()
-
-    def _load(self) -> None:
-        try:
-            from faster_whisper import WhisperModel  # noqa: WPS433 - optional dependency
-            import ctranslate2  # noqa: WPS433 - installed with faster-whisper
-            gpu = ctranslate2.get_cuda_device_count() > 0
-            self.device = "cuda" if gpu else "cpu"
-            self.model_name = self.model_name or ("large-v3-turbo" if gpu else "small.en")
-            self._model = WhisperModel(self.model_name, device=self.device,
-                                       compute_type="float16" if gpu else "int8")
-            self.state = "ready"
-            log.info("speech-to-text ready (%s on %s)", self.model_name, self.device)
-        except Exception as exc:  # noqa: BLE001 - reported to the page
-            self.state = "unavailable"
-            self.error = f"{type(exc).__name__}: {exc}"
+        """Kept for the app lifespan; there is no model to load."""
+        if self.state == "ready":
+            log.info("speech-to-text ready (%s via OpenAI)", self.model_name)
+        else:
             log.warning("speech-to-text unavailable: %s", self.error)
 
     def transcribe(self, audio: bytes) -> str:
         if self.state != "ready":
             raise RuntimeError(f"speech-to-text is {self.state}")
-        with self._lock:  # one transcription at a time; the model is not shared across threads
-            samples = decode_audio(audio)
-            segments, _ = self._model.transcribe(
-                samples, language="en", beam_size=5, initial_prompt=self.prompt or None,
-                condition_on_previous_text=False,
-                # Keep VAD (it stops Whisper inventing words in silence) but pad generously so
-                # short commands and first/last syllables are not cut.
-                vad_filter=True, vad_parameters={"speech_pad_ms": 500, "min_silence_duration_ms": 800},
-            )
-            text = " ".join(s.text.strip() for s in segments).strip()
-            log.info("heard %.1f s of audio: %r", len(samples) / 16000, text)
-            return text
+        samples = decode_audio(audio)
+        path = speech.write_wav(samples)  # 16 kHz mono 16-bit WAV, as speech.py sends it
+        try:
+            text = speech.transcribe(path, model=self.model_name, keywords=self.keywords)
+        except Exception as exc:  # noqa: BLE001 - re-raised without the original, which may echo the key
+            raise RuntimeError(f"{type(exc).__name__}: {redact(str(exc))}") from None
+        finally:
+            os.remove(path)
+        log.info("heard %.1f s of audio: %r", len(samples) / speech.SAMPLE_RATE, text)
+        return text
 
 
-def decode_audio(audio: bytes, rate: int = 16000):
-    """Browser recording (webm/ogg/wav) -> mono float32 samples at `rate` Hz, as Whisper wants.
-
-    Done here with PyAV instead of faster-whisper's decode_audio, which breaks on newer PyAV.
-    """
-    import av  # noqa: WPS433 - installed with faster-whisper
+def decode_audio(audio: bytes, rate: int = speech.SAMPLE_RATE):
+    """Browser recording (webm/ogg/wav) -> mono float32 samples at `rate` Hz."""
+    import av  # noqa: WPS433 - PyAV, listed in requirements.txt
     import numpy as np  # noqa: WPS433
 
     resampler = av.AudioResampler(format="s16", layout="mono", rate=rate)
@@ -281,15 +282,18 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1",
                         help="bind address (the microphone only works on localhost or https)")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
-    parser.add_argument("--no-stt", action="store_true", help="skip faster-whisper; use the browser's")
+    parser.add_argument("--no-stt", action="store_true", help="skip OpenAI speech-to-text; use the browser's")
     parser.add_argument("--no-agent", action="store_true", help="chat only, no Claude")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-    for noisy in ("httpx", "httpx2", "huggingface_hub"):  # model download chatter
+    for noisy in ("httpx", "httpx2", "openai"):  # per-request chatter
         logging.getLogger(noisy).setLevel(logging.WARNING)
-    stt = None if args.no_stt else SpeechToText(os.environ.get("WEB_CONSOLE_STT_MODEL") or None,
-                                                os.environ.get("WEB_CONSOLE_STT_PROMPT", DEFAULT_STT_PROMPT))
+    keywords_env = os.environ.get("WEB_CONSOLE_STT_KEYWORDS", "")
+    keywords = [k.strip() for k in keywords_env.split(",") if k.strip()] or None
+    stt = None if args.no_stt else SpeechToText(os.environ.get("WEB_CONSOLE_STT_MODEL") or None, keywords)
+    if stt is not None and stt.state != "ready":
+        print(f"Note: {stt.error}; the page uses the browser's speech recognition.", flush=True)
 
     import uvicorn  # noqa: WPS433
     print(f"ElRobot console: http://{'localhost' if args.host == '127.0.0.1' else args.host}:{args.port}",

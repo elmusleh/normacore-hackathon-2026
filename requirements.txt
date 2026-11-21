@@ -15,7 +15,8 @@ mcp>=2.0.0  # MCPServer API (FastMCP was renamed in 2.x)
 
 # Web console (src/web_console.py): cameras + voice chat
 uvicorn>=0.30              # also pulled in by mcp
-faster-whisper>=1.1        # local speech-to-text; optional, the page falls back to the browser's
+openai>=3.57               # speech-to-text via gpt-transcribe (languages/keywords); src/speech.py
+av>=12                     # PyAV: decodes the browser's webm/ogg recording before transcription
 anthropic>=2.12            # console chat -> Claude (src/console_agent.py)
 
 # Testing & Verification

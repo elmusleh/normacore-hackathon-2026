@@ -50,12 +50,15 @@ viewer again; [calibration/](../calibration/) holds the ranges measured on 2026-
   Each shows its frame age; amber means the camera has stalled. Needs the Station running.
 - Right: a chat box with a big microphone button. Click to talk, click again to stop (or hold Space).
   The text goes into the box to check, then Send/Enter. Tick "Send right after speaking" to skip that.
-- Speech-to-text runs locally with faster-whisper: `large-v3-turbo` on an NVIDIA GPU, `small.en` on CPU
-  (about 1 s per sentence). The first start downloads the model (~1.6 GB / ~500 MB) from Hugging Face, so
-  do it once while online. Override with `WEB_CONSOLE_STT_MODEL=<name>`. Whisper is told which words to
-  expect (`WEB_CONSOLE_STT_PROMPT`, default: the demo foods and commands); add new foods there.
-  The server log prints what it heard (`heard 2.1 s of audio: '...'`). Without faster-whisper (or with
-  `--no-stt`) the page uses the browser's speech recognition, which sends audio online (Chrome only).
+- Speech-to-text uses OpenAI `gpt-transcribe`, the same call as `src/speech.py` (languages German and
+  English). It needs `OPENAI_API_KEY` in `.env` (`./cli.sh console` loads it) and sends each recording to
+  OpenAI, so it needs internet. Override the model with `WEB_CONSOLE_STT_MODEL=<name>`. The model is told
+  which words to expect: by default the `KEYWORDS` from `src/speech.py` plus the English demo foods and
+  commands. `WEB_CONSOLE_STT_KEYWORDS="grape,rice,..."` (comma-separated) replaces that list; add new
+  foods there. The server log prints what it heard (`heard 2.1 s of audio: '...'`). Without the key (or
+  with `--no-stt`) the page uses the browser's speech recognition, which also sends audio online (Chrome only).
+  The console keeps push-to-talk. The wake word ("Robo") and stop words of `src/speech.py` are not used here;
+  stop the arm with "stop" in the chat or the Stop button.
 - The microphone only works when the page is opened as `localhost` (browsers block it on plain http
   from another machine).
 - Chat goes to Claude (`claude-opus-5-5`, `src/console_agent.py`). The console starts its own copy of the

@@ -87,6 +87,96 @@ def test_frame_when_station_down():
         assert r.status_code == 503 and "not running" in r.json()["error"]
 
 
+def _wav_bytes(rate=48000, seconds=0.5):
+    """A short tone as the browser might send it (other rate than 16 kHz on purpose)."""
+    import io
+    import math
+    import struct
+    import wave
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(b"".join(struct.pack("<h", int(8000 * math.sin(i / 10)))
+                               for i in range(int(rate * seconds))))
+    return buf.getvalue()
+
+
+class FakeOpenAI:
+    """Records what speech.transcribe sends; never touches the network."""
+
+    def __init__(self, text="ich möchte Joghurt", error=None):
+        self.calls = []
+        self._text, self._error = text, error
+        self.audio = self
+        self.transcriptions = self
+
+    def create(self, **kwargs):
+        f = kwargs["file"]
+        self.calls.append({**kwargs, "name": f.name, "data": f.read()})
+        if self._error:
+            raise self._error
+        return type("Result", (), {"text": f"  {self._text} "})()
+
+
+@pytest.fixture
+def fake_openai(monkeypatch):
+    import speech
+    fake = FakeOpenAI()
+    monkeypatch.setattr(speech, "_client", fake)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key")
+    return fake
+
+
+def test_stt_ready_with_key(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key")
+    stt = SpeechToText()
+    assert (stt.state, stt.model_name, stt.device) == ("ready", "gpt-transcribe", "openai")
+
+
+def test_stt_error_without_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    stt = SpeechToText()
+    assert stt.state == "error" and "OPENAI_API_KEY" in stt.error
+    with TestClient(create_app(tools=FakeTools(), stt=stt)) as c:
+        assert c.get("/api/stt").json()["state"] == "error"  # page falls back to the browser
+        assert c.post("/api/transcribe", content=b"x").status_code == 503
+
+
+def test_transcribe_sends_wav_to_gpt_transcribe(fake_openai):
+    import io
+    import wave
+    import speech
+    with TestClient(create_app(tools=FakeTools(), stt=SpeechToText())) as c:
+        r = c.post("/api/transcribe", content=_wav_bytes(), headers={"Content-Type": "audio/wav"})
+    assert r.json()["ok"] and r.json()["text"] == "ich möchte Joghurt"
+    (call,) = fake_openai.calls
+    assert call["model"] == "gpt-transcribe"
+    assert call["languages"] == ["de", "en"]
+    assert set(speech.KEYWORDS) <= set(call["keywords"]) and "grape" in call["keywords"]
+    assert call["name"].endswith(".wav")
+    with wave.open(io.BytesIO(call["data"])) as w:
+        assert (w.getframerate(), w.getnchannels(), w.getsampwidth()) == (16000, 1, 2)
+
+
+def test_transcribe_custom_keywords(fake_openai):
+    stt = SpeechToText(keywords=["Apfel", "Banane"])
+    assert stt.transcribe(_wav_bytes()) == "ich möchte Joghurt"
+    assert fake_openai.calls[0]["keywords"] == ["Apfel", "Banane"]
+
+
+def test_transcribe_error_hides_key(monkeypatch):
+    import speech
+    secret = "sk-proj-abcDEF123_secret"
+    monkeypatch.setattr(speech, "_client", FakeOpenAI(error=ValueError(f"Incorrect API key provided: {secret}")))
+    monkeypatch.setenv("OPENAI_API_KEY", secret)
+    with TestClient(create_app(tools=FakeTools(), stt=SpeechToText())) as c:
+        r = c.post("/api/transcribe", content=_wav_bytes())
+    assert r.status_code == 500
+    assert secret not in r.text and "Incorrect API key" in r.json()["error"]
+
+
 def test_transcribe_without_stt():
     with TestClient(create_app(tools=FakeTools(), stt=None)) as c:
         assert c.get("/api/stt").json()["state"] == "unavailable"
