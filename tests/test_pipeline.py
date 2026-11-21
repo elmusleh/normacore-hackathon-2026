@@ -107,8 +107,9 @@ def test_digital_twin_html_exists():
     assert os.path.exists(html_path)
     with open(html_path, "r", encoding="utf-8") as f:
         content = f.read()
-    assert "Three.js" in content
-    assert "NormaCore Digital Twin" in content
+    assert "select-cam-table" in content
+    assert "select-cam-person" in content
+    assert "NormaCore AI Control Dashboard" in content
     assert "feed_grapes" in content
     assert "feed_spoon" in content
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Replaced the offline Three.js `<canvas>` mockup in Mission Control (`src/digital_twin.html`) with full-size dual live camera views (`Table Cam` + `Person Cam`), saved waypoint badges from `config/waypoints.json`, and clean role-specific real detections only (removed fake fallback `BOWL`/`SPOON`/`MOUTH` placeholder overlays in `src/digital_twin_server.py`).
 - Confirmed hardware config in `config/elrobot.json` (follower bus `5B61034962`, `table` = `port:3-1.2.2`, `gripper` = `port:3-1.2.4`, `person` = `v4l2:6`) and config-backed default camera selection in `CameraHub` (`src/digital_twin_server.py`).
 - Dual live camera discovery and dropdown selection (`Table Cam` + `Person Cam`) in Mission Control (`src/digital_twin_server.py`, `src/digital_twin.html`): automatically discovers both NormaCore Station `usbvideo/*` queues and local `/dev/video*` V4L2 cameras, renders side-by-side annotated feeds with `FeedingVisionDetector` overlays, and streams live detection changes to the event log.
 - Explicit policy for AI agents to commit after each implementation and proactively prompt developers to push branches to remote (`AGENTS.md`, `GUIDELINES.md`).

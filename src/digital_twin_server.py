@@ -32,7 +32,7 @@ import numpy as np
 
 # Ensure src is in sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from elrobot_config import load_config
+from elrobot_config import load_config, load_waypoints
 from feeding_vision import FeedingVisionDetector, run_camera_feeding_cycle
 from mcp_server import NormaCoreMCPServer
 from vision_homography import TabletopCalibrator
@@ -300,40 +300,88 @@ class CameraHub:
             }
 
         with self._detect_lock:
-            detections_obj, annotated_bgr = feeding_detector.analyze_and_annotate(frame)
+            annotated_bgr = frame.copy()
+            det_dict: Dict[str, Any] = {}
+            parts: List[str] = []
 
-        # Build compact human-readable detection summary
-        det_dict: Dict[str, Any] = {}
-        parts: List[str] = []
-        for key, target in (detections_obj or {}).items():
-            if target is None:
-                continue
-            if isinstance(target, dict):
-                label = target.get("label", key)
-                u_px = target.get("u_px", 0)
-                v_px = target.get("v_px", 0)
-                conf = round(float(target.get("confidence", 0.0)), 2)
-                extra = dict(target.get("extra") or {})
+            if role == "person":
+                # Only run real face/mouth detection on the Person camera (skip fake fallback boxes)
+                mouth = feeding_detector.detect_mouth(frame)
+                if mouth and not (mouth.extra or {}).get("fallback", False):
+                    u, v, w, h = mouth.u_px, mouth.v_px, mouth.width_px, mouth.height_px
+                    at_standoff = bool((mouth.extra or {}).get("at_standoff", False))
+                    color = (0, 220, 120) if not at_standoff else (0, 165, 255)
+                    cv2.rectangle(annotated_bgr, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), color, 2)
+                    cv2.putText(
+                        annotated_bgr,
+                        f"MOUTH ({mouth.extra.get('standoff_cm', '?')}cm)",
+                        (max(8, u - 55), max(22, v - h // 2 - 8)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        color,
+                        2,
+                    )
+                    det_dict["mouth"] = {
+                        "label": mouth.label,
+                        "u_px": u,
+                        "v_px": v,
+                        "confidence": round(float(mouth.confidence), 2),
+                        "extra": dict(mouth.extra or {}),
+                    }
+                    standoff_txt = "STOP: AT STANDOFF" if at_standoff else f"{mouth.extra.get('standoff_cm', '?')}cm (SAFE)"
+                    parts.append(f"Face/Mouth detected — {standoff_txt}")
             else:
-                label = getattr(target, "label", key)
-                u_px = getattr(target, "u_px", 0)
-                v_px = getattr(target, "v_px", 0)
-                conf = round(float(getattr(target, "confidence", 0.0)), 2)
-                extra = dict(getattr(target, "extra", None) or {})
-            det_dict[key] = {
-                "label": label,
-                "u_px": u_px,
-                "v_px": v_px,
-                "confidence": conf,
-                "extra": extra,
-            }
-            if key == "mouth":
-                standoff = "SAFE" if extra.get("safe_standoff", True) else "STOP: TOO CLOSE"
-                parts.append(f"mouth ({standoff})")
-            else:
-                parts.append(f"{key} ({int(conf * 100)}%)")
+                # Table camera: only draw real detections (never fake fallback placeholders)
+                bowl = feeding_detector.detect_grape_bowl(frame)
+                if bowl and not (bowl.extra or {}).get("fallback", False):
+                    u, v, w, h = bowl.u_px, bowl.v_px, bowl.width_px, bowl.height_px
+                    cv2.rectangle(annotated_bgr, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), (180, 60, 240), 2)
+                    cv2.putText(
+                        annotated_bgr,
+                        f"BOWL ({int(bowl.confidence * 100)}%)",
+                        (max(8, u - 45), max(22, v - h // 2 - 8)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (180, 60, 240),
+                        2,
+                    )
+                    det_dict["grape_bowl"] = {
+                        "label": bowl.label,
+                        "u_px": u,
+                        "v_px": v,
+                        "confidence": round(float(bowl.confidence), 2),
+                        "extra": dict(bowl.extra or {}),
+                    }
+                    parts.append(f"bowl ({int(bowl.confidence * 100)}%)")
 
-        summary = ", ".join(parts) if parts else "No targets detected"
+                spoon = feeding_detector.detect_spoon(frame)
+                if spoon and not (spoon.extra or {}).get("fallback", False):
+                    u, v, w, h = spoon.u_px, spoon.v_px, spoon.width_px, spoon.height_px
+                    cv2.rectangle(annotated_bgr, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), (50, 210, 100), 2)
+                    cv2.putText(
+                        annotated_bgr,
+                        f"SPOON ({int(spoon.confidence * 100)}%)",
+                        (max(8, u - 45), max(22, v - h // 2 - 8)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (50, 210, 100),
+                        2,
+                    )
+                    det_dict["spoon"] = {
+                        "label": spoon.label,
+                        "u_px": u,
+                        "v_px": v,
+                        "confidence": round(float(spoon.confidence), 2),
+                        "extra": dict(spoon.extra or {}),
+                    }
+                    parts.append(f"spoon ({int(spoon.confidence * 100)}%)")
+
+        if parts:
+            summary = ", ".join(parts)
+        elif role == "person":
+            summary = "Live feed (no face in frame)"
+        else:
+            summary = "Live feed (clean — ready for AI vision)"
 
         ok, buf = cv2.imencode(".jpg", annotated_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
         b64 = base64.b64encode(buf.tobytes()).decode("utf-8") if ok else ""
@@ -432,6 +480,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                 "objects": getattr(station, "objects", {}),
                 "target_zones": getattr(station, "target_zones", {}),
                 "selected_cameras": dict(camera_hub.selected),
+                "waypoints": sorted(load_waypoints().keys()),
             }
             self._send_json(payload)
             return

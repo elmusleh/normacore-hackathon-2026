@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NormaCore Digital Twin — ElRobot Tabletop Mission Control</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>NormaCore AI Control Dashboard — ElRobot Dual-Camera Mission Control</title>
     <style>
         :root {
             --bg-dark: #0a0c10;
@@ -65,37 +64,19 @@
             overflow: hidden;
         }
         .left-viewport {
-            display: grid;
-            grid-template-rows: 1fr 310px;
+            display: flex;
+            flex-direction: column;
             border-right: 1px solid var(--border);
-            background: #000;
+            background: var(--bg-dark);
+            padding: 12px;
+            gap: 12px;
             min-height: 0;
-        }
-        #canvas-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            min-height: 0;
-        }
-        .viewport-overlay {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            background: rgba(20, 23, 33, 0.85);
-            backdrop-filter: blur(4px);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 8px 14px;
-            font-size: 12px;
-            pointer-events: none;
         }
         .camera-panel {
-            background: var(--panel-bg);
-            border-top: 1px solid var(--border);
+            flex: 1;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            padding: 10px;
-            gap: 10px;
+            gap: 12px;
             min-height: 0;
         }
         .camera-card {
@@ -103,20 +84,20 @@
             flex-direction: column;
             background: var(--panel-card);
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             overflow: hidden;
             min-height: 0;
         }
         .camera-card-header {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 8px;
+            gap: 8px;
+            padding: 8px 10px;
             border-bottom: 1px solid var(--border);
             background: #10131c;
         }
         .camera-card-header label {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
             color: var(--text-main);
@@ -129,8 +110,8 @@
             color: var(--text-main);
             border: 1px solid var(--border);
             border-radius: 4px;
-            padding: 3px 6px;
-            font-size: 11px;
+            padding: 4px 8px;
+            font-size: 12px;
             font-family: inherit;
         }
         .camera-frame {
@@ -144,13 +125,13 @@
             min-height: 0;
         }
         .camera-frame img {
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
         }
         .camera-det-bar {
-            padding: 4px 8px;
-            font-size: 11px;
+            padding: 7px 10px;
+            font-size: 12px;
             color: var(--accent-green);
             background: #0d1117;
             border-top: 1px solid var(--border);
@@ -180,26 +161,20 @@
             justify-content: space-between;
             align-items: center;
         }
-        .telemetry-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+        .waypoint-chips {
+            display: flex;
+            flex-wrap: wrap;
             gap: 6px;
+            margin-bottom: 8px;
         }
-        .telemetry-card {
-            background: var(--panel-card);
-            padding: 6px 8px;
-            border-radius: 6px;
+        .chip {
+            background: #1e293b;
             border: 1px solid var(--border);
-        }
-        .telemetry-label {
-            font-size: 10px;
-            color: var(--text-muted);
-        }
-        .telemetry-value {
-            font-size: 12px;
+            color: #e2e8f0;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 11px;
             font-weight: 600;
-            margin-top: 2px;
-            color: var(--text-main);
         }
         .btn-group {
             display: grid;
@@ -249,14 +224,14 @@
             border-radius: 6px;
             padding: 8px;
             font-size: 11px;
-            height: 140px;
+            height: 210px;
             overflow-y: auto;
             font-family: monospace;
             display: flex;
             flex-direction: column;
             gap: 3px;
         }
-        .log-entry { line-height: 1.3; }
+        .log-entry { line-height: 1.35; }
         .log-info { color: #94a3b8; }
         .log-success { color: #34d399; }
         .log-warn { color: #fbbf24; }
@@ -267,36 +242,32 @@
     <header>
         <div class="header-title">
             <span class="status-dot"></span>
-            <h2>NormaCore Mission Control</h2>
-            <span class="badge">ElRobot 7+1 DOF</span>
+            <h2>NormaCore AI Control Dashboard</h2>
+            <span class="badge">Dual-Camera Live</span>
+            <span class="badge" id="station-badge" style="background: #374151;">Station: Checking...</span>
             <span class="badge" id="teleop-status-badge" style="background: #374151;">Teleop: IDLE</span>
         </div>
-        <div style="display: flex; gap: 10px; font-size: 12px;">
-            <span>Master: <strong style="color: #60a5fa;">5B61034962</strong></span>
-            <span>Slave: <strong style="color: #34d399;">5B61037051</strong></span>
+        <div style="display: flex; gap: 14px; font-size: 12px; align-items: center;">
+            <span>Follower (12V): <strong style="color: #34d399;">5B61034962</strong></span>
+            <span>Leader (5V): <strong style="color: #60a5fa;">5B61037051</strong></span>
+            <a href="http://localhost:8889" target="_blank" style="color: #93c5fd; text-decoration: none; font-weight: 600;">Open Station Viewer ↗</a>
         </div>
     </header>
 
     <div class="main-layout">
-        <!-- Left: 3D Twin & Overhead Calibrated Camera -->
+        <!-- Left: Full-Size Dual Live Cameras (Table + Person) -->
         <div class="left-viewport">
-            <div id="canvas-container">
-                <div class="viewport-overlay">
-                    <strong>Interactive 3D Digital Twin</strong><br>
-                    <span style="color: var(--text-muted);">Left-click rotate | Right-click pan | Scroll zoom</span>
-                </div>
-            </div>
             <div class="camera-panel">
                 <div class="camera-card">
                     <div class="camera-card-header">
                         <label for="select-cam-table">Table Cam:</label>
                         <select id="select-cam-table" onchange="onCameraSelect('table', this.value)"></select>
-                        <button class="btn btn-secondary" style="padding: 3px 7px;" title="Rescan cameras" onclick="loadCameras(true)">↻</button>
+                        <button class="btn btn-secondary" style="padding: 4px 8px;" title="Rescan cameras" onclick="loadCameras(true)">↻</button>
                     </div>
                     <div class="camera-frame">
                         <img id="camera-feed-table" src="" alt="Live Table Camera">
                     </div>
-                    <div class="camera-det-bar" id="det-table">Scanning table camera...</div>
+                    <div class="camera-det-bar" id="det-table">Connecting to table camera...</div>
                 </div>
                 <div class="camera-card">
                     <div class="camera-card-header">
@@ -306,35 +277,45 @@
                     <div class="camera-frame">
                         <img id="camera-feed-person" src="" alt="Live Person Camera">
                     </div>
-                    <div class="camera-det-bar" id="det-person">Scanning person camera...</div>
+                    <div class="camera-det-bar" id="det-person">Connecting to person camera...</div>
                 </div>
             </div>
         </div>
 
-        <!-- Right: Hardware, CLI Runner & Testing Controls -->
+        <!-- Right: Hardware, Waypoints, Feeding & Live Event Log -->
         <div class="right-sidebar">
-            <!-- Assistive Feeding (Camera -> Slave Arm) -->
+            <!-- Saved Waypoints & Teach -->
             <div class="panel-section">
                 <div class="section-title">
-                    <span>Assistive Feeding &amp; Waypoints</span>
+                    <span>Saved Waypoints (config/waypoints.json)</span>
                 </div>
-                <div class="btn-group">
-                    <button class="btn btn-green" onclick="sendAction('feed_grapes')">🍇 Feed Grapes (Bowl -> Mouth)</button>
-                    <button class="btn btn-amber" onclick="sendAction('feed_spoon')">🥄 Feed with Spoon (Scoop -> Mouth)</button>
+                <div class="waypoint-chips" id="waypoint-chips">
+                    <span class="chip">Loading...</span>
                 </div>
-                <div style="display: flex; gap: 6px; margin-top: 8px;">
-                    <input id="teach-name" type="text" placeholder="Waypoint name (e.g. home, table_hover)" style="background: #000; border: 1px solid var(--border); color: #fff; padding: 5px 8px; border-radius: 4px; font-size: 11px; flex: 1;">
-                    <button class="btn btn-secondary" onclick="teachWaypoint()">Teach Pose</button>
+                <div style="display: flex; gap: 6px;">
+                    <input id="teach-name" type="text" placeholder="Waypoint name (e.g. serve, zone_a)" style="background: #000; border: 1px solid var(--border); color: #fff; padding: 6px 8px; border-radius: 4px; font-size: 11px; flex: 1;">
+                    <button class="btn btn-green" onclick="teachWaypoint()">Teach Current Pose</button>
                 </div>
             </div>
 
-            <!-- Teleop Control -->
+            <!-- Assistive Feeding -->
             <div class="panel-section">
                 <div class="section-title">
-                    <span>Teleop Sync (Master -> Slave)</span>
+                    <span>Assistive Feeding Actions</span>
                 </div>
                 <div class="btn-group">
-                    <button class="btn btn-green" id="btn-teleop-start" onclick="sendAction('teleop_start')">▶ Start Teleop (50Hz)</button>
+                    <button class="btn btn-green" onclick="sendAction('feed_grapes')">🍇 Feed Grapes (Dry-Run)</button>
+                    <button class="btn btn-amber" onclick="sendAction('feed_spoon')">🥄 Feed Spoon (Dry-Run)</button>
+                </div>
+            </div>
+
+            <!-- Teleop & Emergency Stop -->
+            <div class="panel-section">
+                <div class="section-title">
+                    <span>Safety &amp; Teleop Control</span>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-green" id="btn-teleop-start" onclick="sendAction('teleop_start')">▶ Start Teleop</button>
                     <button class="btn btn-amber" id="btn-teleop-stop" onclick="sendAction('teleop_stop')">⏹ Stop Teleop</button>
                 </div>
                 <button class="btn btn-red" style="width: 100%; margin-top: 6px;" onclick="sendAction('estop')">⚠️ EMERGENCY STOP (Torque Off)</button>
@@ -342,147 +323,28 @@
 
             <!-- Integrated CLI Runner -->
             <div class="panel-section">
-                <div class="section-title">CLI Runner & Hardware Commands</div>
+                <div class="section-title">Hardware Diagnostics &amp; CLI</div>
                 <div class="btn-group">
-                    <button class="btn btn-secondary" onclick="runCli('preflight')">Preflight Check</button>
+                    <button class="btn btn-secondary" onclick="runCli('check')">System Check</button>
+                    <button class="btn btn-secondary" onclick="runCli('preflight')">Preflight</button>
                     <button class="btn btn-secondary" onclick="runCli('hw motors')">Live Motors</button>
                     <button class="btn btn-secondary" onclick="runCli('hw waypoints')">List Waypoints</button>
-                    <button class="btn btn-secondary" onclick="runCli('sdk-check')">SDK Check</button>
                 </div>
                 <div class="cli-input-box">
-                    <input id="cli-input" type="text" placeholder="e.g. hw identify, hw jog 2 50, test" onkeydown="if(event.key==='Enter') executeCustomCli()">
+                    <input id="cli-input" type="text" placeholder="e.g. hw motors, hw waypoints, test" onkeydown="if(event.key==='Enter') executeCustomCli()">
                     <button class="btn btn-secondary" onclick="executeCustomCli()">Run</button>
                 </div>
             </div>
 
-            <!-- Testing & Autonomous Stage Demo -->
-            <div class="panel-section">
-                <div class="section-title">Testing & Autonomous Judge Demos</div>
-                <button class="btn btn-amber" style="width: 100%; margin-bottom: 6px;" onclick="runAutonomousDemo()">
-                    🏆 Run Judge Perturbation Recovery Demo
-                </button>
-                <div class="btn-group">
-                    <button class="btn btn-secondary" onclick="sendAction('run_tests')">Run Full Pytest Suite</button>
-                    <button class="btn btn-secondary" onclick="sendAction('perturb')">Simulate Perturbation</button>
-                </div>
-            </div>
-
-            <!-- Telemetry -->
-            <div class="panel-section">
-                <div class="section-title">Real-time Telemetry</div>
-                <div class="telemetry-grid">
-                    <div class="telemetry-card">
-                        <div class="telemetry-label">End-Effector (X, Y, Z)</div>
-                        <div class="telemetry-value" id="val-xyz">-- mm</div>
-                    </div>
-                    <div class="telemetry-card">
-                        <div class="telemetry-label">Gripper State</div>
-                        <div class="telemetry-value" id="val-gripper">--</div>
-                    </div>
-                    <div class="telemetry-card">
-                        <div class="telemetry-label">Gripper Load</div>
-                        <div class="telemetry-value" id="val-load">0.00 / 1.00</div>
-                    </div>
-                    <div class="telemetry-card">
-                        <div class="telemetry-label">Held Object</div>
-                        <div class="telemetry-value" id="val-held">None</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Event Stream -->
+            <!-- Live Event & Detection Log -->
             <div class="panel-section" style="flex: 1; display: flex; flex-direction: column;">
-                <div class="section-title">Live Terminal & Event Log</div>
+                <div class="section-title">Live Detection &amp; Event Log</div>
                 <div class="log-box" id="log-box"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- 1. Three.js Digital Twin Setup ---
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0a0c10);
-
-        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 2000);
-        camera.position.set(0, 220, 480);
-        camera.lookAt(0, 160, 20);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(container.clientWidth, container.clientHeight);
-        renderer.shadowMap.enabled = true;
-        container.appendChild(renderer.domElement);
-
-        window.addEventListener('resize', () => {
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
-        });
-
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-        scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-        dirLight.position.set(100, 300, 200);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-
-        // Table
-        const tableGeo = new THREE.BoxGeometry(600, 10, 450);
-        const tableMat = new THREE.MeshStandardMaterial({ color: 0x1e222d, roughness: 0.8 });
-        const table = new THREE.Mesh(tableGeo, tableMat);
-        table.position.set(0, -5, 180);
-        scene.add(table);
-
-        const grid = new THREE.GridHelper(500, 25, 0x3b82f6, 0x1e293b);
-        grid.position.set(0, 0, 180);
-        scene.add(grid);
-
-        // Robot Base & Links
-        const baseMat = new THREE.MeshStandardMaterial({ color: 0x2563eb });
-        const linkMat = new THREE.MeshStandardMaterial({ color: 0x475569 });
-        const tipMat = new THREE.MeshStandardMaterial({ color: 0x10b981 });
-
-        const base = new THREE.Mesh(new THREE.CylinderGeometry(35, 45, 15, 32), baseMat);
-        base.position.set(0, 7.5, 0);
-        scene.add(base);
-
-        const link1 = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 120, 16), linkMat);
-        const link2 = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 120, 16), linkMat);
-        const link3 = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 80, 16), linkMat);
-        const eeTip = new THREE.Mesh(new THREE.SphereGeometry(12, 16, 16), tipMat);
-        scene.add(link1, link2, link3, eeTip);
-
-        function updateArmGeometry(x, y, z) {
-            const shoulder = new THREE.Vector3(0, 30, 0);
-            const target = new THREE.Vector3(x, z, y);
-            eeTip.position.copy(target);
-
-            const mid1 = new THREE.Vector3().lerpVectors(shoulder, target, 0.35);
-            mid1.y += 40;
-            const mid2 = new THREE.Vector3().lerpVectors(shoulder, target, 0.70);
-            mid2.y += 20;
-
-            alignCylinder(link1, shoulder, mid1);
-            alignCylinder(link2, mid1, mid2);
-            alignCylinder(link3, mid2, target);
-        }
-
-        function alignCylinder(mesh, p1, p2) {
-            const dir = new THREE.Vector3().subVectors(p2, p1);
-            const len = dir.length();
-            mesh.scale.set(1, len / 120, 1);
-            mesh.position.copy(new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5));
-            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
-        animate();
-
-        // --- 2. Live Polling & Action Handling ---
         function appendLog(msg, type = 'info') {
             const box = document.getElementById('log-box');
             const div = document.createElement('div');
@@ -497,9 +359,20 @@
                 const res = await fetch('/api/state');
                 const data = await res.json();
 
+                const stBadge = document.getElementById('station-badge');
+                if (data.station_reachable) {
+                    stBadge.textContent = 'Station: ONLINE';
+                    stBadge.style.background = '#065f46';
+                    stBadge.style.color = '#34d399';
+                } else {
+                    stBadge.textContent = 'Station: OFFLINE';
+                    stBadge.style.background = '#7f1d1d';
+                    stBadge.style.color = '#fca5a5';
+                }
+
                 const badge = document.getElementById('teleop-status-badge');
                 if (data.teleop_active) {
-                    badge.textContent = 'Teleop: ACTIVE (50Hz)';
+                    badge.textContent = 'Teleop: ACTIVE';
                     badge.style.background = '#065f46';
                     badge.style.color = '#34d399';
                 } else {
@@ -508,18 +381,19 @@
                     badge.style.color = '#9ca3af';
                 }
 
-                const p = data.arm_pose;
-                document.getElementById('val-xyz').textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)} mm`;
-                document.getElementById('val-gripper').textContent = data.gripper_state > 0.5 ? 'OPEN' : 'CLOSED';
-                document.getElementById('val-load').textContent = `${data.gripper_load.toFixed(2)} / 1.00`;
-                document.getElementById('val-held').textContent = data.held_object || 'None';
-
-                updateArmGeometry(p.x, p.y, p.z);
+                const wpBox = document.getElementById('waypoint-chips');
+                const wps = data.waypoints || [];
+                if (wps.length === 0) {
+                    wpBox.innerHTML = '<span class="chip" style="color:#94a3b8;">None saved yet</span>';
+                } else {
+                    wpBox.innerHTML = wps.map(w => `<span class="chip">📍 ${w}</span>`).join('');
+                }
             } catch (err) {}
         }
-        setInterval(fetchState, 600);
+        setInterval(fetchState, 1000);
+        fetchState();
 
-        // --- 2b. Dual Live Camera Discovery, Selection & Detection Feed ---
+        // --- Dual Live Camera Discovery, Selection & Real Detection Feed ---
         const lastDetectionSummary = { table: '', person: '' };
 
         async function loadCameras(forceRefresh = false) {
@@ -562,7 +436,7 @@
                     img.src = 'data:image/jpeg;base64,' + data.image_base64;
                 }
                 if (detBar) {
-                    detBar.textContent = data.summary || 'No targets detected';
+                    detBar.textContent = data.summary || 'Live feed';
                     detBar.style.color = data.ok ? '#34d399' : '#f87171';
                 }
                 if (data.summary && data.summary !== lastDetectionSummary[role]) {
@@ -570,9 +444,8 @@
                     appendLog(`[${role.toUpperCase()}] ${data.summary}`, data.ok ? 'success' : 'warn');
                 }
             } catch (err) {
-                // Retry quietly
             } finally {
-                setTimeout(() => pollCamera(role), 350);
+                setTimeout(() => pollCamera(role), 300);
             }
         }
 
@@ -609,24 +482,17 @@
             const input = document.getElementById('cli-input');
             const cmd = input.value.trim();
             if (cmd) {
-                await runCli(cmd);
                 input.value = '';
+                await runCli(cmd);
             }
         }
 
         async function teachWaypoint() {
             const input = document.getElementById('teach-name');
-            const name = input.value.trim() || 'waypoint_1';
+            const name = input.value.trim() || 'point_1';
             await sendAction('teach', { name });
             input.value = '';
         }
-
-        async function runAutonomousDemo() {
-            appendLog('--- STARTING AUTONOMOUS STAGE DEMO ---', 'warn');
-            await sendAction('run_demo');
-        }
-
-        appendLog('Mission Control UI Loaded. Station connected.', 'success');
     </script>
 </body>
 </html>
