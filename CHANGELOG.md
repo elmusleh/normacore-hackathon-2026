@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `scripts/teleop_sync.py` and `./cli.sh teleop`: live 50Hz master/slave mirroring script mapping joint movements from Leader (`5B61034962`) to Follower (`5B61037051`) with overload protection and graceful torque shutdown on exit.
+- `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`: printable PDF containing standard 36h11 fiducial markers for overhead camera homography calibration.
+
 ### Changed
+- `config/elrobot.json`: set default follower serial bus to `5B61037051`.
+- `cli.sh`: integrated `teleop` command.
+- Downgraded numpy to `<2` (1.26.4) to fix OpenCV ABI compatibility on Python 3.12.
 - `AGENTS.md`: every finished change is committed before reporting back (explicit paths, CHANGELOG entry, Conventional Commits). Added a team workflow: feature branches, pull requests, single hardware owner, calibration commits, and shared handoffs.
 - `AGENTS.md`: after each implementation, agents give 3 prioritized suggestions and record them in `SUGGESTIONS.md`.
 - `AGENTS.md`: added setup and safety pointers, where things live, a definition of done, testing, conventions, blocker reporting and privacy rules, plus shared-file etiquette for handoffs.

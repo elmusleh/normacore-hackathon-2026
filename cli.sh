@@ -142,6 +142,12 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         fi
         ;;
 
+    teleop)
+        echo -e "${C_GREEN}[+] Starting Master -> Slave Real-time Sync...${C_RESET}"
+        shift || true
+        python3 scripts/teleop_sync.py "$@"
+        ;;
+
     hw)
         python3 scripts/hw_day.py "$@"
         ;;

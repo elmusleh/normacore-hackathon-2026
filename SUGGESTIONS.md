@@ -1,6 +1,25 @@
 ### Post-Implementation Suggestions
 
-1. Verify local Python dependencies and run the offline test suite — Priority 92% (Critical) [Best practices]
+1. Calibrate tabletop homography with printed AprilTags — Priority 95% (Critical) [Best practices]
+   What: Place the printed 4-corner AprilTags on the workspace table under `/dev/video2` or `/dev/video4` and run `python3 scripts/calibrate_camera.py`.
+   Why: Transforms 2D image coordinates into exact millimeter $(X, Y)$ coordinates relative to the arm base, allowing autonomous agents to see objects on the table without coordinate hallucinations.
+   How: Print `docs/apriltags_printable.html` or display on a smartphone, place at table corners, and execute `python3 scripts/calibrate_camera.py`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Requires physical placement of tags on the hackathon desk.
+
+2. Teach initial core waypoints (`home`, `hover`, `bin`) — Priority 85% (High value) [Best practices]
+   What: Use the leader arm or `./cli.sh hw teach <name>` to record default reference positions into `config/waypoints.json`.
+   Why: Provides deterministic, collision-safe poses that the autonomous agent can return to between pick and place operations.
+   How: Move the arm to desired rest and clearance positions and run `./cli.sh hw teach home` and `./cli.sh hw teach clear`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: To be performed on the physical table alongside the team.
+
+3. Add dynamic role indicators to web console / CLI HUD — Priority 72% (Nice to have) [Professionalism]
+   What: Display a visual banner or terminal HUD clearly indicating Master (`5B61034962`) and Slave (`5B61037051`) with live joint angle comparison.
+   Why: Prevents confusion between identical-looking leader and follower buses during rapid demo presentations and judging rounds.
+   How: Add a small status banner in `scripts/teleop_sync.py` and the digital twin dashboard.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Core sync functionality is verified; UI embellishment can be added before Sunday pitch.
    What: Run `pip install -r requirements.txt` and execute `pytest tests/test_pipeline.py` on your machine.
    Why: Ensures your Python environment (especially NumPy and OpenCV/Pillow) is 100% verified and all 5 unit/integration tests pass before traveling.
    How: Run `pip install -r requirements.txt && pytest tests/test_pipeline.py -v`.

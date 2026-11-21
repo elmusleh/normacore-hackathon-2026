@@ -1,11 +1,51 @@
 ---
-last_agent: claude
-timestamp: 2026-11-20T23:10:00Z
-status: ready-for-hardware
-current_phase: "Phase 3: Agent Integration & Tabletop Primitives (partial)"
-current_task: "Hardware-day tooling complete and tested offline; first run on the real arm pending"
-stop_reason: needs-physical-arm
+last_agent: antigravity
+timestamp: 2026-11-21T11:35:00Z
+status: hardware-verified-teleop-active
+current_phase: "Phase 3: Agent Integration & Tabletop Primitives (teleop complete)"
+current_task: "Master/Slave Teleoperation Sync verified live; cameras probed"
+hardware_owner: "steve"
 ---
+
+## What Was Completed
+
+1. **Hardware Onboarding & Verification:**
+   - Identified follower arm bus `5B61037051` and leader/master arm bus `5B61034962`.
+   - Confirmed all 8 motors are visible, calibrated, and in clean 0x0 status via live Station.
+   - Updated `config/elrobot.json` with bus `5B61037051`.
+2. **Master -> Slave Real-time Teleop Sync:**
+   - Implemented `scripts/teleop_sync.py` and `./cli.sh teleop`.
+   - Tested live at 50Hz: mirrors joints 1-8 from Master (`5B61034962`) to Slave (`5B61037051`) with overload current protection (`threshold=150`).
+3. **Cameras & Environment:**
+   - Downgraded user numpy to `numpy<2` (1.26.4) to resolve OpenCV ABI compatibility.
+   - Probed UVC cameras on `/dev/video2` and `/dev/video4`.
+   - Generated 4-corner AprilTags calibration sheet (`docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`).
+
+## Work In Progress
+
+- Tabletop camera homography calibration (place AprilTags in view of `/dev/video2` or `/dev/video4` and run `scripts/calibrate_camera.py`).
+- Teaching Cartesian pick/place waypoints for autonomous Claude/Codex agent execution.
+
+## Next Steps
+
+1. Run `./cli.sh teleop` for master-slave teleoperation demonstration.
+2. Place AprilTags on tabletop and complete homography calibration.
+3. Teach `home`, `pick`, and `place` waypoints using `./cli.sh hw teach <name>`.
+4. Test MCP server (`./cli.sh mcp`) connected to live Station runtime.
+
+## Files Modified/Created
+
+- `scripts/teleop_sync.py` (new): 50Hz master/slave mirroring with current overload guard.
+- `cli.sh`: added `teleop` command.
+- `config/elrobot.json`: locked follower bus serial to `5B61037051`.
+- `docs/NormaCore Hackathon - 4-Corner AprilTags.pdf`: printable marker sheet.
+- `.ai-sync/HANDOFF.md`, `.ai-sync/PROGRESS.md`, `CHANGELOG.md`, `SUGGESTIONS.md`.
+
+## Build Status
+
+- `python3 -m pytest tests/`: 44 passed.
+- `bash -n cli.sh`: OK.
+- `py_compile scripts/teleop_sync.py`: OK.
 
 ## What Was Completed
 
