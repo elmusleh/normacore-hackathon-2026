@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `config/elrobot.json`: `table` and `gripper` camera names swapped (table = port 3-5.2.2, gripper = port 3-5.2.4). The old mapping showed the gripper view as `table`; confirmed by the user 2026-11-21.
 - `.mcp.json`: `ELROBOT_ALLOW_MOTION` set to `"1"`, so Claude's MCP tools move the real arm (was dry-run).
 
+### Changed
+- Camera ports in `config/elrobot.json` back on the `3-5` hub port: table `3-5.1`, gripper `3-5.2.4`, face `3-5.3` (checked from frames 2026-11-22; the gripper camera was stuck at manual exposure 14, which made its view nearly black).
+
 ### Removed
 - Software picture enhancement in `look()` (`src/frame_enhance.py`: denoise, white balance, auto gamma, CLAHE, sharpen). `look()` (MCP tool, console tiles, `calib camera`) again returns the camera's own JPEG, unchanged. Gone with it: the `camera_enhance` config defaults, `look(raw=...)`, the console's `/frame/<cam>?raw=1`, and the `exposure` / `exposure_warning` fields of `look()`. `./cli.sh cameras --tune` still measures exposure; `exposure_stats` moved into `scripts/camera_settings.py`. Tests: `tests/test_frame_enhance.py` -> `tests/test_camera_settings.py` (tuning helpers only).
 

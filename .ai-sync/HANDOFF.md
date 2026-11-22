@@ -9,7 +9,12 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
-## Latest session (2026-11-22, claude for Jafer): camera preprocessing removed
+## Latest session (2026-11-22, claude for Jafer): camera ports, dark gripper camera
+- Jafer saw the camera view too bright, then too dark after a Station restart. Cause of the dark view: the gripper camera (port 3-5.2.4) in manual exposure 14. The hub is back on laptop port 5, so the config names pointed at missing `3-1.x` ports and `cameras --tune` could not find them.
+- Changed (with Jafer's OK): `config/elrobot.json` cameras -> table `port:3-5.1`, gripper `port:3-5.2.4`, face `port:3-5.3`. Evidence in FINDINGS.md.
+- Next: point the gripper camera at the table, Station stopped, `./cli.sh cameras --tune gripper --write`, commit the value as a calibration commit, restart the Station.
+
+## Earlier session (2026-11-22, claude for Jafer): camera preprocessing removed
 - Request: "please undo any preprocessing". Read as: remove the software picture enhancement added 2026-11-21 (commit 179b423). Branch `feat/vision-apriltag-ik` (not pushed).
 - Changed: deleted `src/frame_enhance.py`. `RobotTools.look()`, the MCP `look` tool and the console's `/frame/<cam>` return the camera's JPEG unchanged; no `raw` parameter, no `exposure`/`exposure_warning` fields, no `camera_enhance` defaults. `scripts/calib.py` no longer passes `raw=True`. `exposure_stats` moved into `scripts/camera_settings.py`, so `./cli.sh cameras --tune` still works. Docs updated (`docs/mcp_server.md`, plan status table, SUGGESTIONS).
 - Kept on purpose: camera exposure/V4L2 settings (hardware settings, not image processing) and the internal upscale in `tag_calibration.detect_tags` (works on a private grayscale copy; tag pixels are scaled back).
