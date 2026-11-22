@@ -23,8 +23,10 @@ react to come back as {"ok": False, "error": ...} rather than exceptions.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+from pathlib import Path
 import re
 import threading
 import time
@@ -53,6 +55,46 @@ from elrobot_hardware import (
     clamp_goal,
     plan_goto,
 )
+
+MOUTH_GATE_DEFAULT_TIMEOUT_S = 12.0
+MOUTH_GATE_MIN_TIMEOUT_S = 3.0
+MOUTH_GATE_MAX_TIMEOUT_S = 30.0
+MOUTH_GATE_STATE_FILE = Path(__file__).resolve().parent.parent / "data" / "mouth_gate_state.json"
+
+
+def mouth_gate_timeout_s(cfg: Dict[str, Any]) -> float:
+    """Read feeding_vision.mouth_gate_timeout_s from config and clamp to [3.0, 30.0] seconds."""
+    fv = cfg.get("feeding_vision") or {}
+    raw = fv.get("mouth_gate_timeout_s", MOUTH_GATE_DEFAULT_TIMEOUT_S)
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        val = MOUTH_GATE_DEFAULT_TIMEOUT_S
+    return max(MOUTH_GATE_MIN_TIMEOUT_S, min(MOUTH_GATE_MAX_TIMEOUT_S, val))
+
+
+def _write_mouth_gate_state(payload: Dict[str, Any]) -> None:
+    """Atomically write live mouth-gate status to data/mouth_gate_state.json (best-effort)."""
+    try:
+        MOUTH_GATE_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = MOUTH_GATE_STATE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload), encoding="utf-8")
+        tmp.replace(MOUTH_GATE_STATE_FILE)
+    except Exception:  # noqa: BLE001 - telemetry must never block safety gate
+        pass
+
+
+def read_mouth_gate_state(max_age_s: float = 2.0) -> Optional[Dict[str, Any]]:
+    """Read recent mouth-gate status written by _mouth_gate_check, or None if stale/missing."""
+    try:
+        if not MOUTH_GATE_STATE_FILE.exists():
+            return None
+        data = json.loads(MOUTH_GATE_STATE_FILE.read_text(encoding="utf-8"))
+        if time.time() - float(data.get("ts", 0.0)) <= max_age_s:
+            return data
+    except Exception:  # noqa: BLE001
+        pass
+    return None
 from sequence_player import SEQ_MAX_PAUSE, TRACK_TOLERANCE, plan_legs, run_legs, waypoint_target
 
 log = logging.getLogger("elrobot.mcp")
@@ -455,7 +497,7 @@ class RobotTools:
         fv_cfg = cfg.get("feeding_vision", {})
         mouth_gate_on = bool(fv_cfg.get("mouth_gate_enabled", False))
         gate_waypoints = set(fv_cfg.get("mouth_gate_waypoints") or ["serve", "feed_3", "feed_4", "choc_feed_7"])
-        gate_timeout_s = float(fv_cfg.get("mouth_gate_timeout_s", 12.0))
+        gate_timeout_s = mouth_gate_timeout_s(cfg)
         after_leg_cb = (
             (lambda leg_name, ev: self._mouth_gate_check(leg_name, ev, gate_waypoints, gate_timeout_s))
             if mouth_gate_on
@@ -532,28 +574,44 @@ class RobotTools:
         if leg_name not in gate_waypoints:
             return True, ""
         log.info("mouth gate active at '%s': waiting up to %.1fs for mouth_open_confirmed", leg_name, timeout_s)
+        _write_mouth_gate_state({
+            "waiting": True,
+            "waypoint": leg_name,
+            "timeout_s": timeout_s,
+            "ts": time.time(),
+        })
         deadline = time.monotonic() + timeout_s
         saw_face = False
         lost_since: Optional[float] = None
-        while time.monotonic() < deadline:
-            if stop_event is not None and stop_event.is_set():
-                return False, "stopped by request while waiting for mouth open"
-            res = self.check_person_mouth()
-            if not res.get("ok"):
-                return False, f"mouth gate failed ({res.get('error')}); holding safely"
-            if res.get("face_detected"):
-                saw_face = True
-                lost_since = None
-                if res.get("mouth_open_confirmed"):
-                    log.info("mouth_open_confirmed at '%s' (MAR=%s); continuing sequence", leg_name, res.get("mar"))
-                    return True, ""
-            elif saw_face:
-                now = time.monotonic()
-                lost_since = lost_since or now
-                if now - lost_since > 0.6:
-                    return False, "person turned away (face lost watchdog) at serve standoff; holding safely"
-            time.sleep(0.12)
-        return False, f"mouth did not open within {timeout_s:g}s at '{leg_name}'; holding safely"
+        try:
+            while time.monotonic() < deadline:
+                if stop_event is not None and stop_event.is_set():
+                    return False, "stopped by request while waiting for mouth open"
+                res = self.check_person_mouth()
+                _write_mouth_gate_state({
+                    "waiting": True,
+                    "waypoint": leg_name,
+                    "timeout_s": timeout_s,
+                    "ts": time.time(),
+                    **res,
+                })
+                if not res.get("ok"):
+                    return False, f"mouth gate failed ({res.get('error')}); holding safely"
+                if res.get("face_detected"):
+                    saw_face = True
+                    lost_since = None
+                    if res.get("mouth_open_confirmed"):
+                        log.info("mouth_open_confirmed at '%s' (MAR=%s); continuing sequence", leg_name, res.get("mar"))
+                        return True, ""
+                elif saw_face:
+                    now = time.monotonic()
+                    lost_since = lost_since or now
+                    if now - lost_since > 0.6:
+                        return False, "person turned away (face lost watchdog) at serve standoff; holding safely"
+                time.sleep(0.12)
+            return False, f"mouth did not open within {timeout_s:g}s at '{leg_name}'; holding safely"
+        finally:
+            _write_mouth_gate_state({"waiting": False, "waypoint": "", "ts": time.time()})
 
     def stop_now(self) -> Dict[str, Any]:
         """stop() without waiting for the tool lock, so it can interrupt a running play_sequence."""

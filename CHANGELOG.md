@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Leader/follower serial roles were swapped in `scripts/teleop_sync.py` (it drove the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` and `docs/team_setup.md`. Confirmed on the arm 2026-11-21: follower `5B61034962`, leader `5B61037051`.
 
 ### Added
+- Added live OBSBOT mouth-status badge (`Mouth: Open / Closed / No Face`), amber waiting-for-mouth banner + spoken TTS cue (`GET /api/mouth_status` + `data/mouth_gate_state.json` zero-contention handoff), and clamped `feeding_vision.mouth_gate_timeout_s` (`[3.0, 30.0]s`) in `src/robot_tools.py`, `src/web_console.py`, and `src/web/console.html`.
 - Connected live OBSBOT MediaPipe `mouth_open_confirmed` safety gate into `src/sequence_player.py`, `src/robot_tools.py`, and `src/robot_mcp_server.py` (`check_person_mouth` + `set_mouth_gate` MCP tools), with an enable/disable toggle (`Wait for Mouth-Open (OBSBOT)`) in `src/web/console.html` (`GET/POST /api/mouth_gate`).
 - Added gentle Web Audio chimes (start listening, command sent, stop) to Hands-Free Mode in `src/web/console.html` for eyes-free accessibility feedback.
 - Updated `AGENTS.md` to remove mandatory post-commit remote push prompting (push only when explicitly requested).

@@ -285,16 +285,78 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
 
     async def mouth_gate(request: Request):
         from elrobot_config import save_config
+        from robot_tools import mouth_gate_timeout_s
         cfg = load_config()
         fv = dict(cfg.get("feeding_vision") or {})
         if request.method == "GET":
-            return JSONResponse({"enabled": bool(fv.get("mouth_gate_enabled", False))})
+            return JSONResponse({
+                "enabled": bool(fv.get("mouth_gate_enabled", False)),
+                "timeout_s": mouth_gate_timeout_s(cfg),
+            })
         body = await request.json()
         enabled = bool(body.get("enabled", False))
         fv["mouth_gate_enabled"] = enabled
         cfg["feeding_vision"] = fv
         save_config(cfg)
-        return JSONResponse({"ok": True, "enabled": enabled})
+        return JSONResponse({"ok": True, "enabled": enabled, "timeout_s": mouth_gate_timeout_s(cfg)})
+
+    mouth_probe_lock = threading.Lock()
+    mouth_probe_state: Dict[str, Any] = {"ts": 0.0, "data": None, "tools": None}
+
+    def _poll_mouth_status() -> Dict[str, Any]:
+        from robot_tools import RobotTools, mouth_gate_timeout_s, read_mouth_gate_state
+        cfg = load_config()
+        fv = cfg.get("feeding_vision") or {}
+        enabled = bool(fv.get("mouth_gate_enabled", False))
+        timeout_s = mouth_gate_timeout_s(cfg)
+
+        # If play_sequence is actively polling OBSBOT in the MCP subprocess, reuse its fresh state
+        # so we never contend on V4L2 /dev/video*!
+        live = read_mouth_gate_state(max_age_s=2.0)
+        if live and live.get("waiting"):
+            return {
+                "ok": bool(live.get("ok", True)),
+                "enabled": enabled,
+                "timeout_s": timeout_s,
+                "waiting_for_mouth": True,
+                "waiting_waypoint": str(live.get("waypoint", "")),
+                "face_detected": bool(live.get("face_detected", False)),
+                "mouth_open": bool(live.get("mouth_open", False)),
+                "mouth_open_confirmed": bool(live.get("mouth_open_confirmed", False)),
+                "mar": live.get("mar"),
+                "error": live.get("error", ""),
+            }
+
+        now = time.monotonic()
+        with mouth_probe_lock:
+            if mouth_probe_state["data"] is not None and (now - mouth_probe_state["ts"]) < 0.5:
+                cached = dict(mouth_probe_state["data"])
+                cached.update(enabled=enabled, timeout_s=timeout_s, waiting_for_mouth=False, waiting_waypoint="")
+                return cached
+            tools = mouth_probe_state["tools"]
+            if tools is None:
+                tools = RobotTools(lambda: None)
+                mouth_probe_state["tools"] = tools
+            res = tools.check_person_mouth()
+            out = {
+                "ok": bool(res.get("ok", False)),
+                "enabled": enabled,
+                "timeout_s": timeout_s,
+                "waiting_for_mouth": False,
+                "waiting_waypoint": "",
+                "face_detected": bool(res.get("face_detected", False)),
+                "mouth_open": bool(res.get("mouth_open", False)),
+                "mouth_open_confirmed": bool(res.get("mouth_open_confirmed", False)),
+                "mar": res.get("mar"),
+                "error": str(res.get("error", "")),
+            }
+            mouth_probe_state["data"] = out
+            mouth_probe_state["ts"] = time.monotonic()
+            return out
+
+    async def mouth_status(_: Request):
+        data = await run_in_threadpool(_poll_mouth_status)
+        return JSONResponse(data, headers={"Cache-Control": "no-store"})
 
     @contextlib.asynccontextmanager
     async def lifespan(_app):
@@ -317,6 +379,7 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         Route("/api/transcribe", transcribe, methods=["POST"]),
         Route("/api/tts", tts, methods=["POST"]),
         Route("/api/mouth_gate", mouth_gate, methods=["GET", "POST"]),
+        Route("/api/mouth_status", mouth_status),
         Route("/api/messages", messages, methods=["GET", "POST"]),
         Route("/api/stop", stop, methods=["POST"]),
     ], lifespan=lifespan)

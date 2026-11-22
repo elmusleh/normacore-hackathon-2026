@@ -1,25 +1,25 @@
 ### Post-Implementation Suggestions
 
-1. Add a live OBSBOT mouth-status badge (`Mouth: Open / Closed / No Face`) to `http://localhost:8890` — Priority 84% (High value) [Professionalism]
-   What: Show a compact real-time indicator next to the `Wait for Mouth-Open (OBSBOT)` checkbox displaying whether OBSBOT currently sees a face and whether the mouth is open or closed.
-   Why: Gives judges and the user immediate visual confidence before starting a feeding sequence that the camera sees their face and the threshold is calibrated.
-   How: Expose a read-only `GET /api/mouth_status` endpoint in `src/web_console.py` backed by `check_person_mouth()` (cached ~500 ms so it doesn't contend with the camera) and poll it lightly when the checkbox is enabled.
+1. Add a one-click `Test Mouth Gate (Dry-Run)` button next to the OBSBOT badge in `http://localhost:8890` — Priority 80% (High value) [Professionalism]
+   What: Add a small button beside the live mouth badge that lets the user or a judge test the full mouth-open confirmation flow (waiting banner -> open mouth -> chime + "Mouth confirmed!") without moving any robot motors.
+   Why: Lets you demonstrate the MediaPipe mouth-open trigger safely to judges or calibrate a new user in 5 seconds before turning on arm motion.
+   How: Add a client-side rehearsal toggle in `src/web/console.html` that watches `/api/mouth_status` until `mouth_open_confirmed` turns true and then plays the confirm chime and shows a green success banner.
    Status: ⏳ Unimplemented
-   Reason Deferred: Kept this turn focused on the core mouth-open gate, MCP tools, and toggle without adding background camera polling from the console page.
+   Reason Deferred: Kept this turn focused on live status badge, real sequence waiting cue, and configurable timeout.
 
-2. Add a visual + spoken cue when `play_sequence` pauses for mouth-open confirmation — Priority 78% (High value) [Best practices]
-   What: Emit a console status event (and optional TTS prompt like "Ready — open your mouth when you want the bite") the moment the arm reaches the mouth-standoff waypoint and begins waiting for `mouth_open_confirmed`.
-   Why: A paralyzed user watching the arm stop in front of them immediately knows the robot is waiting for their mouth-open cue rather than stalled.
-   How: Pass a status callback or update `web_console.py`'s SSE stream from `_mouth_gate_check` in `src/robot_tools.py` so the browser shows an amber "Waiting for mouth open..." banner and speaks a short cue.
+2. Add a `GET /api/mouth_status` unit test in `tests/test_web_console.py` — Priority 74% (High value) [Best practices]
+   What: Add an offline test in `tests/test_web_console.py` verifying that `GET /api/mouth_status` returns fresh `data/mouth_gate_state.json` without opening a physical V4L2 camera when a sequence is waiting.
+   Why: Locks in the zero-contention V4L2 handoff contract so future edits to `web_console.py` cannot accidentally cause camera busy errors during feeding.
+   How: Monkeypatch `robot_tools.MOUTH_GATE_STATE_FILE` to a temp file with `waiting: true` and assert `TestClient(app).get("/api/mouth_status").json()["waiting_for_mouth"] is True`.
    Status: ⏳ Unimplemented
-   Reason Deferred: Requires wiring a progress event hook from `RobotTools` into `console_agent.py`'s SSE stream.
+   Reason Deferred: Unit tests for `mouth_gate_timeout_s` and state-file roundtrip were added in `tests/test_robot_mcp.py`; HTTP route test is a quick follow-up.
 
-3. Add a hardware-independent timeout/watchdog setting in `config/elrobot.json` for `mouth_gate_timeout_s` — Priority 58% (Nice to have) [Security]
-   What: Make the 12-second mouth-open wait timeout configurable in `config/elrobot.json` under `feeding_vision.mouth_gate_timeout_s` (clamped between 3 s and 30 s) instead of hardcoded in `src/robot_tools.py`.
-   Why: Different users (especially those with limited mobility or dysphagia) need more or less time to prepare for a bite, while clamping prevents an unbounded hang near the face.
-   How: Read `feeding_vision.get("mouth_gate_timeout_s", 12.0)` in `_mouth_gate_check` in `src/robot_tools.py`, clamp to `[3.0, 30.0]`, and add a unit test in `tests/test_robot_mcp.py`.
+3. Add a configurable `Mouth Timeout (s)` number input in `http://localhost:8890` — Priority 52% (Nice to have) [Professionalism]
+   What: Expose `feeding_vision.mouth_gate_timeout_s` as a small `3–30 s` numeric input next to the `Wait for Mouth-Open (OBSBOT)` checkbox via `POST /api/mouth_gate`.
+   Why: Allows caregivers to adjust how long the arm waits for a diner's mouth to open directly from the browser instead of editing `config/elrobot.json`.
+   How: Accept optional `timeout_s` in `POST /api/mouth_gate` (clamped with `mouth_gate_timeout_s`), save it to `config/elrobot.json`, and bind an `<input type="number" min="3" max="30">` in `src/web/console.html`.
    Status: ⏳ Unimplemented
-   Reason Deferred: Default 12.0 s timeout is sensible for the hackathon demo; per-user tuning can be added if needed during rehearsal.
+   Reason Deferred: Default 12 s (with config override) is sufficient for the demo; UI slider is optional polish.
 
 1. Raise `resize_target` in `station.yaml` (224 -> 480) and apply manual exposure via `v4l-utils` — Priority 93% (Critical) [Best practices]
    What: Increase `usb-video.resize_target` from `224` to `480` in `station.yaml`, install `v4l-utils`, and run `./cli.sh cameras` before starting the Station.

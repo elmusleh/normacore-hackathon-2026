@@ -435,3 +435,23 @@ def test_sequence_player_after_leg_can_halt_sequence(plans):
     assert seen == ["start", "grape"]
     assert len(arm.moves) == 2
 
+
+def test_mouth_gate_timeout_clamping():
+    assert robot_tools.mouth_gate_timeout_s({}) == 12.0
+    assert robot_tools.mouth_gate_timeout_s({"feeding_vision": {"mouth_gate_timeout_s": 1.0}}) == 3.0
+    assert robot_tools.mouth_gate_timeout_s({"feeding_vision": {"mouth_gate_timeout_s": 99.0}}) == 30.0
+    assert robot_tools.mouth_gate_timeout_s({"feeding_vision": {"mouth_gate_timeout_s": 18.5}}) == 18.5
+    assert robot_tools.mouth_gate_timeout_s({"feeding_vision": {"mouth_gate_timeout_s": "bad"}}) == 12.0
+
+
+def test_mouth_gate_state_file_roundtrip(tmp_path, monkeypatch):
+    monkeypatch.setattr(robot_tools, "MOUTH_GATE_STATE_FILE", tmp_path / "mouth_gate_state.json")
+    assert robot_tools.read_mouth_gate_state() is None
+    robot_tools._write_mouth_gate_state({"waiting": True, "waypoint": "serve", "ts": 9999999999.0})
+    state = robot_tools.read_mouth_gate_state(max_age_s=60.0)
+    assert state is not None and state["waiting"] is True and state["waypoint"] == "serve"
+    # Stale entries return None
+    robot_tools._write_mouth_gate_state({"waiting": True, "waypoint": "serve", "ts": 1.0})
+    assert robot_tools.read_mouth_gate_state(max_age_s=2.0) is None
+
+

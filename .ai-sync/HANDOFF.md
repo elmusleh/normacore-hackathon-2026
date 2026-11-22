@@ -1,15 +1,25 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T03:26:00Z
-status: hands-free-voice-chimes-and-mouth-gate-live
+timestamp: 2026-11-22T03:38:00Z
+status: mouth-status-badge-cue-and-timeout-live
 current_phase: "Phase 3: Full Team Integration (Hands-Free Voice Console + OBSBOT MediaPipe Mouth-Open Gate)"
-current_task: "Added Web Audio chimes, wired OBSBOT MediaPipe mouth-open gate into play_sequence & MCP with UI toggle, removed push-prompt rule from AGENTS.md"
+current_task: "Added live OBSBOT mouth-status badge, waiting-for-mouth amber banner + spoken TTS cue, and clamped mouth_gate_timeout_s"
 stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-22T02:11 — merged-jan-and-jafer-ready-for-demo
+previous_session: antigravity 2026-11-22T03:26 — hands-free-voice-chimes-and-mouth-gate-live
 ---
 
-## Latest session (2026-11-22 03:26): Hands-Free Voice Chimes, OBSBOT Mouth-Open Gate & `AGENTS.md` Policy
+## Latest session (2026-11-22 03:38): Live OBSBOT Mouth Badge, Waiting Cue & Configurable Timeout
+
+- **What Changed:**
+  - **Configurable & Clamped Timeout (`src/robot_tools.py`):** Added `mouth_gate_timeout_s(cfg)` reading `feeding_vision.mouth_gate_timeout_s` (default `12.0s`, clamped to `[3.0, 30.0]s`), plus atomic `data/mouth_gate_state.json` telemetry written by `_mouth_gate_check`.
+  - **Zero-Contention Live Mouth Status Endpoint (`src/web_console.py`):** Added `GET /api/mouth_status` (reuses `data/mouth_gate_state.json` while `play_sequence` holds OBSBOT, or polls OBSBOT with a 500 ms cache & persistent `FeedingVisionDetector` otherwise).
+  - **Live Badge + Visual/Spoken Waiting Cue (`src/web/console.html`):** Added `#mouth-badge` (`Mouth: OPEN ✓` / `Closed` / `No Face` / `OBSBOT: Offline`) next to the `Wait for Mouth-Open (OBSBOT)` checkbox and `#mouth-banner` amber cue + TTS prompt (*"Ready. Open your mouth when you want the bite."*) whenever `play_sequence` pauses for mouth-open confirmation.
+  - **Tests (`tests/test_robot_mcp.py`):** Added unit tests for `mouth_gate_timeout_s` clamping and `data/mouth_gate_state.json` round-trip/staleness.
+- **Next Steps:**
+  1. Hard-refresh `http://localhost:8890` (`Ctrl+Shift+R`), check `Wait for Mouth-Open (OBSBOT)`, and verify the live badge flips between `Mouth: Closed` and `Mouth: OPEN ✓` on your OBSBOT camera.
+
+## Session (2026-11-22 03:26): Hands-Free Voice Chimes, OBSBOT Mouth-Open Gate & `AGENTS.md` Policy
 
 - **What Changed:**
   - **`AGENTS.md`:** Removed the mandatory push-to-remote prompt from `Commit Every Change`, `Definition of Done`, and `On Stop` (push only when the user explicitly asks).
