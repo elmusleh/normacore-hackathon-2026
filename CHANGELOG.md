@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- `docs/team_setup.md`: new step 8 for the web console (API key, speech model download, motion switch, stop); test count updated to 144.
 - `docs/FEEDING_ASSISTANT_PLAN.md`: current-state section and movement design updated to the 2026-11-22 handover (temporary arm, new camera ports, calib goto IK, what works and what is blocked); HANDOFF.md named as the live source of truth.
 - Docs: `docs/tcp_calibration.md` lists the new `calib goto/line` options, defaults and the sag note; `docs/feeding_skills.md` status and autonomy updated for `grip-object` / `drop-in-bowl`; `calib` usage text updated.
 - FINDINGS: bowl grip failure, `--down` refusals (wrist zeros), stale MCP readings, reach-dependent sag. PREFERENCES: Jafer's fast arm pace. SUGGESTIONS: 3 new (2026-11-22 handover).
