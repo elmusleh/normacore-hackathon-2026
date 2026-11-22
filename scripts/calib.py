@@ -345,7 +345,7 @@ def cmd_reach(args, cal):
     _warn_unmeasured(cal)
 
 
-STREAM_MAX_MM_S = 60         # fastest fingertip speed calib goto/line accept
+STREAM_MAX_MM_S = 70         # fastest fingertip speed calib goto/line accept
 STREAM_MAX_LAG_STEPS = 200   # stop if a motor falls this far behind the last streamed goal (~17 deg)
 
 
@@ -497,7 +497,7 @@ def main() -> int:
     p.add_argument("y", type=float)
     p.add_argument("z", type=float)
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
-    p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-60 mm/s)")
+    p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-70 mm/s)")
     p.add_argument("--step-mm", type=float, default=3.0, help="distance between streamed points (2-20)")
     p.add_argument("--travel-z", type=float, default=GOTO_TRAVEL_Z_MM,
                    help="height (mm) to travel sideways at; never below the safety floor (default 150)")
@@ -509,7 +509,7 @@ def main() -> int:
     p.add_argument("--travel-z", type=float, default=GOTO_TRAVEL_Z_MM,
                    help="height (mm) to travel sideways at; never below the safety floor (default 150)")
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
-    p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-60 mm/s)")
+    p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-70 mm/s)")
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
     p = sub.add_parser("zero")
     p.add_argument("--write", action="store_true")
