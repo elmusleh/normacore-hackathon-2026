@@ -18,8 +18,10 @@ previous_session: antigravity 2026-11-22T03:38 — mouth-status-badge-cue-and-ti
   - **Live Developer Action Trace & 3-Tab UI (`src/console_agent.py`, `src/web_console.py`, `src/web/console.html`):**
     - Added `ConsoleAgent.trace_after()` / `clear_trace()` and `GET /api/trace` + `POST /api/trace/clear` recording `guardrail`, `thinking`, `tool_call` (exact arm MCP arguments), `tool_result` (arm response), and `stop` events.
     - Upgraded `http://localhost:8890` into 3 tabs (`Demo Console`, `Developer Trace` with filter pills + Copy JSON + Clear, and `Commands & Guardrails`) plus a header `Dev Log in Chat: OFF/ON` toggle button.
+  - **Gripper Camera Roadmap (`docs/GRIPPER_CAMERA_ROADMAP.md`):** Documented the 5-stage eye-in-hand roadmap (Stage 0–4) and step-by-step execution plan for Stages 0–2 (crosshair overlay, split sequences + dual-signal grasp check, bounded `align_base` + jaw-ROI telemetry).
 - **Next Steps:**
-  1. Hard-refresh `http://localhost:8890` (`Ctrl+Shift+R`) and test an off-topic message (e.g. `"Robo, what is the weather?"`) and a real command (`"Robo, look at the table"`), then inspect the **Developer Trace** tab.
+  1. Execute **Stage 0** (add `gripper` crosshair + jaw-zone overlay in `src/web_console.py` — safe offline, 15 min) and optionally **Stage 1A / 2A** offline code + unit tests from `docs/GRIPPER_CAMERA_ROADMAP.md`.
+  2. When at the bench with hardware owner Steve: run Step 1B / 2B calibration (`hw identify 8`, `hw identify 1`, open-jaw `grape_open` pose, camera-to-motor sign).
 
 ## Session (2026-11-22 03:38): Live OBSBOT Mouth Badge, Waiting Cue & Configurable Timeout
 

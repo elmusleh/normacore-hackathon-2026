@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Implement Stage 0 (`gripper` center crosshair + jaw-zone ROI overlay in `src/web_console.py`) — Priority 86% (High value) [Professionalism]
+   What: Draw a subtle vertical center guide line and jaw-zone box on the `gripper` camera feed in `http://localhost:8890`, matching the overlays on `person` and `table`.
+   Why: Zero-risk 10-minute upgrade that gives both Claude (`look("gripper")`) and judges an immediate visual alignment reference without touching arm motion code.
+   How: Add a `role == "gripper"` branch in `_annotate_bgr()` in `src/web_console.py` and include `"gripper"` in the `_annotate_jpeg()` check.
+   Status: ⏳ Unimplemented
+   Reason Deferred: This turn documented the full Stage 0–4 roadmap and Stage 0–2 plan first before implementing code changes.
+
+2. Implement Stage 1A + 2A offline code (`play_sequence` `start_at`/`stop_after` + bounded `align_base` + `FakeArm` unit tests) — Priority 82% (High value) [Best practices]
+   What: Build the deterministic partial-sequence runner and bounded `align_base(delta_percent)` MCP tool offline with full `FakeArm` unit tests before the bench session.
+   Why: Separates software verification from hardware calibration so bench time with the powered arm is short, calm, and focused solely on measuring the 4 physical facts.
+   How: Follow Steps 1A and 2A in `docs/GRIPPER_CAMERA_ROADMAP.md` (`src/robot_tools.py`, `src/robot_mcp_server.py`, `tests/test_robot_mcp.py`).
+   Status: ⏳ Unimplemented
+   Reason Deferred: Awaiting user go-ahead on whether to build Stage 0 only for the demo or proceed straight into Stage 1A/2A offline code.
+
+3. Add a hardware-bench calibration script (`./cli.sh hw calibrate-grasp`) for Stage 1B/2B — Priority 64% (Nice to have) [Security]
+   What: Add a guided read-only/single-step CLI wizard that walks the hardware owner through identifying motor 8 (gripper), motor 1 (base), and verifying camera-to-motor sign safely.
+   Why: Prevents manual JSON typos in `config/elrobot.json` and ensures `gripper.verified` and `grasp_alignment.camera_sign` are recorded consistently.
+   How: Add a helper in `scripts/hw_day.py` that wraps `identify` and prints the exact JSON snippet to review before saving.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Manual `./cli.sh hw identify` commands already exist for the hackathon bench session.
+
 1. Add a 1-click `Dry-Run Command Preview` mode toggle in the `Developer Trace` tab — Priority 79% (High value) [Security]
    What: Add a toggle in the `Developer Trace` tab showing whether `ELROBOT_ALLOW_MOTION` is `1` (live) or `0` (dry-run) and warning loudly in red when live arm motion is armed.
    Why: Lets developers verify at a glance whether a traced command will physically move the arm before speaking a feeding command during rehearsal.
