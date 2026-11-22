@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Table + arm calibration from 4 corner AprilTags, and Cartesian (TCP) lookups. Moves NOTHING.
+"""Table + arm calibration from 4 corner AprilTags, and Cartesian (TCP) lookups. Only `calib goto` moves the arm.
 
 Usage (via ./cli.sh calib):
   calib layout --width-mm W --depth-mm D [--tag-size-mm S]   tape-measured tag-centre rectangle
@@ -10,6 +10,7 @@ Usage (via ./cli.sh calib):
   calib touch --list | --clear
   calib fit [--refine] [--write]       arm base pose in the table frame (+ joint zeros/directions)
   calib where                          current fingertip position in base and table frames
+  calib goto X Y Z [--down] [--speed N]  MOVES the arm: lift, across at 150 mm, descend (asks MOVE)
   calib reach X Y Z [--down]           IK: joint steps that put the fingertip at table point X Y Z
   calib pixel U V [--size WxH]         table point under a camera pixel
   calib show                           what is calibrated and how well
@@ -39,6 +40,7 @@ from arm_kinematics import (  # noqa: E402
     BaseInTable,
     JointCalibration,
     fit_base_in_table,
+    plan_cartesian_goto,
     refine_joint_zeros,
     step_delta,
     step_in_range,
@@ -258,7 +260,11 @@ def cmd_fit(args, cal):
     model = _model(cal)
     jc = JointCalibration.from_config(cal["joints"])
     if args.refine:
-        jc, base, rms, errs = refine_joint_zeros(model, jc, samples)
+        try:
+            jc, base, rms, errs = refine_joint_zeros(model, jc, samples)
+        except ValueError as exc:
+            raise SystemExit(f"ERROR: {exc}. Touch each tag twice, in two clearly different arm poses "
+                             "(calib touch --list shows what you have).")
         print("Joint calibration fitted from the touches:")
         for m in ARM_MOTORS:
             old = cal["joints"]["motors"][str(m)]
@@ -336,6 +342,66 @@ def cmd_reach(args, cal):
     _warn_unmeasured(cal)
 
 
+def cmd_goto(args, cal):
+    """Move the fingertip to a table point. The only calib command that moves the arm."""
+    import hw_day  # motion helpers: Station connection, MOVE prompt, torque check, speed cap
+    from elrobot_config import current_threshold_for
+    from elrobot_hardware import DEFAULT_MAX_ACCEL
+    for key, what in (("joints", "joint zeros (calib zero + calib fit --refine)"),
+                      ("base_in_table", "arm base (calib fit --write)")):
+        if not cal[key].get("measured"):
+            raise SystemExit(f"Refused: {what} not measured yet. Nothing moved.")
+    rms = float(cal["base_in_table"].get("rms_mm") or 0.0)
+    model, jc, base = _model(cal), JointCalibration.from_config(cal["joints"]), _base(cal)
+    speed = min(args.speed, hw_day.JOG_MAX_SPEED)
+    target = [args.x, args.y, args.z]
+
+    def go(hw, cfg):
+        readings = hw.snapshot()
+        missing = [m for m in ARM_MOTORS if m not in readings]
+        if missing:
+            print(f"Refused: no reading for motors {missing}. Nothing moved.")
+            return 1
+        present = {m: readings[m].present for m in ARM_MOTORS}
+        ranges = {m: (readings[m].range_min, readings[m].range_max) for m in ARM_MOTORS}
+        try:
+            legs = plan_cartesian_goto(model, jc, base, present, ranges, target,
+                                       point_down=args.down, fit_rms_mm=rms)
+        except ValueError as exc:
+            print(f"Refused: {exc}. Nothing moved.")
+            return 1
+        if not hw_day._require_torque(readings, list(ARM_MOTORS)):
+            return 1
+        print(f"\nGoto table {_fmt(target)} mm" + (", fingers down" if args.down else "")
+              + f", speed {speed}. Fit error {rms:.0f} mm: expect the fingertip within ~{2 * rms:.0f} mm.")
+        prev = dict(present)
+        for label, p, goals in legs:
+            print(f"  {label:8s} -> {_fmt(p, 0)} mm: " + ", ".join(
+                f"m{m} {prev[m]}->{goals[m]} ({goals[m] - prev[m]:+d})" for m in ARM_MOTORS if goals[m] != prev[m]))
+            prev = goals
+        print("  Gripper (motor 8) and wrist roll (motor 7) stay as they are.")
+        if not hw_day._confirm_motion(args.yes, "Check the path is clear, hand on the 12 V switch."):
+            print("Cancelled. Nothing moved.")
+            return 0
+        thresholds = {m: current_threshold_for(cfg, m) for m in ARM_MOTORS}
+        for label, p, goals in legs:
+            status = hw.move_and_watch(goals, enable_motion=True, max_speed=speed, max_accel=DEFAULT_MAX_ACCEL,
+                                       thresholds=thresholds)
+            if not all(st == "reached" for st in status.values()):
+                print(f"Stopped during '{label}': " + ", ".join(f"{m}={st}" for m, st in sorted(status.items())))
+                print("The arm holds where it stopped. Check for an obstacle, then ./cli.sh logs.")
+                return 1
+            print(f"  {label}: reached")
+        final = hw.snapshot()
+        tip = base.base_to_table(model.tcp(jc.to_radians({m: final[m].present for m in ARM_MOTORS})))
+        print(f"Arrived. Fingertip by the joint readings: {_fmt(tip)} mm (target {_fmt(target)}).")
+        return 0
+    try:
+        return hw_day._with_station(go)
+    except hw_day.StationDown as exc:
+        raise SystemExit(f"ERROR: {exc}")
+
+
 def cmd_pixel(args, cal):
     cam = TableCamera.from_config(cal["camera"])
     size = tuple(int(v) for v in args.size.lower().split("x")) if args.size else None
@@ -373,6 +439,13 @@ def main() -> int:
     p.add_argument("--camera", default="table")
     p.add_argument("--image", help="use a saved picture instead of the live camera")
     p.add_argument("--write", action="store_true")
+    p = sub.add_parser("goto", help="MOVE the fingertip to a table point (asks MOVE first)")
+    p.add_argument("x", type=float)
+    p.add_argument("y", type=float)
+    p.add_argument("z", type=float)
+    p.add_argument("--down", action="store_true", help="fingers pointing straight down")
+    p.add_argument("--speed", type=int, default=200)
+    p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
     p = sub.add_parser("zero")
     p.add_argument("--write", action="store_true")
     p = sub.add_parser("touch")
@@ -397,7 +470,7 @@ def main() -> int:
     args = ap.parse_args()
     cal = load_calibration()
     {"layout": cmd_layout, "camera": cmd_camera, "zero": cmd_zero, "touch": cmd_touch, "fit": cmd_fit,
-     "where": cmd_where, "reach": cmd_reach, "pixel": cmd_pixel, "show": cmd_show}[args.cmd](args, cal)
+     "where": cmd_where, "reach": cmd_reach, "goto": cmd_goto, "pixel": cmd_pixel, "show": cmd_show}[args.cmd](args, cal)
     return 0
 
 

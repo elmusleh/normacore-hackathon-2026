@@ -374,3 +374,64 @@ def refine_joint_zeros(model: ArmModel, calib: JointCalibration, samples: Sequen
         if best is None or result[2] < best[2]:
             best = result
     return best
+
+
+# -- Cartesian goto planning (pure: the caller sends the goals) -----------------
+
+GOTO_TRAVEL_Z_MM = 150.0     # lift to this height before moving sideways, then descend
+GOTO_MIN_Z_MM = 50.0         # never aim lower than this (plus the fit error) above the table
+GOTO_RANGE_MARGIN = 20       # steps kept away from each motor's range ends (same as clamp_goal)
+GOTO_MAX_IK_ERR_MM = 5.0
+
+
+def plan_cartesian_goto(model: ArmModel, calib: JointCalibration, base: BaseInTable,
+                        present: Dict[int, int], ranges: Dict[int, Tuple[int, int]],
+                        target_table_mm: Sequence[float], *, point_down: bool = False,
+                        fit_rms_mm: float = 0.0, travel_z_mm: float = GOTO_TRAVEL_Z_MM,
+                        min_z_mm: float = GOTO_MIN_Z_MM) -> List[Tuple[str, List[float], Dict[int, int]]]:
+    """Legs [(label, table point mm, {motor: goal steps 1..7})] to bring the fingertip to a table point.
+
+    Lift straight up to travel_z at the current spot, move across at travel_z, then descend, so
+    the arm never sweeps low over the table. Raises ValueError instead of guessing: target below
+    min_z + fit_rms, unreachable (IK error > 5 mm), or any goal outside a motor range (minus a
+    margin). Goals are never clamped: a clamped goal is a different pose than the one planned.
+    Motor 7 (wrist roll) stays where it is."""
+    x, y, z = (float(v) for v in target_table_mm)
+    floor = min_z_mm + max(fit_rms_mm, 0.0)
+    if z < floor:
+        raise ValueError(f"target z {z:.0f} mm is below the allowed {floor:.0f} mm "
+                         f"({min_z_mm:.0f} mm + fit error {fit_rms_mm:.0f} mm)")
+    for m in ARM_MOTORS:
+        lo_s, hi_s = ranges.get(m, (0, 0))
+        if hi_s - lo_s <= 2 * GOTO_RANGE_MARGIN:
+            raise ValueError(f"motor {m} range {lo_s}..{hi_s} is not a valid calibrated range; "
+                             "recalibrate in the Station console")
+    lo, hi = calib.limits_from_ranges(ranges, model)
+    q = calib.to_radians(present)
+    here = base.base_to_table(model.tcp(q))
+    travel = max(travel_z_mm, z)
+    points = []
+    if here[2] < travel - 10:
+        points.append(("lift", [float(here[0]), float(here[1]), travel]))
+    if math.hypot(here[0] - x, here[1] - y) > 10:
+        points.append(("across", [x, y, travel]))
+    if travel - z > 1:
+        points.append(("descend", [x, y, z]))
+    if not points:
+        points.append(("target", [x, y, z]))
+    legs = []
+    for label, p in points:
+        q, err = model.solve(base.table_to_base(p), q, lower=lo, upper=hi,
+                             point_down=point_down and label != "lift", locked=(7,))
+        if err * 1000 > GOTO_MAX_IK_ERR_MM:
+            raise ValueError(f"{label} point ({p[0]:.0f}, {p[1]:.0f}, {p[2]:.0f}) mm is out of reach "
+                             f"(IK error {err * 1000:.0f} mm)")
+        goals = calib.to_steps(q)
+        goals[7] = present[7]
+        for m in ARM_MOTORS:
+            lo_s, hi_s = ranges[m]
+            if not lo_s + GOTO_RANGE_MARGIN <= goals[m] <= hi_s - GOTO_RANGE_MARGIN:
+                raise ValueError(f"{label}: motor {m} goal {goals[m]} is outside its range "
+                                 f"{lo_s}..{hi_s} (minus {GOTO_RANGE_MARGIN})")
+        legs.append((label, p, goals))
+    return legs

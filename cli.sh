@@ -67,7 +67,7 @@ print_usage() {
     echo -e "  ${C_CYAN}hw bundle${C_RESET}            Pack logs, config and state for debugging or sharing"
     echo -e "  ${C_CYAN}logs [-f]${C_RESET}            Show the newest run log (-f follows it live)"
     echo -e "  ${C_CYAN}cameras${C_RESET}              Apply fixed camera exposure (Station must be stopped)"
-    echo -e "  ${C_GREEN}calib <cmd>${C_RESET}          AprilTag table frame + arm base + IK lookups (moves nothing): layout, camera, zero, touch, fit, where, reach, pixel, show"
+    echo -e "  ${C_GREEN}calib <cmd>${C_RESET}          AprilTag table frame + arm base + IK: layout, camera, zero, touch, fit, where, reach, pixel, show; goto MOVES the arm"
     echo -e "  ${C_CYAN}preflight${C_RESET}            Read-only ElRobot readiness check (writes logs/)"
     echo ""
     echo -e "${C_BOLD}Team Sync:${C_RESET}"

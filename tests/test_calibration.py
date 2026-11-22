@@ -240,3 +240,42 @@ def test_steps_wrap_across_4095_to_0():
         lo, hi = ak.JointCalibration({m: 411 for m in ak.ARM_MOTORS}, {m: 1 for m in ak.ARM_MOTORS}
                                      ).limits_from_ranges({7: (2439, 2198)}, ak.ArmModel())
         assert lo[6] < 0 < hi[6]
+
+
+def _goto_setup():
+    model = ak.ArmModel()
+    jc = ak.JointCalibration({m: 2048 for m in ak.ARM_MOTORS}, {m: 1 for m in ak.ARM_MOTORS})
+    base = ak.BaseInTable(228.0, 380.0, 180.0, 0.0)  # arm behind the tags, facing the person
+    q0 = np.zeros(7)
+    q0[1], q0[3] = 0.6, 0.9  # a folded, raised start pose
+    present = jc.to_steps(q0)
+    ranges = {m: (100, 4000) for m in ak.ARM_MOTORS}
+    return model, jc, base, present, ranges
+
+
+@pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
+def test_cartesian_goto_lifts_moves_across_and_descends():
+    model, jc, base, present, ranges = _goto_setup()
+    legs = ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, 150, 80], point_down=True, fit_rms_mm=16)
+    labels = [label for label, _, _ in legs]
+    assert labels[-2:] == ["across", "descend"]
+    assert all(p[2] >= 80 for _, p, _ in legs)
+    final = legs[-1][2]
+    assert final[7] == present[7]
+    tip = base.base_to_table(model.tcp(jc.to_radians(final)))
+    assert np.linalg.norm(tip - np.array([228, 150, 80])) < 5
+    assert model.approach(jc.to_radians(final))[2] < -0.95
+
+
+@pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
+def test_cartesian_goto_refuses_unsafe_targets():
+    model, jc, base, present, ranges = _goto_setup()
+    with pytest.raises(ValueError, match="below the allowed"):
+        ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, 150, 60], fit_rms_mm=16)
+    with pytest.raises(ValueError, match="out of reach"):
+        ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, -900, 100])
+    with pytest.raises(ValueError, match="not a valid calibrated range"):
+        ak.plan_cartesian_goto(model, jc, base, present, {**ranges, 2: (3726, 1565)}, [228, 150, 100])
+    narrow = {**ranges, 2: (present[2] - 30, present[2] + 30)}
+    with pytest.raises(ValueError, match="outside its range|out of reach"):
+        ak.plan_cartesian_goto(model, jc, base, present, narrow, [228, 150, 80], point_down=True)
