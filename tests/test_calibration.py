@@ -254,17 +254,23 @@ def _goto_setup():
 
 
 @pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
-def test_cartesian_goto_lifts_moves_across_and_descends():
+def test_cartesian_goto_lifts_moves_across_and_descends_in_small_steps():
     model, jc, base, present, ranges = _goto_setup()
-    legs = ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, 150, 80], point_down=True, fit_rms_mm=16)
-    labels = [label for label, _, _ in legs]
-    assert labels[-2:] == ["across", "descend"]
-    assert all(p[2] >= 80 for _, p, _ in legs)
-    final = legs[-1][2]
-    assert final[7] == present[7]
-    tip = base.base_to_table(model.tcp(jc.to_radians(final)))
-    assert np.linalg.norm(tip - np.array([228, 150, 80])) < 5
-    assert model.approach(jc.to_radians(final))[2] < -0.95
+    plan = ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, 150, 80], point_down=True, fit_rms_mm=16)
+    names = [label.split(" ")[0] for label, _, _, mode in plan if mode == "stream"]
+    assert names[0] == "lift" and names[-1] == "descend" and "across" in names
+    assert [label for label, *_ , mode in plan if mode == "watch"] == ["turn wrist down"]
+    prev = None
+    for label, p, goals, mode in plan:
+        tip = base.base_to_table(model.tcp(jc.to_radians(goals)))
+        assert np.linalg.norm(tip - np.asarray(p)) < 5           # every point is where it should be
+        assert goals[7] == present[7]
+        if prev is not None and mode == "stream":
+            assert np.linalg.norm(np.asarray(p) - prev) <= ak.PATH_STEP_MM + 1e-6
+            if not label.startswith("lift"):
+                assert p[2] >= 80 - 1e-6
+        prev = np.asarray(p)
+    assert model.approach(jc.to_radians(plan[-1][2]))[2] < -0.95
 
 
 @pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
@@ -272,7 +278,7 @@ def test_cartesian_goto_refuses_unsafe_targets():
     model, jc, base, present, ranges = _goto_setup()
     with pytest.raises(ValueError, match="below the allowed"):
         ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, 150, 60], fit_rms_mm=16)
-    with pytest.raises(ValueError, match="out of reach"):
+    with pytest.raises(ValueError, match="out of reach|would jump"):
         ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, -900, 100])
     with pytest.raises(ValueError, match="not a valid calibrated range"):
         ak.plan_cartesian_goto(model, jc, base, present, {**ranges, 2: (3726, 1565)}, [228, 150, 100])
@@ -284,15 +290,16 @@ def test_cartesian_goto_refuses_unsafe_targets():
 @pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
 def test_cartesian_line_follows_the_line_without_pose_jumps():
     model, jc, base, present, ranges = _goto_setup()
-    legs = ak.plan_cartesian_line(model, jc, base, present, ranges, [150, 150, 100], [300, 150, 100], step_mm=10)
-    line = [leg for leg in legs if leg[0].startswith("line ")]
-    assert len(line) == 15
-    prev = legs[len(legs) - len(line) - 1][2]
-    for _, p, goals in line:
+    plan = ak.plan_cartesian_line(model, jc, base, present, ranges, [150, 150, 100], [300, 150, 100])
+    line = [step for step in plan if step[0].startswith("line ")]
+    assert len(line) == 30
+    prev = plan[len(plan) - len(line) - 1][2]
+    for _, p, goals, mode in line:
+        assert mode == "stream"
         tip = base.base_to_table(model.tcp(jc.to_radians(goals)))
-        assert np.linalg.norm(tip - np.asarray(p)) < 5      # every point is on the line
+        assert np.linalg.norm(tip - np.asarray(p)) < 5
         assert abs(p[1] - 150) < 1e-6 and abs(p[2] - 100) < 1e-6
-        assert max(abs(goals[m] - prev[m]) for m in ak.ARM_MOTORS) <= ak.LINE_MAX_JUMP_STEPS
+        assert max(abs(goals[m] - prev[m]) for m in ak.ARM_MOTORS) <= ak.PATH_MAX_JUMP_STEPS
         prev = goals
 
 

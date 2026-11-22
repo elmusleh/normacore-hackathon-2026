@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `calib goto` and `calib line` move smoothly: the whole move (lift, across, descend, line) is planned as straight segments with a point every 3 mm (`plan_cartesian_path`) and streamed at a steady fingertip speed (`--mm-per-s`, default 25, max 60) with `move_motors`, instead of stopping at each point (Jafer saw the line stutter). Watched on every point: overload, fault, motor > 200 steps behind -> hold. `--speed` replaced by `--mm-per-s`. With `--down` the wrist turns once above the target.
+
 ### Added
 - `./cli.sh calib line X1 Y1 Z1 X2 Y2 Z2 [--step-mm 10] [--down] [--speed N] [--yes]`: goes to the start like `calib goto`, then follows a straight line point by point (`plan_cartesian_line` in `src/arm_kinematics.py`). All points are planned and checked before the MOVE prompt (height, reach, ranges, no motor jump > 200 steps between neighbours). Not yet run on the arm. Dry plan on live readings: (128,114,120)->(328,114,120) plans; lines toward the arm hit motor 2's range.
 - `./cli.sh calib goto X Y Z [--down] [--speed N] [--yes]`: moves the fingertip to a table point. Plans lift -> across at 150 mm -> descend (`plan_cartesian_goto` in `src/arm_kinematics.py`), shows the plan, asks for MOVE, then drives each leg with the `hw goto` machinery (torque check, speed cap 800, overload watch). Refuses without a measured calibration, below 50 mm + fit error, when out of reach (> 5 mm) or when any goal leaves a motor's range (no clamping). Not yet run on the arm.

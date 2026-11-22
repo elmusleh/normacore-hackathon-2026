@@ -10,8 +10,8 @@ Usage (via ./cli.sh calib):
   calib touch --list | --clear
   calib fit [--refine] [--write]       arm base pose in the table frame (+ joint zeros/directions)
   calib where                          current fingertip position in base and table frames
-  calib goto X Y Z [--down] [--speed N]  MOVES the arm: lift, across at 150 mm, descend (asks MOVE)
-  calib line X1 Y1 Z1 X2 Y2 Z2 [--step-mm 10] [--down]  MOVES: goto the start, then along a straight line
+  calib goto X Y Z [--down] [--mm-per-s 25]  MOVES the arm smoothly: lift, across at 150 mm, descend (asks MOVE)
+  calib line X1 Y1 Z1 X2 Y2 Z2 [--down] [--mm-per-s 25]  MOVES: goto the start, then along a straight line
   calib reach X Y Z [--down]           IK: joint steps that put the fingertip at table point X Y Z
   calib pixel U V [--size WxH]         table point under a camera pixel
   calib show                           what is calibrated and how well
@@ -344,23 +344,30 @@ def cmd_reach(args, cal):
     _warn_unmeasured(cal)
 
 
+STREAM_MAX_MM_S = 60         # fastest fingertip speed calib goto/line accept
+STREAM_MAX_LAG_STEPS = 200   # stop if a motor falls this far behind the last streamed goal (~17 deg)
+
+
 def cmd_goto(args, cal):
-    """Move the fingertip to a table point. The only calib command that moves the arm."""
-    import hw_day  # motion helpers: Station connection, MOVE prompt, torque check, speed cap
+    """Move the fingertip along a planned straight-line path (goto and line). The only commands that move."""
+    import time
+    import hw_day  # motion helpers: Station connection, MOVE prompt, torque check
     from elrobot_config import current_threshold_for
-    from elrobot_hardware import DEFAULT_MAX_ACCEL
+    from elrobot_hardware import DEFAULT_MAX_ACCEL, OverloadDetector
     from sequence_player import SEQ_NEAR_TOLERANCE
     for key, what in (("joints", "joint zeros (calib zero + calib fit --refine)"),
                       ("base_in_table", "arm base (calib fit --write)")):
         if not cal[key].get("measured"):
             raise SystemExit(f"Refused: {what} not measured yet. Nothing moved.")
+    if not 5 <= args.mm_per_s <= STREAM_MAX_MM_S:
+        raise SystemExit(f"Refused: --mm-per-s must be 5-{STREAM_MAX_MM_S}. Nothing moved.")
     rms = float(cal["base_in_table"].get("rms_mm") or 0.0)
     model, jc, base = _model(cal), JointCalibration.from_config(cal["joints"]), _base(cal)
-    speed = min(args.speed, hw_day.JOG_MAX_SPEED)
     if args.cmd == "line":
         target, end = [args.x1, args.y1, args.z1], [args.x2, args.y2, args.z2]
     else:
         target, end = [args.x, args.y, args.z], None
+    dt = args.step_mm / args.mm_per_s  # seconds between streamed points
 
     def go(hw, cfg):
         readings = hw.snapshot()
@@ -370,13 +377,12 @@ def cmd_goto(args, cal):
             return 1
         present = {m: readings[m].present for m in ARM_MOTORS}
         ranges = {m: (readings[m].range_min, readings[m].range_max) for m in ARM_MOTORS}
+        kw = dict(point_down=args.down, fit_rms_mm=rms, step_mm=args.step_mm)
         try:
-            if args.cmd == "line":
-                legs = plan_cartesian_line(model, jc, base, present, ranges, target, end,
-                                           point_down=args.down, fit_rms_mm=rms, step_mm=args.step_mm)
+            if end:
+                plan = plan_cartesian_line(model, jc, base, present, ranges, target, end, **kw)
             else:
-                legs = plan_cartesian_goto(model, jc, base, present, ranges, target,
-                                           point_down=args.down, fit_rms_mm=rms)
+                plan = plan_cartesian_goto(model, jc, base, present, ranges, target, **kw)
         except ValueError as exc:
             print(f"Refused: {exc}. Nothing moved.")
             return 1
@@ -384,35 +390,58 @@ def cmd_goto(args, cal):
             return 1
         what = f"Line {_fmt(target)} -> {_fmt(end)} mm" if end else f"Goto table {_fmt(target)} mm"
         print(f"\n{what}" + (", fingers down" if args.down else "")
-              + f", speed {speed}. Fit error {rms:.0f} mm: expect the fingertip within ~{2 * rms:.0f} mm.")
-        prev = dict(present)
-        line_legs = [leg for leg in legs if leg[0].startswith("line ")]
-        for k, (label, p, goals) in enumerate(legs):
-            if label.startswith("line ") and 0 < line_legs.index((label, p, goals)) < len(line_legs) - 1:
-                prev = goals
-                continue  # long lines: show only the first and last line point
-            print(f"  {label:8s} -> {_fmt(p, 0)} mm: " + ", ".join(
-                f"m{m} {prev[m]}->{goals[m]} ({goals[m] - prev[m]:+d})" for m in ARM_MOTORS if goals[m] != prev[m]))
-            prev = goals
-        if line_legs:
-            print(f"  ... {len(line_legs)} line points, {args.step_mm:g} mm apart, all checked before moving.")
-        print("  Gripper (motor 8) and wrist roll (motor 7) stay as they are.")
+              + f". Fit error {rms:.0f} mm: expect the fingertip within ~{2 * rms:.0f} mm.")
+        segs = []
+        for label, p, goals, mode in plan:
+            name = label.split(" ")[0] if mode == "stream" else label
+            if not segs or segs[-1][0] != name:
+                segs.append([name, p, p, 0])
+            segs[-1][2], segs[-1][3] = p, segs[-1][3] + 1
+        for name, p0, p1, n in segs:
+            print(f"  {name:16s} {n:3d} points, ends at {_fmt(p1, 0)} mm")
+        n_stream = sum(1 for *_, mode in plan if mode == "stream")
+        print(f"  Smooth: one point every {args.step_mm:g} mm at {args.mm_per_s:g} mm/s, about {n_stream * dt:.0f} s."
+              " Gripper and wrist roll (motor 7) stay as they are.")
         if not hw_day._confirm_motion(args.yes, "Check the path is clear, hand on the 12 V switch."):
             print("Cancelled. Nothing moved.")
             return 0
         thresholds = {m: current_threshold_for(cfg, m) for m in ARM_MOTORS}
-        for label, p, goals in legs:
-            # Loaded joints settle 20-45 steps short under gravity: accept "near" like the sequence player.
-            status = hw.move_and_watch(goals, enable_motion=True, max_speed=speed, max_accel=DEFAULT_MAX_ACCEL,
-                                       thresholds=thresholds, near_tolerance=SEQ_NEAR_TOLERANCE)
-            if not all(st in ("reached", "near") for st in status.values()):
-                print(f"Stopped during '{label}': " + ", ".join(f"{m}={st}" for m, st in sorted(status.items())))
-                print("The arm holds where it stopped. Check for an obstacle, then ./cli.sh logs.")
-                return 1
-            short = {m: goals[m] - st for m, st in ((m, r.present) for m, r in hw.snapshot().items())
-                     if m in goals and abs(goals[m] - st) > 12}
-            if not label.startswith("line ") or label.endswith(f"/{len(line_legs)}"):
-                print(f"  {label}: reached" + (f" (settled short, steps: {short})" if short else ""))
+        detectors = {m: OverloadDetector(thresholds[m]) for m in ARM_MOTORS}
+        sent = dict(present)
+
+        def stop(reason: str) -> int:
+            hw.hold(list(ARM_MOTORS))
+            print(f"STOPPED: {reason}. The arm holds where it is. Check for an obstacle, then ./cli.sh logs.")
+            return 1
+
+        last = present
+        for label, p, goals, mode in plan:
+            if mode == "watch":
+                status = hw.move_and_watch(goals, enable_motion=True, max_speed=300, max_accel=DEFAULT_MAX_ACCEL,
+                                           thresholds=thresholds, near_tolerance=SEQ_NEAR_TOLERANCE)
+                if not all(st in ("reached", "near") for st in status.values()):
+                    return stop(f"{label}: " + ", ".join(f"{m}={st}" for m, st in sorted(status.items())))
+                sent, last = dict(goals), goals
+                continue
+            t0 = time.monotonic()
+            r = hw.snapshot()
+            for m in ARM_MOTORS:
+                if r[m].faulted:
+                    return stop(f"motor {m} fault status 0x{r[m].status:02x} at {label}")
+                if detectors[m].update(r[m].current, r[m].present):
+                    return stop(f"motor {m} overload (current {r[m].current} > {thresholds[m]}) at {label}")
+                if abs(sent[m] - r[m].present) > STREAM_MAX_LAG_STEPS:
+                    return stop(f"motor {m} fell {sent[m] - r[m].present:+d} steps behind at {label}")
+            # servo speed: just enough to still be moving when the next point arrives (no stop-and-go)
+            need = max(abs(goals[m] - last[m]) for m in ARM_MOTORS) / dt
+            hw.move_motors(goals, enable_motion=True, max_speed=int(min(800, max(40, 1.2 * need))),
+                           max_accel=DEFAULT_MAX_ACCEL)
+            sent, last = dict(goals), goals
+            time.sleep(max(0.0, dt - (time.monotonic() - t0)))
+        status = hw.move_and_watch(last, enable_motion=True, max_speed=200, max_accel=DEFAULT_MAX_ACCEL,
+                                   thresholds=thresholds, near_tolerance=SEQ_NEAR_TOLERANCE)
+        if not all(st in ("reached", "near") for st in status.values()):
+            return stop("settling at the end: " + ", ".join(f"{m}={st}" for m, st in sorted(status.items())))
         final = hw.snapshot()
         tip = base.base_to_table(model.tcp(jc.to_radians({m: final[m].present for m in ARM_MOTORS})))
         print(f"Arrived. Fingertip by the joint readings: {_fmt(tip)} mm (target {_fmt(end or target)}).")
@@ -465,14 +494,15 @@ def main() -> int:
     p.add_argument("y", type=float)
     p.add_argument("z", type=float)
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
-    p.add_argument("--speed", type=int, default=200)
+    p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-60 mm/s)")
+    p.add_argument("--step-mm", type=float, default=3.0, help="distance between streamed points (2-20)")
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
     p = sub.add_parser("line", help="MOVE: goto the start point, then along a straight line (asks MOVE first)")
     for a in ("x1", "y1", "z1", "x2", "y2", "z2"):
         p.add_argument(a, type=float)
-    p.add_argument("--step-mm", type=float, default=10.0, help="distance between points on the line (2-50)")
+    p.add_argument("--step-mm", type=float, default=3.0, help="distance between streamed points (2-20)")
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
-    p.add_argument("--speed", type=int, default=200)
+    p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-60 mm/s)")
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
     p = sub.add_parser("zero")
     p.add_argument("--write", action="store_true")

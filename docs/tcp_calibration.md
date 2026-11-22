@@ -67,13 +67,12 @@ Origin = centre of tag 0, +x toward tag 1, +y toward tag 3, z up from the table 
 - Motor 1's zero cannot be told apart from the base yaw: the fit puts it in the yaw.
 - The URDF wrist and gripper geometry is assumed correct; the TCP offset (closed fingertip,
   103.5 mm past the Gripper_Base frame) comes from the jaw meshes, not a ruler.
-- `calib reach` only computes. `./cli.sh calib goto X Y Z [--down] [--speed N]` MOVES the arm
-  (hardware owner only, `docs/bench_safety.md` first): straight up to 150 mm, across at 150 mm, then
-  down to the target. It shows the plan and asks you to type MOVE. It refuses, and moves nothing,
-  when the calibration is not measured, the target is lower than 50 mm + the fit error, the point is
-  out of reach, or any motor goal falls outside its range (it never clamps). Motor 7 and the
-  gripper stay where they are. First tests: no `--down`, target 100 mm or higher, speed 200.
-- `./cli.sh calib line X1 Y1 Z1 X2 Y2 Z2 [--step-mm 10] [--down] [--speed N]` MOVES the arm: like
-  `goto` to the start point, then along the straight line in steps of `--step-mm` (stop-and-go at
-  each point). Every point is checked before anything moves; it also refuses when a motor would
-  jump more than 200 steps between neighbouring points (the arm would change pose mid-line).
+- `calib reach` only computes. `./cli.sh calib goto X Y Z [--down] [--mm-per-s 25]` and
+  `./cli.sh calib line X1 Y1 Z1 X2 Y2 Z2 [--down] [--mm-per-s 25]` MOVE the arm (hardware owner only,
+  `docs/bench_safety.md` first). Path: straight up to 150 mm, straight across, straight down to the
+  target (and for `line`, along the line). Points every `--step-mm` (3) are streamed at a steady
+  pace without waiting, so the arm glides instead of stopping at each point. With `--down` the
+  wrist turns down once, above the target. Every point is checked before the MOVE prompt (height
+  >= 50 mm + fit error, reach, motor ranges never clamped, no motor jumping > 120 steps between
+  neighbours). While moving it holds the arm at once on an overload, a motor fault, or a motor
+  more than 200 steps behind. Motor 7 and the gripper stay where they are.

@@ -376,31 +376,48 @@ def refine_joint_zeros(model: ArmModel, calib: JointCalibration, samples: Sequen
     return best
 
 
-# -- Cartesian goto planning (pure: the caller sends the goals) -----------------
+# -- Cartesian paths (pure: the caller sends the goals) --------------------------
+#
+# A move is a list of steps (label, table point mm, {motor: goal steps 1..7}, mode):
+#   mode "stream": a point on a straight segment, sent in a steady stream without waiting
+#   mode "watch":  a joint move that is sent and then watched until it arrives (wrist turn)
 
 GOTO_TRAVEL_Z_MM = 150.0     # lift to this height before moving sideways, then descend
 GOTO_MIN_Z_MM = 50.0         # never aim lower than this (plus the fit error) above the table
 GOTO_RANGE_MARGIN = 20       # steps kept away from each motor's range ends (same as clamp_goal)
 GOTO_MAX_IK_ERR_MM = 5.0
+PATH_STEP_MM = 5.0           # distance between streamed points
+PATH_MAX_JUMP_STEPS = 120    # a bigger change of one motor between neighbouring points = IK flipped pose
+LINE_STEP_MM = PATH_STEP_MM  # kept for callers of the first version
 
 
-def plan_cartesian_goto(model: ArmModel, calib: JointCalibration, base: BaseInTable,
+def _check_goals(label: str, goals: Dict[int, int], ranges: Dict[int, Tuple[int, int]]) -> None:
+    for m in ARM_MOTORS:
+        lo_s, hi_s = ranges[m]
+        if not lo_s + GOTO_RANGE_MARGIN <= goals[m] <= hi_s - GOTO_RANGE_MARGIN:
+            raise ValueError(f"{label}: motor {m} goal {goals[m]} is outside its range "
+                             f"{lo_s}..{hi_s} (minus {GOTO_RANGE_MARGIN})")
+
+
+def plan_cartesian_path(model: ArmModel, calib: JointCalibration, base: BaseInTable,
                         present: Dict[int, int], ranges: Dict[int, Tuple[int, int]],
-                        target_table_mm: Sequence[float], *, point_down: bool = False,
-                        fit_rms_mm: float = 0.0, travel_z_mm: float = GOTO_TRAVEL_Z_MM,
-                        min_z_mm: float = GOTO_MIN_Z_MM) -> List[Tuple[str, List[float], Dict[int, int]]]:
-    """Legs [(label, table point mm, {motor: goal steps 1..7})] to bring the fingertip to a table point.
-
-    Lift straight up to travel_z at the current spot, move across at travel_z, then descend, so
-    the arm never sweeps low over the table. Raises ValueError instead of guessing: target below
-    min_z + fit_rms, unreachable (IK error > 5 mm), or any goal outside a motor range (minus a
-    margin). Goals are never clamped: a clamped goal is a different pose than the one planned.
-    Motor 7 (wrist roll) stays where it is."""
-    x, y, z = (float(v) for v in target_table_mm)
+                        corners: Sequence[Tuple[str, Sequence[float]]], *, point_down: bool = False,
+                        fit_rms_mm: float = 0.0, step_mm: float = PATH_STEP_MM,
+                        travel_z_mm: float = GOTO_TRAVEL_Z_MM, min_z_mm: float = GOTO_MIN_Z_MM
+                        ) -> List[Tuple[str, List[float], Dict[int, int], str]]:
+    """Plan: lift straight up to travel_z at the current spot, then straight segments through
+    `corners` [(name, table point mm), ...], every point step_mm apart. Every point is checked
+    before anything moves: height (min_z + fit error, except the lift which only goes up), reach
+    (IK error <= 5 mm), motor ranges (never clamped) and no motor jumping more than
+    PATH_MAX_JUMP_STEPS between neighbours. With point_down the wrist turns down once, above the
+    first corner at travel height ("watch" step). Motor 7 stays where it is. Raises ValueError instead of guessing."""
+    if not 2.0 <= step_mm <= 20.0:
+        raise ValueError("step must be 2-20 mm")
     floor = min_z_mm + max(fit_rms_mm, 0.0)
-    if z < floor:
-        raise ValueError(f"target z {z:.0f} mm is below the allowed {floor:.0f} mm "
-                         f"({min_z_mm:.0f} mm + fit error {fit_rms_mm:.0f} mm)")
+    for name, c in corners:
+        if c[2] < floor:
+            raise ValueError(f"{name} z {c[2]:.0f} mm is below the allowed {floor:.0f} mm "
+                             f"({min_z_mm:.0f} mm + fit error {fit_rms_mm:.0f} mm)")
     for m in ARM_MOTORS:
         lo_s, hi_s = ranges.get(m, (0, 0))
         if hi_s - lo_s <= 2 * GOTO_RANGE_MARGIN:
@@ -408,77 +425,66 @@ def plan_cartesian_goto(model: ArmModel, calib: JointCalibration, base: BaseInTa
                              "recalibrate in the Station console")
     lo, hi = calib.limits_from_ranges(ranges, model)
     q = calib.to_radians(present)
+    prev = dict(present)
     here = base.base_to_table(model.tcp(q))
-    travel = max(travel_z_mm, z)
-    points = []
-    if here[2] < travel - 10:
-        points.append(("lift", [float(here[0]), float(here[1]), travel]))
-    if math.hypot(here[0] - x, here[1] - y) > 10:
-        points.append(("across", [x, y, travel]))
-    if travel - z > 1:
-        points.append(("descend", [x, y, z]))
-    if not points:
-        points.append(("target", [x, y, z]))
-    legs = []
-    for label, p in points:
-        q, err = model.solve(base.table_to_base(p), q, lower=lo, upper=hi,
-                             point_down=point_down and label != "lift", locked=(7,))
+    steps: List[Tuple[str, List[float], Dict[int, int], str]] = []
+
+    def solve(label: str, p: np.ndarray, down: bool) -> Dict[int, int]:
+        nonlocal q
+        q, err = model.solve(base.table_to_base(p), q, lower=lo, upper=hi, point_down=down, locked=(7,))
         if err * 1000 > GOTO_MAX_IK_ERR_MM:
-            raise ValueError(f"{label} point ({p[0]:.0f}, {p[1]:.0f}, {p[2]:.0f}) mm is out of reach "
+            raise ValueError(f"{label} ({p[0]:.0f}, {p[1]:.0f}, {p[2]:.0f}) mm is out of reach "
                              f"(IK error {err * 1000:.0f} mm)")
         goals = calib.to_steps(q)
         goals[7] = present[7]
-        for m in ARM_MOTORS:
-            lo_s, hi_s = ranges[m]
-            if not lo_s + GOTO_RANGE_MARGIN <= goals[m] <= hi_s - GOTO_RANGE_MARGIN:
-                raise ValueError(f"{label}: motor {m} goal {goals[m]} is outside its range "
-                                 f"{lo_s}..{hi_s} (minus {GOTO_RANGE_MARGIN})")
-        legs.append((label, p, goals))
-    return legs
+        _check_goals(label, goals, ranges)
+        return goals
+
+    def segment(name: str, a: np.ndarray, b: np.ndarray, down: bool) -> None:
+        nonlocal prev
+        n = int(math.ceil(float(np.linalg.norm(b - a)) / step_mm))
+        for i in range(1, n + 1):
+            p = a + (b - a) * i / n
+            label = f"{name} {i}/{n}"
+            goals = solve(label, p, down)
+            jump = max(ARM_MOTORS, key=lambda m: abs(goals[m] - prev[m]))
+            if abs(goals[jump] - prev[jump]) > PATH_MAX_JUMP_STEPS:
+                raise ValueError(f"{label}: motor {jump} would jump {goals[jump] - prev[jump]:+d} steps between "
+                                 "neighbouring points (the arm would change pose); try another path")
+            steps.append((label, [float(v) for v in p], goals, "stream"))
+            prev = goals
+
+    travel = max(travel_z_mm, max(c[2] for _, c in corners))
+    top = np.array([here[0], here[1], travel])
+    segment("lift", here, top, False)
+    first = np.asarray(corners[0][1], dtype=float)
+    above = np.array([first[0], first[1], travel])
+    segment("across", top, above, False)
+    if point_down:
+        goals = solve("turn wrist down", above, True)
+        steps.append(("turn wrist down", [float(v) for v in above], goals, "watch"))
+        prev = goals
+    pos = above
+    for name, c in corners:
+        c = np.asarray(c, dtype=float)
+        segment(name, pos, c, point_down)
+        pos = c
+    if not steps:
+        raise ValueError("already there")
+    return steps
 
 
-LINE_STEP_MM = 10.0          # distance between points along a line
-LINE_MAX_JUMP_STEPS = 200    # a bigger change of one motor between neighbouring points = IK flipped pose
+def plan_cartesian_goto(model: ArmModel, calib: JointCalibration, base: BaseInTable,
+                        present: Dict[int, int], ranges: Dict[int, Tuple[int, int]],
+                        target_table_mm: Sequence[float], **kw) -> List[Tuple[str, List[float], Dict[int, int], str]]:
+    """Lift, across at travel height, then straight down to the target. See plan_cartesian_path."""
+    return plan_cartesian_path(model, calib, base, present, ranges, [("descend", target_table_mm)], **kw)
 
 
 def plan_cartesian_line(model: ArmModel, calib: JointCalibration, base: BaseInTable,
                         present: Dict[int, int], ranges: Dict[int, Tuple[int, int]],
-                        start_mm: Sequence[float], end_mm: Sequence[float], *, point_down: bool = False,
-                        fit_rms_mm: float = 0.0, step_mm: float = LINE_STEP_MM,
-                        min_z_mm: float = GOTO_MIN_Z_MM) -> List[Tuple[str, List[float], Dict[int, int]]]:
-    """Legs to reach `start_mm` safely (as plan_cartesian_goto), then points every step_mm along the
-    straight line to `end_mm`. Every point is checked before anything moves: height, reach, motor
-    ranges, and no motor jumping more than LINE_MAX_JUMP_STEPS between neighbouring points.
-    Raises ValueError instead of guessing."""
-    a, b = np.asarray(start_mm, dtype=float), np.asarray(end_mm, dtype=float)
-    floor = min_z_mm + max(fit_rms_mm, 0.0)
-    if min(a[2], b[2]) < floor:
-        raise ValueError(f"line goes down to z {min(a[2], b[2]):.0f} mm, below the allowed {floor:.0f} mm")
-    if not 2.0 <= step_mm <= 50.0:
-        raise ValueError("step must be 2-50 mm")
-    legs = plan_cartesian_goto(model, calib, base, present, ranges, a, point_down=point_down,
-                               fit_rms_mm=fit_rms_mm, min_z_mm=min_z_mm)
-    lo, hi = calib.limits_from_ranges(ranges, model)
-    length = float(np.linalg.norm(b - a))
-    n = max(1, int(math.ceil(length / step_mm)))
-    prev = legs[-1][2]
-    q = calib.to_radians(prev)
-    for i in range(1, n + 1):
-        p = a + (b - a) * i / n
-        q, err = model.solve(base.table_to_base(p), q, lower=lo, upper=hi, point_down=point_down, locked=(7,))
-        if err * 1000 > GOTO_MAX_IK_ERR_MM:
-            raise ValueError(f"line point {i}/{n} ({p[0]:.0f}, {p[1]:.0f}, {p[2]:.0f}) mm is out of reach "
-                             f"(IK error {err * 1000:.0f} mm)")
-        goals = calib.to_steps(q)
-        goals[7] = present[7]
-        for m in ARM_MOTORS:
-            lo_s, hi_s = ranges[m]
-            if not lo_s + GOTO_RANGE_MARGIN <= goals[m] <= hi_s - GOTO_RANGE_MARGIN:
-                raise ValueError(f"line point {i}/{n}: motor {m} goal {goals[m]} is outside its range "
-                                 f"{lo_s}..{hi_s} (minus {GOTO_RANGE_MARGIN})")
-            if abs(goals[m] - prev[m]) > LINE_MAX_JUMP_STEPS:
-                raise ValueError(f"line point {i}/{n}: motor {m} would jump {goals[m] - prev[m]:+d} steps "
-                                 "between neighbouring points (the arm would change pose); try another line")
-        legs.append((f"line {i}/{n}", [float(v) for v in p], goals))
-        prev = goals
-    return legs
+                        start_mm: Sequence[float], end_mm: Sequence[float], **kw
+                        ) -> List[Tuple[str, List[float], Dict[int, int], str]]:
+    """Like plan_cartesian_goto to start_mm, then along the straight line to end_mm."""
+    return plan_cartesian_path(model, calib, base, present, ranges,
+                               [("descend", start_mm), ("line", end_mm)], **kw)
