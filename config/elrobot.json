@@ -32,10 +32,10 @@
   },
   "camera_settings": {
     "table": {
-      "exposure": 250
+      "exposure": 20
     },
     "gripper": {
-      "exposure": 250
+      "exposure": 50
     }
   },
   "agent": {
