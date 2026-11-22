@@ -200,6 +200,7 @@ fetch("/api/cameras").then(r => r.json())
 // ---------------------------------------------------------------- text to speech (TTS)
 let currentAudio = null;
 let ttsPlaying = false;
+let ttsSeq = 0;
 let followupUntil = 0;
 let hfCancelCurrent = false;
 
@@ -221,27 +222,35 @@ function abortHandsFreeRecording() {
 
 async function speakText(text, force = false) {
   if ((!force && !$("tts")?.checked) || !text) return;
+  const mySeq = ++ttsSeq;
   ttsPlaying = true;
   abortHandsFreeRecording();
   setHfMicEnabled(false);
   if (hfActive) setHfState("speaking", "Robot speaking… (mic muted)");
   try {
-    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    if (currentAudio) {
+      currentAudio.onended = null;
+      currentAudio.onerror = null;
+      currentAudio.pause();
+      currentAudio = null;
+    }
     const r = await fetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
+    if (mySeq !== ttsSeq) return;  // superseded by newer reply
     if (!r.ok) {
       const info = await r.json().catch(() => ({}));
       throw new Error(info.error || `HTTP ${r.status}`);
     }
     const url = URL.createObjectURL(await r.blob());
+    if (mySeq !== ttsSeq) { URL.revokeObjectURL(url); return; }
     await new Promise((resolve) => {
       currentAudio = new Audio(url);
       const done = () => {
         URL.revokeObjectURL(url);
-        currentAudio = null;
+        if (mySeq === ttsSeq) currentAudio = null;
         resolve();
       };
       currentAudio.onended = done;
@@ -249,6 +258,7 @@ async function speakText(text, force = false) {
       currentAudio.play().catch(done);
     });
   } catch (e) {
+    if (mySeq !== ttsSeq) return;
     // Fallback to browser speechSynthesis if server TTS fails
     if ("speechSynthesis" in window) {
       try {
@@ -258,14 +268,17 @@ async function speakText(text, force = false) {
     }
     if (force) setStatus(`TTS error: ${e.message}`, true);
   } finally {
-    // Keep mic muted for 700 ms after TTS finishes so speaker tail/echo is completely gone
-    setTimeout(() => {
-      ttsPlaying = false;
-      setHfMicEnabled(true);
-      if ($("handsfree")?.checked && !recording && !busy) {
-        setHfState("standby", 'Say "Robo, ..." to command (or "Stop" anytime)');
-      }
-    }, 700);
+    // Only the latest TTS utterance may unmute the mic (prevents overlapping replies from unmuting early!)
+    if (mySeq === ttsSeq) {
+      setTimeout(() => {
+        if (mySeq !== ttsSeq) return;
+        ttsPlaying = false;
+        setHfMicEnabled(true);
+        if ($("handsfree")?.checked && !recording && !busy && !agentBusy) {
+          setHfState("standby", 'Say "Robo, ..." to command (or "Stop" anytime)');
+        }
+      }, 800);
+    }
   }
 }
 
@@ -335,6 +348,8 @@ poll();
 async function send(text) {
   text = text.trim();
   if (!text) return;
+  agentBusy = true;
+  if (hfActive) setHfState("busy", "Waiting for robot reply…");
   const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify({ role: "user", text }) });
   const d = await r.json();
