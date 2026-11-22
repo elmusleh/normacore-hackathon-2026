@@ -1,15 +1,25 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T07:28:00Z
-status: diagrams-png-pdf-and-illustrated-video-ready
+timestamp: 2026-11-22T07:34:00Z
+status: narrated-story-film-ready
 current_phase: "Phase 5: Demo Polishing & Sunday Pitch"
-current_task: "Rendered PNG/PDF architecture diagrams, generated 6 bespoke editorial illustrations of CareArm helping paralyzed/elderly diners, and built 1080p Ken Burns story video"
+current_task: "Wrote CareArm production story script (docs/CAREARM_STORY_SCRIPT.md) and generated narrated 1080p story film (data/carearm_story_film_1080p.mp4)"
 stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-22T07:21 — plantuml-diagrams-and-video-builder-ready
+previous_session: antigravity 2026-11-22T07:28 — diagrams-png-pdf-and-illustrated-video-ready
 ---
 
-## Latest session (2026-11-22 07:28): PNG/PDF Architecture Diagrams & 1080p Illustrated Story Video
+## Latest session (2026-11-22 07:34): Narrated 1080p Story Film ("Marta's Dinner")
+
+- **What Changed:**
+  - **Story Script (`docs/CAREARM_STORY_SCRIPT.md`):** Wrote a 9-scene narrative production script ("Marta's Dinner") following an older adult with upper-limb mobility loss from waiting for meals to hands-free voice feeding, gentle wrist-camera grasp, respectful 8 cm mouth-open standoff, 4-layer architecture reveal, shared family dinners, and 10× affordable elder-care impact.
+  - **Narrated 1080p Story Film (`scripts/build_story_film.py` -> `data/carearm_story_film_1080p.mp4`):** Generated per-scene studio narration via OpenAI `tts-1-hd` (`nova`), auto-synced every scene's duration to its exact voiceover length, added Ken Burns slow-zoom motion, `carearm_overview.png` architecture reveal, crisp lower-third captions, a subtle warm Cmaj7 ambient music bed, and smooth crossfades.
+- **Files Changed:** `docs/CAREARM_STORY_SCRIPT.md`, `scripts/build_story_film.py`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`, `.ai-sync/PROGRESS.md`.
+- **Next Steps:**
+  1. Watch `data/carearm_story_film_1080p.mp4` (and optionally splice a 30–60 s real bench robot clip after Scene 5 in CapCut).
+  2. Upload the final video to your shared Google Drive folder and submit `https://tally.so/r/GexoxQ` before **16:30**.
+
+## Session (2026-11-22 07:28): PNG/PDF Architecture Diagrams & 1080p Illustrated Story Video
 
 - **What Changed:**
   - **Rendered PNG & PDF Diagrams (`scripts/render_architecture_diagrams.py`):** Generated ready-to-use visual diagrams (no code needed to view) at `docs/diagrams/carearm_overview.png`, `docs/diagrams/carearm_overview.pdf`, `docs/diagrams/carearm_feeding_sequence.png`, and `docs/diagrams/carearm_feeding_sequence.pdf`.

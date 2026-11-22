@@ -60,6 +60,7 @@
 ## Phase 5: Demo Polishing & Sunday Pitch — IN PROGRESS
 - [x] Generate final 10-slide presentation pitch deck with speaker notes (`docs/Assistive_Feeding_Robot_Pitch.pptx`, `scripts/generate_pitch_deck.py`)
 - [x] Generate 9-slide use-case & human-impact presentation deck with speaker notes (`docs/CareArm_Use_Case_Pitch.pptx`, `scripts/generate_use_case_deck.py`)
+- [x] Render PNG & PDF architecture diagrams + 6 editorial illustrations + narrated 1080p story film (`docs/CAREARM_STORY_SCRIPT.md`, `scripts/build_story_film.py`, `data/carearm_story_film_1080p.mp4`)
 - [x] Prepare copy-paste Tally submission form inputs & pre-16:30 checklist (`docs/Hackathon_submission_requirements.md`)
 - [ ] Build split-screen display
 - [ ] Rehearse 3-minute winning stage demo

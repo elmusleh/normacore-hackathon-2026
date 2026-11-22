@@ -1,11 +1,25 @@
 ### Post-Implementation Suggestions
 
-1. Add a calm voiceover narration track to `data/carearm_use_case_story_1080p.mp4` using `--audio` before uploading to Google Drive — Priority 90% (Critical) [Professionalism]
-   What: Record a warm 55-second human voiceover (or generate one with OpenAI TTS `nova` / ElevenLabs) matching the 6 illustrated scenes and mux it via `python3 scripts/build_illustrated_video.py --audio data/narration.mp3`.
-   Why: Adding warm spoken storytelling (and optionally soft background piano) transforms the illustrated 1080p video from silent captions into an emotionally compelling pitch film.
-   How: Record or export an MP3 voiceover to `data/narration.mp3`, then run `python3 scripts/build_illustrated_video.py --audio data/narration.mp3`.
+1. Splice a 30–60 second real ElRobot bench demo clip right after Scene 5 of `data/carearm_story_film_1080p.mp4` before uploading to Google Drive — Priority 92% (Critical) [Professionalism]
+   What: Insert a short real-hardware clip showing the physical ElRobot picking a grape and pausing for the OBSBOT Mouth-Open gate between Scene 5 (architecture) and Scene 6 (family dinner) in CapCut or ffmpeg.
+   Why: Keeps the emotional, studio-narrated Marta story while also satisfying the Robotics Track rule to show the real physical robot in action.
+   How: Drop `data/carearm_story_film_1080p.mp4` and your bench phone/OBS clip into CapCut, cut right after Scene 5, export 1080p MP4, and upload to your shared Google Drive folder before `16:30`.
    Status: ⏳ Unimplemented
-   Reason Deferred: Kept the generated video clean and narration-ready so you can choose a live teammate voice or AI narration.
+   Reason Deferred: Ready as soon as you capture one clean 30–60 s clip on the physical bench.
+
+2. Generate a German-narrated version of the story film (`--voice nova` with German script) for local Berlin care-home partners — Priority 55% (Nice to have) [Professionalism]
+   What: Add a `--lang de` option to `scripts/build_story_film.py` with translated German narration and captions so you can share the video directly with Berlin occupational therapists and care facilities.
+   Why: CareArm already supports bilingual EN/DE voice; having a German story film makes post-hackathon pilot outreach in Berlin effortless.
+   How: Add a `STORY_SCENES_DE` list in `scripts/build_story_film.py` and run `.venv/bin/python scripts/build_story_film.py --output data/carearm_story_film_de_1080p.mp4`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: English version is the primary submission for the international Berlin hackathon jury.
+
+3. Export an `.srt` subtitle file alongside `data/carearm_story_film_1080p.mp4` for accessibility — Priority 50% (Nice to have) [Best practices]
+   What: Have `scripts/build_story_film.py` write a matching `data/carearm_story_film_1080p.srt` timed to each scene's narration start/end so viewers watching on mute or with hearing impairments get full word-for-word captions.
+   Why: Reinforces CareArm's accessibility-first mission and helps judges watching quickly in Google Drive or YouTube.
+   How: Record each scene's cumulative start/end timestamps in `build_story_film.py` and write standard SRT blocks next to the `.mp4`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Every scene already has baked-in lower-third headline & summary captions.
 
 2. Embed `docs/assets/scene_01_need.png` through `scene_06_carehome.png` into `docs/CareArm_Use_Case_Pitch.pptx` — Priority 78% (High value) [Professionalism]
    What: Place the 6 bespoke illustrations directly onto the slides of `docs/CareArm_Use_Case_Pitch.pptx` so your live stage slides share the exact same visual world as your video.
