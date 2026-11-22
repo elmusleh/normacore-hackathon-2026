@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `docs/feeding_skills.md`: roadmap of 17 Claude Code skills from hover-above-object to feeding a person (check-ready, scan-table, center-on-object, grasp-food, carry-to-serve, find-mouth, approach-mouth, handover, return-to-clear, feed-me, safe-recover, place-object, say-and-listen, spoon skills, meal-session), with tier, dependencies, autonomy and build order. Docs only.
+- `docs/feeding_skills.md`: two skills to feed a person, `grab <object>` and `feed <object>` (feed grabs first if needed), with their steps, the missing pieces per step and the autonomy rule. Replaces the 17-skill list written earlier the same day. Docs only.
 - Project skill `.claude/skills/hover-above-object/SKILL.md`: the fixed procedure for "move above <object>" (table camera look -> `calib pixel` -> `calib reach` -> `calib goto X Y 70 --yes` -> look again). Jafer (hardware owner) authorised it to run without asking each time on 2026-11-22, for hover moves only; grasping, lower moves and gripper commands still need typed confirmation.
 
 ### Changed

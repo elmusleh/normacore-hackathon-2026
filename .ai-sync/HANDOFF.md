@@ -9,6 +9,11 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, claude for Jafer): feeding skills cut to two
+- Jafer found the 17-skill list too much ("as smooth as possible"). `docs/feeding_skills.md` now has two skills: `grab <object>` (find, hover, centre, grasp, lift) and `feed <object>` (grab if needed, carry to serve, approach to standoff, handover, return). The old skills are steps inside them. Docs only.
+- Next: 1) Measure the gripper camera's finger-centre pixel. 2) Gripper direction + current probe (plan 1.2-1.3), grasp width for grapes. 3) Write `.claude/skills/grab/SKILL.md`. 4) Teach `serve`, build `find_mouth` + approach, then `.claude/skills/feed/SKILL.md`.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, claude for Jafer): feeding skills roadmap
 - Jafer asked for the list of skills needed to get from "move above <object>" to feeding a person. Wrote `docs/feeding_skills.md`: 17 skills (check-ready, scan-table, hover-above-object [done], center-on-object, grasp-food, carry-to-serve, find-mouth, approach-mouth, handover, return-to-clear, feed-me, safe-recover, place-object, say-and-listen, pick/return-tool, scoop, meal-session), each with tier, dependencies, autonomy and status, plus a build order. Docs only; no code, no motion.
 - Next: 1) Jafer reviews the list and the autonomy column (which moves may run without asking). 2) Write `check-ready`, `return-to-clear`, `safe-recover` skills. 3) Measure the gripper camera's finger-centre pixel for `center-on-object`. 4) Gripper direction + current probe (plan 1.2-1.3) to unblock `grasp-food`.

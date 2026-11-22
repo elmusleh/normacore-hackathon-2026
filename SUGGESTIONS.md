@@ -1,7 +1,28 @@
 ### Post-Implementation Suggestions
 
+1. Show the grasp target on the camera picture before going down — Priority 74% (High value) [Security]
+   What: Before `grab` descends, save the gripper-camera frame with the planned grasp point drawn on it and let the agent check it.
+   Why: The descent is the riskiest table move; a wrong target (wrong grape, edge of the bowl) is caught before the fingers hit anything.
+   How: In the grab procedure, after centring, call `look("gripper")`, draw a cross at the finger-centre pixel, and stop if the object is not under it.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The finger-centre pixel is not measured yet.
+
+2. Time each step of `grab` and `feed` — Priority 62% (Nice to have) [Best practices]
+   What: Log how long each step takes (find, hover, centre, grasp, carry, approach, handover).
+   Why: "Smooth" means no long pauses; the timings show which step to speed up instead of guessing.
+   How: Print a timestamp at the start and end of each step in the skill run and add a one-line summary to the handoff after rehearsals.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Skills not written yet.
+
+3. Wait in a "ready" pose above the table middle between requests — Priority 45% (Nice to have) [Best practices]
+   What: After `feed` returns, park the fingertip above the middle of the table instead of at `clear`.
+   Why: Every next move starts closer to the food, so requests feel faster and paths are shorter.
+   How: Pick a table point (e.g. x 250, y 120, z 150), check it with `calib reach`, and use it as the end of `feed` once the owner agrees.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the owner's OK on a new resting pose.
+
 1. Give each skill a written "done when" test and run it before trusting the skill — Priority 84% (High value) [Best practices]
-   What: For every skill in docs/feeding_skills.md, a short pass rule (e.g. "grasp-food: 5 grapes in a row, none crushed") recorded in FINDINGS.md with the run date.
+   What: For `grab` and `feed` in docs/feeding_skills.md, a short pass rule (e.g. "grab grape: 5 in a row, none crushed") recorded in FINDINGS.md with the run date.
    Why: A skill that worked once at 4 a.m. is not a demo skill. A clear pass rule tells the team which skills `feed-me` may rely on and which must fall back to the recorded plan.
    How: Copy the "Done when" column from the plan's task tables into each skill file; after each bench run, add one FINDINGS.md line with the result and the log path.
    Status: ⏳ Unimplemented

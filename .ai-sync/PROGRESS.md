@@ -58,8 +58,8 @@
 - [x] AprilTag generator prints real 36h11 tags (`./cli.sh apriltags`, 80 mm default)
 - [x] Table frame + URDF FK/IK + base/joint-zero fit, read-only CLI `./cli.sh calib` (tested offline only)
 - [x] First camera-located hover: `calib goto` above the grape (2026-11-22, on the arm); skill `.claude/skills/hover-above-object/` for repeat requests
-- [x] Skill roadmap to feeding a person: `docs/feeding_skills.md` (17 skills, build order)
-- [ ] Write skills in build order: check-ready, return-to-clear, safe-recover, then center-on-object and grasp-food
+- [x] Skill design to feeding a person: `docs/feeding_skills.md` (two skills: `grab <object>`, `feed <object>`)
+- [ ] Write `.claude/skills/grab/` (needs finger-centre pixel, gripper 1.2-1.4) and `.claude/skills/feed/` (needs serve pose, find_mouth, approach loop)
 - [ ] Bench calibration per docs/tcp_calibration.md: layout, camera, zero, touches, fit --refine; commit config/calibration.json
 - [ ] Check `calib where` against the tape measure at 3+ spots (target: within ~1 cm)
 - [ ] Cartesian move command (table x,y,z -> IK -> clamped joint goals via move_and_watch), reviewed by the hardware owner
