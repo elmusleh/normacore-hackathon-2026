@@ -16,6 +16,7 @@ previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP serve
 - Next: 1) Jafer runs the bench checklist (docs/bench_safety.md), `./cli.sh hw torque on` while holding the arm, then `./cli.sh calib goto 228 114 120 --speed 200`, type MOVE, hand on the 12 V switch. 2) Recalibrate motor 2 through its full travel (waypoints use down to 1016). 3) Ruler layout, zero, touches, fit < 10 mm.
 - 04:08: first live goto stopped in the lift leg (timeout: motors 2-4 settled 18-48 steps short under gravity). Fixed to accept `near` like the sequence player. Arm holding at the lift pose with torque on. Motor 2's range was 994..3102 yesterday, 1532..2564 now: recalibrate it.
 - ~04:15: second run arrived (all legs `near`); readings say (228.8, 112.1, 106.3) mm, 14 mm low from gravity sag. Real position not yet measured.
+- New `calib line` (follow a straight line). NOT run on the arm yet. Suggested first run: `./cli.sh calib line 128 114 120 328 114 120 --speed 200`. Lines toward the arm fail on motor 2's narrow range until it is recalibrated.
 - Hardware owner: jafer.
 
 ## Latest session (2026-11-22, ~02:20, claude for Jafer): camera resolution, console sees all cameras

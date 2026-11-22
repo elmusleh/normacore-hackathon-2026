@@ -11,6 +11,7 @@ Usage (via ./cli.sh calib):
   calib fit [--refine] [--write]       arm base pose in the table frame (+ joint zeros/directions)
   calib where                          current fingertip position in base and table frames
   calib goto X Y Z [--down] [--speed N]  MOVES the arm: lift, across at 150 mm, descend (asks MOVE)
+  calib line X1 Y1 Z1 X2 Y2 Z2 [--step-mm 10] [--down]  MOVES: goto the start, then along a straight line
   calib reach X Y Z [--down]           IK: joint steps that put the fingertip at table point X Y Z
   calib pixel U V [--size WxH]         table point under a camera pixel
   calib show                           what is calibrated and how well
@@ -41,6 +42,7 @@ from arm_kinematics import (  # noqa: E402
     JointCalibration,
     fit_base_in_table,
     plan_cartesian_goto,
+    plan_cartesian_line,
     refine_joint_zeros,
     step_delta,
     step_in_range,
@@ -355,7 +357,10 @@ def cmd_goto(args, cal):
     rms = float(cal["base_in_table"].get("rms_mm") or 0.0)
     model, jc, base = _model(cal), JointCalibration.from_config(cal["joints"]), _base(cal)
     speed = min(args.speed, hw_day.JOG_MAX_SPEED)
-    target = [args.x, args.y, args.z]
+    if args.cmd == "line":
+        target, end = [args.x1, args.y1, args.z1], [args.x2, args.y2, args.z2]
+    else:
+        target, end = [args.x, args.y, args.z], None
 
     def go(hw, cfg):
         readings = hw.snapshot()
@@ -366,20 +371,31 @@ def cmd_goto(args, cal):
         present = {m: readings[m].present for m in ARM_MOTORS}
         ranges = {m: (readings[m].range_min, readings[m].range_max) for m in ARM_MOTORS}
         try:
-            legs = plan_cartesian_goto(model, jc, base, present, ranges, target,
-                                       point_down=args.down, fit_rms_mm=rms)
+            if args.cmd == "line":
+                legs = plan_cartesian_line(model, jc, base, present, ranges, target, end,
+                                           point_down=args.down, fit_rms_mm=rms, step_mm=args.step_mm)
+            else:
+                legs = plan_cartesian_goto(model, jc, base, present, ranges, target,
+                                           point_down=args.down, fit_rms_mm=rms)
         except ValueError as exc:
             print(f"Refused: {exc}. Nothing moved.")
             return 1
         if not hw_day._require_torque(readings, list(ARM_MOTORS)):
             return 1
-        print(f"\nGoto table {_fmt(target)} mm" + (", fingers down" if args.down else "")
+        what = f"Line {_fmt(target)} -> {_fmt(end)} mm" if end else f"Goto table {_fmt(target)} mm"
+        print(f"\n{what}" + (", fingers down" if args.down else "")
               + f", speed {speed}. Fit error {rms:.0f} mm: expect the fingertip within ~{2 * rms:.0f} mm.")
         prev = dict(present)
-        for label, p, goals in legs:
+        line_legs = [leg for leg in legs if leg[0].startswith("line ")]
+        for k, (label, p, goals) in enumerate(legs):
+            if label.startswith("line ") and 0 < line_legs.index((label, p, goals)) < len(line_legs) - 1:
+                prev = goals
+                continue  # long lines: show only the first and last line point
             print(f"  {label:8s} -> {_fmt(p, 0)} mm: " + ", ".join(
                 f"m{m} {prev[m]}->{goals[m]} ({goals[m] - prev[m]:+d})" for m in ARM_MOTORS if goals[m] != prev[m]))
             prev = goals
+        if line_legs:
+            print(f"  ... {len(line_legs)} line points, {args.step_mm:g} mm apart, all checked before moving.")
         print("  Gripper (motor 8) and wrist roll (motor 7) stay as they are.")
         if not hw_day._confirm_motion(args.yes, "Check the path is clear, hand on the 12 V switch."):
             print("Cancelled. Nothing moved.")
@@ -395,10 +411,11 @@ def cmd_goto(args, cal):
                 return 1
             short = {m: goals[m] - st for m, st in ((m, r.present) for m, r in hw.snapshot().items())
                      if m in goals and abs(goals[m] - st) > 12}
-            print(f"  {label}: reached" + (f" (settled short, steps: {short})" if short else ""))
+            if not label.startswith("line ") or label.endswith(f"/{len(line_legs)}"):
+                print(f"  {label}: reached" + (f" (settled short, steps: {short})" if short else ""))
         final = hw.snapshot()
         tip = base.base_to_table(model.tcp(jc.to_radians({m: final[m].present for m in ARM_MOTORS})))
-        print(f"Arrived. Fingertip by the joint readings: {_fmt(tip)} mm (target {_fmt(target)}).")
+        print(f"Arrived. Fingertip by the joint readings: {_fmt(tip)} mm (target {_fmt(end or target)}).")
         return 0
     try:
         return hw_day._with_station(go)
@@ -450,6 +467,13 @@ def main() -> int:
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
     p.add_argument("--speed", type=int, default=200)
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
+    p = sub.add_parser("line", help="MOVE: goto the start point, then along a straight line (asks MOVE first)")
+    for a in ("x1", "y1", "z1", "x2", "y2", "z2"):
+        p.add_argument(a, type=float)
+    p.add_argument("--step-mm", type=float, default=10.0, help="distance between points on the line (2-50)")
+    p.add_argument("--down", action="store_true", help="fingers pointing straight down")
+    p.add_argument("--speed", type=int, default=200)
+    p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
     p = sub.add_parser("zero")
     p.add_argument("--write", action="store_true")
     p = sub.add_parser("touch")
@@ -474,7 +498,7 @@ def main() -> int:
     args = ap.parse_args()
     cal = load_calibration()
     {"layout": cmd_layout, "camera": cmd_camera, "zero": cmd_zero, "touch": cmd_touch, "fit": cmd_fit,
-     "where": cmd_where, "reach": cmd_reach, "goto": cmd_goto, "pixel": cmd_pixel, "show": cmd_show}[args.cmd](args, cal)
+     "where": cmd_where, "reach": cmd_reach, "goto": cmd_goto, "line": cmd_goto, "pixel": cmd_pixel, "show": cmd_show}[args.cmd](args, cal)
     return 0
 
 

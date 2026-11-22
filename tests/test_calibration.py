@@ -279,3 +279,25 @@ def test_cartesian_goto_refuses_unsafe_targets():
     narrow = {**ranges, 2: (present[2] - 30, present[2] + 30)}
     with pytest.raises(ValueError, match="outside its range|out of reach"):
         ak.plan_cartesian_goto(model, jc, base, present, narrow, [228, 150, 80], point_down=True)
+
+
+@pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
+def test_cartesian_line_follows_the_line_without_pose_jumps():
+    model, jc, base, present, ranges = _goto_setup()
+    legs = ak.plan_cartesian_line(model, jc, base, present, ranges, [150, 150, 100], [300, 150, 100], step_mm=10)
+    line = [leg for leg in legs if leg[0].startswith("line ")]
+    assert len(line) == 15
+    prev = legs[len(legs) - len(line) - 1][2]
+    for _, p, goals in line:
+        tip = base.base_to_table(model.tcp(jc.to_radians(goals)))
+        assert np.linalg.norm(tip - np.asarray(p)) < 5      # every point is on the line
+        assert abs(p[1] - 150) < 1e-6 and abs(p[2] - 100) < 1e-6
+        assert max(abs(goals[m] - prev[m]) for m in ak.ARM_MOTORS) <= ak.LINE_MAX_JUMP_STEPS
+        prev = goals
+
+
+@pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
+def test_cartesian_line_refuses_low_lines():
+    model, jc, base, present, ranges = _goto_setup()
+    with pytest.raises(ValueError, match="below the allowed"):
+        ak.plan_cartesian_line(model, jc, base, present, ranges, [150, 150, 100], [300, 150, 40])

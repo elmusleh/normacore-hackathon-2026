@@ -435,3 +435,50 @@ def plan_cartesian_goto(model: ArmModel, calib: JointCalibration, base: BaseInTa
                                  f"{lo_s}..{hi_s} (minus {GOTO_RANGE_MARGIN})")
         legs.append((label, p, goals))
     return legs
+
+
+LINE_STEP_MM = 10.0          # distance between points along a line
+LINE_MAX_JUMP_STEPS = 200    # a bigger change of one motor between neighbouring points = IK flipped pose
+
+
+def plan_cartesian_line(model: ArmModel, calib: JointCalibration, base: BaseInTable,
+                        present: Dict[int, int], ranges: Dict[int, Tuple[int, int]],
+                        start_mm: Sequence[float], end_mm: Sequence[float], *, point_down: bool = False,
+                        fit_rms_mm: float = 0.0, step_mm: float = LINE_STEP_MM,
+                        min_z_mm: float = GOTO_MIN_Z_MM) -> List[Tuple[str, List[float], Dict[int, int]]]:
+    """Legs to reach `start_mm` safely (as plan_cartesian_goto), then points every step_mm along the
+    straight line to `end_mm`. Every point is checked before anything moves: height, reach, motor
+    ranges, and no motor jumping more than LINE_MAX_JUMP_STEPS between neighbouring points.
+    Raises ValueError instead of guessing."""
+    a, b = np.asarray(start_mm, dtype=float), np.asarray(end_mm, dtype=float)
+    floor = min_z_mm + max(fit_rms_mm, 0.0)
+    if min(a[2], b[2]) < floor:
+        raise ValueError(f"line goes down to z {min(a[2], b[2]):.0f} mm, below the allowed {floor:.0f} mm")
+    if not 2.0 <= step_mm <= 50.0:
+        raise ValueError("step must be 2-50 mm")
+    legs = plan_cartesian_goto(model, calib, base, present, ranges, a, point_down=point_down,
+                               fit_rms_mm=fit_rms_mm, min_z_mm=min_z_mm)
+    lo, hi = calib.limits_from_ranges(ranges, model)
+    length = float(np.linalg.norm(b - a))
+    n = max(1, int(math.ceil(length / step_mm)))
+    prev = legs[-1][2]
+    q = calib.to_radians(prev)
+    for i in range(1, n + 1):
+        p = a + (b - a) * i / n
+        q, err = model.solve(base.table_to_base(p), q, lower=lo, upper=hi, point_down=point_down, locked=(7,))
+        if err * 1000 > GOTO_MAX_IK_ERR_MM:
+            raise ValueError(f"line point {i}/{n} ({p[0]:.0f}, {p[1]:.0f}, {p[2]:.0f}) mm is out of reach "
+                             f"(IK error {err * 1000:.0f} mm)")
+        goals = calib.to_steps(q)
+        goals[7] = present[7]
+        for m in ARM_MOTORS:
+            lo_s, hi_s = ranges[m]
+            if not lo_s + GOTO_RANGE_MARGIN <= goals[m] <= hi_s - GOTO_RANGE_MARGIN:
+                raise ValueError(f"line point {i}/{n}: motor {m} goal {goals[m]} is outside its range "
+                                 f"{lo_s}..{hi_s} (minus {GOTO_RANGE_MARGIN})")
+            if abs(goals[m] - prev[m]) > LINE_MAX_JUMP_STEPS:
+                raise ValueError(f"line point {i}/{n}: motor {m} would jump {goals[m] - prev[m]:+d} steps "
+                                 "between neighbouring points (the arm would change pose); try another line")
+        legs.append((f"line {i}/{n}", [float(v) for v in p], goals))
+        prev = goals
+    return legs
