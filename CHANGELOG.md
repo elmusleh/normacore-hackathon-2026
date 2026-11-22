@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.mcp.json`: `ELROBOT_ALLOW_MOTION` set to `"1"`, so Claude's MCP tools move the real arm (was dry-run).
 
 ### Fixed
+- Tightened Hands-Free voice `STOP_RE` in `src/web/console.html` to anchor explicit stop commands (`stop|stopp|halt|freeze` only, removing `wait`) and tag voice stops in `POST /api/stop` so normal sentences containing `"wait"` never falsely trigger `Stop (button)`.
+- Served local `v4l2:*` cameras (such as OBSBOT `person: "v4l2:2"`) directly in `src/web_console.py` (`GET /api/frame/{camera}`) without requiring Station to be running, sharing the V4L2 handle with `GET /api/mouth_status` and releasing cleanly whenever the agent is busy.
 - Leader/follower serial roles were swapped in `scripts/teleop_sync.py` (it drove the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` and `docs/team_setup.md`. Confirmed on the arm 2026-11-21: follower `5B61034962`, leader `5B61037051`.
 
 ### Added

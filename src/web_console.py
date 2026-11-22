@@ -184,8 +184,77 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
     async def cameras(_: Request):
         return JSONResponse({"cameras": list(load_config().get("cameras", {}))})
 
+    v4l2_lock = threading.Lock()
+    v4l2_state: Dict[str, Any] = {"caps": {}, "last_frame": {}, "last_jpeg": {}}
+
+    def _v4l2_device_for(cam_name: str) -> Optional[str]:
+        target = load_config().get("cameras", {}).get(cam_name)
+        if isinstance(target, list):
+            target = next((t for t in target if str(t).startswith("v4l2:")), None)
+        if isinstance(target, str) and target.startswith("v4l2:"):
+            return f"/dev/video{target[5:]}"
+        return None
+
+    def _release_v4l2(dev_path: Optional[str] = None) -> None:
+        with v4l2_lock:
+            keys = [dev_path] if dev_path else list(v4l2_state["caps"])
+            for k in keys:
+                cap = v4l2_state["caps"].pop(k, None)
+                if cap is not None:
+                    try:
+                        cap.release()
+                    except Exception:  # noqa: BLE001
+                        pass
+
+    def _grab_v4l2_frame(dev_path: str):
+        """Capture a BGR frame + JPEG bytes from a local V4L2 camera, yielding cleanly while agent is busy."""
+        import cv2
+        from robot_tools import read_mouth_gate_state
+
+        agent = agent_box["agent"]
+        live_gate = read_mouth_gate_state(max_age_s=2.0)
+        if (agent and agent.busy) or (live_gate and live_gate.get("waiting")):
+            _release_v4l2(dev_path)
+            return v4l2_state["last_frame"].get(dev_path), v4l2_state["last_jpeg"].get(dev_path), ""
+
+        with v4l2_lock:
+            cap = v4l2_state["caps"].get(dev_path)
+            if cap is None or not cap.isOpened():
+                cap = cv2.VideoCapture(dev_path, cv2.CAP_V4L2)
+                if not cap.isOpened():
+                    return None, None, f"cannot open local camera {dev_path}"
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                v4l2_state["caps"][dev_path] = cap
+            ok, bgr = cap.read()
+            if not ok or bgr is None:
+                try:
+                    cap.release()
+                except Exception:  # noqa: BLE001
+                    pass
+                v4l2_state["caps"].pop(dev_path, None)
+                return None, None, f"empty frame from local camera {dev_path}"
+            enc_ok, buf = cv2.imencode(".jpg", bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+            jpeg = buf.tobytes() if enc_ok else None
+            v4l2_state["last_frame"][dev_path] = bgr
+            if jpeg is not None:
+                v4l2_state["last_jpeg"][dev_path] = jpeg
+            return bgr, jpeg, ""
+
     async def frame(request: Request):
         name = request.path_params["camera"]
+        dev_path = _v4l2_device_for(name)
+        if dev_path is not None:
+            bgr, jpeg, err = await run_in_threadpool(_grab_v4l2_frame, dev_path)
+            if jpeg is None:
+                return JSONResponse({"ok": False, "error": err or f"camera {name!r} unavailable"}, status_code=503)
+            h, w = bgr.shape[:2] if bgr is not None else (0, 0)
+            return Response(jpeg, media_type="image/jpeg", headers={
+                "Cache-Control": "no-store",
+                "X-Frame-Age": "0.0",
+                "X-Frame-Size": f"{w}x{h}",
+            })
         if not await run_in_threadpool(station_up):
             return JSONResponse({"ok": False, "error": "the Station is not running (./cli.sh station)"},
                                 status_code=503)
@@ -263,9 +332,17 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         raise RuntimeError("No TTS backend available (OpenAI TTS and espeak-ng both failed)")
 
 
-    async def stop(_: Request):
+    async def stop(request: Request):
         agent = agent_box["agent"]
-        chat.add("user", "Stop (button)")
+        label = "Stop (button)"
+        try:
+            body = await request.json()
+            if isinstance(body, dict) and body.get("source") == "voice":
+                heard = str(body.get("text", "")).strip()
+                label = f'Stop (voice: "{heard}")' if heard else "Stop (voice)"
+        except Exception:  # noqa: BLE001 - empty POST body from STOP button is normal
+            pass
+        chat.add("user", label)
         if agent is None:
             chat.add("error", "No agent running, nothing to stop here. Use the power plug if the arm moves.")
             return JSONResponse({"ok": False}, status_code=503)
@@ -333,23 +410,35 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
                 cached = dict(mouth_probe_state["data"])
                 cached.update(enabled=enabled, timeout_s=timeout_s, waiting_for_mouth=False, waiting_waypoint="")
                 return cached
-            tools = mouth_probe_state["tools"]
-            if tools is None:
-                tools = RobotTools(lambda: None)
-                mouth_probe_state["tools"] = tools
-            res = tools.check_person_mouth()
-            out = {
-                "ok": bool(res.get("ok", False)),
-                "enabled": enabled,
-                "timeout_s": timeout_s,
-                "waiting_for_mouth": False,
-                "waiting_waypoint": "",
-                "face_detected": bool(res.get("face_detected", False)),
-                "mouth_open": bool(res.get("mouth_open", False)),
-                "mouth_open_confirmed": bool(res.get("mouth_open_confirmed", False)),
-                "mar": res.get("mar"),
-                "error": str(res.get("error", "")),
-            }
+            dev_path = _v4l2_device_for("person") or "/dev/video2"
+            bgr, _jpeg, err = _grab_v4l2_frame(dev_path)
+            if bgr is None:
+                out = {
+                    "ok": False, "enabled": enabled, "timeout_s": timeout_s,
+                    "waiting_for_mouth": False, "waiting_waypoint": "",
+                    "face_detected": False, "mouth_open": False, "mouth_open_confirmed": False,
+                    "mar": None, "error": err or f"cannot open person camera {dev_path}",
+                }
+            else:
+                det = mouth_probe_state.get("detector")
+                if det is None:
+                    from feeding_vision import FeedingVisionDetector
+                    det = FeedingVisionDetector()
+                    mouth_probe_state["detector"] = det
+                m = det.detect_mouth(bgr)
+                extra = dict(m.extra or {})
+                out = {
+                    "ok": True,
+                    "enabled": enabled,
+                    "timeout_s": timeout_s,
+                    "waiting_for_mouth": False,
+                    "waiting_waypoint": "",
+                    "face_detected": bool(extra.get("face_detected", False)) and not bool(extra.get("fallback", False)),
+                    "mouth_open": bool(extra.get("mouth_open", False)),
+                    "mouth_open_confirmed": bool(extra.get("mouth_open_confirmed", False)),
+                    "mar": extra.get("mar"),
+                    "error": "",
+                }
             mouth_probe_state["data"] = out
             mouth_probe_state["ts"] = time.monotonic()
             return out
@@ -368,6 +457,7 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         try:
             yield
         finally:
+            _release_v4l2()
             if agent_box["agent"] is not None:
                 await agent_box["agent"].close()
 

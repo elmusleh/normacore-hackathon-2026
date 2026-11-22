@@ -672,7 +672,7 @@ let hfRmsThreshold = 0.018;         // adjustable via Mic threshold slider
 const HF_SILENCE_MS = 1200;         // natural pause before sending
 const HF_MIN_SPEECH_MS = 350;       // ignores short clicks / coughs
 const HF_MAX_UTTERANCE_MS = 7500;
-const STOP_RE = /\b(stop|stopp|halt|freeze|wait)\b/i;
+const STOP_RE = /^\W*(stop|stopp|halt|freeze)(\W+(now|please|it|the arm|everything|moving))?\W*$/i;
 const WAKE_RE = /^\W*(robo|robbo|roboh)\b[\s,.:;!?-]*(.*)$/i;
 
 const sensEl = $("hf-sens");
@@ -731,7 +731,11 @@ async function handleHandsFreeTranscript(rawText) {
     if (STOP_RE.test(cmd)) {
       playChime("stop");
       setHfState("busy", "Robo STOP heard — halting arm!");
-      await fetch("/api/stop", { method: "POST" });
+      await fetch("/api/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "voice", text }),
+      });
       await speakText("Stopped, holding still.");
       return;
     }
@@ -745,7 +749,11 @@ async function handleHandsFreeTranscript(rawText) {
   if (STOP_RE.test(text)) {
     playChime("stop");
     setHfState("busy", "STOP heard — halting arm!");
-    await fetch("/api/stop", { method: "POST" });
+    await fetch("/api/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "voice", text }),
+    });
     await speakText("Stopped, holding still.");
     return;
   }
