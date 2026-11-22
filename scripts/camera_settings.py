@@ -226,7 +226,10 @@ def run_tune(cfg: dict, devices: dict, names: dict, wanted: list, write: bool) -
         save_config(cfg)
         print("Saved to config/elrobot.json. Commit it as a calibration commit, e.g.\n"
               "  chore(elrobot): record camera exposure measured <date>")
-    elif not write:
+    elif write:
+        print("NOT saved: a camera above failed. Fix it, or tune only the cameras that work, "
+              "e.g. ./cli.sh cameras --tune gripper --write")
+    else:
         print("Applied for now. Add --write to save, or edit config/elrobot.json -> camera_settings.")
     return status
 
