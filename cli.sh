@@ -145,7 +145,10 @@ case "$COMMAND" in
         if command -v xdg-open > /dev/null 2>&1; then
             (sleep 1 && xdg-open "http://localhost:${PORT}") &
         fi
-        python3 src/digital_twin_server.py "$PORT"
+        # The venv has MediaPipe; without it the person camera falls back to a Haar
+        # detector that draws false mouth boxes when nobody is in view.
+        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        "$PY" src/digital_twin_server.py "$PORT"
         ;;
 
     digital-twin)
@@ -154,7 +157,10 @@ case "$COMMAND" in
         if command -v xdg-open > /dev/null 2>&1; then
             (sleep 1 && xdg-open "http://localhost:${PORT}") &
         fi
-        python3 src/digital_twin_server.py "$PORT"
+        # The venv has MediaPipe; without it the person camera falls back to a Haar
+        # detector that draws false mouth boxes when nobody is in view.
+        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        "$PY" src/digital_twin_server.py "$PORT"
         ;;
 
     station)

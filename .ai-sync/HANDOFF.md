@@ -9,6 +9,23 @@ hardware_owner: "steve"
 previous_session: antigravity 2026-11-22T07:28 — diagrams-png-pdf-and-illustrated-video-ready
 ---
 
+## Latest session (2026-11-22 ~09:00, Claude Code for steve): Stage 1.1 camera check, Full HD and person-mouth fix
+
+- **What Changed:**
+  - `cli.sh`: `start` and `digital-twin` now use `.venv/bin/python` (fallback `python3`). Under plain `python3` MediaPipe is missing, so the person camera drew a false "MOUTH closed" box with nobody in view.
+  - Local only (gitignored): this laptop's `station.yaml` set to the Full HD `formats` list and `resize_target: 1080` (backup in `logs/station.yaml.bak-20261122`). Table and gripper now store 1920x1080 frames (captured at 1280x720, USB 2.0 limit).
+  - Stage 1.1 passed: both cameras show the two grapes clearly after `./cli.sh cameras` and a camera replug.
+- **Hardware notes (no motion sent this session):**
+  - `config/elrobot.json` `station.bus` is still `5B61034679` (Jafer's temporary arm, `049a4fe`), which is not on this bench. The dashboard was run with `ELROBOT_BUS=5B61034962` for the session. The MCP server and `./cli.sh hw` will target the wrong arm until the person who measured it changes it back in a calibration commit.
+  - Gripper direction (`78bdae3`) was measured on the temporary arm (`18358fb`), so it is not yet verified on `5B61034962`.
+  - At ~09:38 all 8 follower motors on `5B61034962` showed torque ON, though the Station reported torque off at 08:26. Source unknown; ask before any motion.
+- **Files Changed:** `cli.sh`, `CHANGELOG.md`, `FINDINGS.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
+- **Build Status:** `.venv/bin/python -m pytest tests/` 163 passed; `bash -n cli.sh` OK.
+- **Next Steps:**
+  1. Find out who turned torque on for the follower, and set it to (Self-controlled) in http://localhost:8889.
+  2. Point `station.bus` back at `5B61034962` (calibration commit by the arm's owner).
+  3. Re-check the gripper direction on `5B61034962` (`./cli.sh hw identify 8`), then continue Stage 1 with the `hover-above-object` and `grip-object` skills.
+
 ## Latest session (2026-11-22 07:34): Narrated 1080p Story Film ("Marta's Dinner")
 
 - **What Changed:**

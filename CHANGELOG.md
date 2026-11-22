@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `./cli.sh start` and `./cli.sh digital-twin` now run the dashboard with `.venv/bin/python` (falling back to `python3`), like `console` and `mcp`. Under plain `python3` MediaPipe is missing, so the person camera fell back to the OpenCV Haar detector and drew a false "MOUTH closed" box on an empty scene.
+
 ### Changed
 - Updated `README.md` to reflect Team 6 (**CareArm — Assistive Feeding Robot**), its 4-layer architecture, 3-camera MediaPipe vision, 15 MCP tools, 3-layer guardrails, verified benchmarks (123/123 tests), `./cli.sh` reference, and Team 6 roster.
 - Added Team 6 (`CareArm`) and all 3 team member names (Jan Schulz, Jafer Sharfeddin, Mohammad El-Musleh) to Slides 1 and 10 of `scripts/generate_pitch_deck.py` and regenerated `docs/Assistive_Feeding_Robot_Pitch.pptx`.

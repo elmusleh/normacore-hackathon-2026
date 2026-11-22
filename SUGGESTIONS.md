@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Make every `./cli.sh` Python command use the project venv — Priority 78% (High value) [Best practices]
+   What: Set `PY` once at the top of `cli.sh` (`.venv/bin/python` if present, else `python3`) and use it for every subcommand, not just `console`, `mcp`, `start` and `digital-twin`.
+   Why: `hw`, `calib`, `cameras`, `feed` and `test` still call plain `python3`, so any of them can silently lose MediaPipe or other venv-only packages, as the dashboard did.
+   How: Add `PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"` near the top, replace `python3 ` in each case branch with `"$PY" `, run `bash -n cli.sh` and the tests.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Touches every subcommand, including motion ones (`hw`, `calib`), so it needs the hardware owner's OK.
+
+2. Have the dashboard refuse the OpenCV mouth fallback on the person camera — Priority 70% (High value) [Security]
+   What: When MediaPipe cannot load, show "face detection unavailable" on the person tile instead of running the Haar fallback.
+   Why: A false mouth box on an empty scene could let a feeding step continue toward nobody; failing closed is safer than guessing.
+   How: In `src/digital_twin_server.py`, skip drawing when `mouth.extra["detector"] != "mediapipe"`, log a one-time warning, and add a test with the landmarker set to `None`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Changes vision behaviour used by feeding; wants a team decision.
+
+3. Ship a committed `station.example.yaml` with the Full HD camera list — Priority 55% (Nice to have) [Professionalism]
+   What: A tracked template of the local, gitignored `station.yaml` containing the documented `formats` list and `resize_target: 1080`.
+   Why: Each laptop currently starts at 320x240 until someone remembers to edit `station.yaml`, which breaks the 1920x1080 calibration in the grip skills.
+   How: Copy the working `station.yaml` to `station.example.yaml`, commit it, and have `./cli.sh station` copy it to `station.yaml` when the local file is missing or has `formats: []`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Awaiting team agreement on Station defaults across laptops.
+
 1. Splice a 30–60 second real ElRobot bench demo clip right after Scene 5 of `data/carearm_story_film_1080p.mp4` before uploading to Google Drive — Priority 92% (Critical) [Professionalism]
    What: Insert a short real-hardware clip showing the physical ElRobot picking a grape and pausing for the OBSBOT Mouth-Open gate between Scene 5 (architecture) and Scene 6 (family dinner) in CapCut or ffmpeg.
    Why: Keeps the emotional, studio-narrated Marta story while also satisfying the Robotics Track rule to show the real physical robot in action.
