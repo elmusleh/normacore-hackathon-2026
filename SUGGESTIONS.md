@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Add a calm voiceover narration track to `data/carearm_use_case_story_1080p.mp4` using `--audio` before uploading to Google Drive — Priority 90% (Critical) [Professionalism]
+   What: Record a warm 55-second human voiceover (or generate one with OpenAI TTS `nova` / ElevenLabs) matching the 6 illustrated scenes and mux it via `python3 scripts/build_illustrated_video.py --audio data/narration.mp3`.
+   Why: Adding warm spoken storytelling (and optionally soft background piano) transforms the illustrated 1080p video from silent captions into an emotionally compelling pitch film.
+   How: Record or export an MP3 voiceover to `data/narration.mp3`, then run `python3 scripts/build_illustrated_video.py --audio data/narration.mp3`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Kept the generated video clean and narration-ready so you can choose a live teammate voice or AI narration.
+
+2. Embed `docs/assets/scene_01_need.png` through `scene_06_carehome.png` into `docs/CareArm_Use_Case_Pitch.pptx` — Priority 78% (High value) [Professionalism]
+   What: Place the 6 bespoke illustrations directly onto the slides of `docs/CareArm_Use_Case_Pitch.pptx` so your live stage slides share the exact same visual world as your video.
+   Why: Visual continuity between your submission video and stage presentation makes Team 6 look like a polished med-tech startup.
+   How: Add `slide.shapes.add_picture("docs/assets/scene_0X_*.png", ...)` calls in `scripts/generate_use_case_deck.py` and re-run it.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Kept the text-focused slides crisp until you decide which illustrations you want featured on stage.
+
+3. Embed `docs/diagrams/carearm_overview.png` directly in `README.md` — Priority 70% (High value) [Best practices]
+   What: Add `![CareArm System Overview](docs/diagrams/carearm_overview.png)` under the Architecture section of `README.md` so judges immediately see the color-coded 4-layer diagram on GitHub.
+   Why: A visual diagram renders natively on GitHub and communicates the entire decoupled architecture in 3 seconds.
+   How: Insert the markdown image link right above or below the ASCII diagram in `README.md`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Kept this turn focused on generating the PNG/PDF diagrams and the 6-scene illustrated video.
+
 1. Splice live ElRobot bench footage into `data/carearm_pitch_1080p.mp4` using CapCut or DaVinci Resolve for the 3-minute submission video — Priority 93% (Critical) [Professionalism]
    What: Combine the first 45 seconds of `data/carearm_pitch_1080p.mp4` (the human story slides) with 90–120 seconds of real bench video (a teammate speaking to camera + live grape pick + OBSBOT Mouth-Open delivery + voice `"Stop!"`) and auto-captions.
    Why: The Robotics Track rules explicitly require showing the physical robot in action and recommend a team member speaking to camera — slides alone will score lower than a real hardware + story cut.
