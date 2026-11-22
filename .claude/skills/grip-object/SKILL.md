@@ -30,7 +30,11 @@ Worked first on 2026-11-22 (right grape, temporary arm `5B61034679`). See the HA
    - `look("gripper")`: the object should sit between the jaws, at the fingertips. The table-camera point puts
      the jaws about **2 cm short along the finger direction**; correct X/Y from the gripper picture
      (on 2026-11-22 the fix was about +18 mm in x, -6 mm in y).
+     Left grape, same day: object ~3 cm beyond the tips; moved the target 30 mm along the finger direction
+     (`calib where` prints it in the base frame; table frame ~ (-bx, -by) with the current base yaw ~180°).
    - `./cli.sh calib goto X Y 18 --travel-z 50 --min-z 0 --mm-per-s 8 --yes` (grape height; taller objects: about half their height).
+     Sag: read the joint-reading z after the 40 mm stage. If it is well below 40 (e.g. 28 on the left side),
+     command about 25 instead of 18 so the jaws end near grape height (~15-25 mm by joints) and do not hit the table.
    Never go below what `--min-z 0` allows (the fit error stays on top).
 7. **Close.** `set_gripper(0)`.
 8. **Check with the gripper camera, not the result field.** `holding_object` is unreliable until motor 8's range is

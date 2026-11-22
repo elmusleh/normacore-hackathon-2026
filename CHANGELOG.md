@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- `grip-object` skill: notes on the along-finger offset and on commanding ~25 mm when the arm sags (left grape gripped first try, 2026-11-22).
 - New skill `.claude/skills/grip-object/SKILL.md` ("grip <object>"): hover, open, two-stage descent with `--min-z 0`, close, check with the gripper camera, lift; retries allowed (up to 3). From the first grape grasp, 2026-11-22.
 - `calib goto` / `calib line` take `--min-z MM` (0-50, default 50) to lower the safety floor for a grasp; the fit error is still added and a warning is printed. First grape grasp on the temporary arm used it (2026-11-22). Test added.
 - Gripper direction verified on the temporary arm (`config/elrobot.json` gripper `verified: true`); FINDINGS entry added (2026-11-22).

@@ -9,6 +9,12 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~07:55, claude for Jafer): left grape gripped with the grip-object skill
+- Put the right grape down at (407, 138) (lowered to 31 mm, opened: MCP set_gripper(100) timed out twice, `hw jog 8 200` x7 worked). After the left grip the right grape is NOT visible on the table near where it was released; there is a stain there. Check it.
+- Left grape (table cam (112, 45)): hover 70, 40-mm stage (joints 28 mm: big sag), gripper cam showed it ~3 cm beyond the tips; target (100.6, 19.9, 25) -> joints (103.3, 19.9, 24.7); closed; lifted to 50 mm by joints. First try, held.
+- Arm now: holding the left grape at about (102, 24, 50) mm, torque on. Skill updated with the sag and offset notes.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~07:40, claude for Jafer): FIRST GRAPE GRASP (right grape)
 - Jafer: "just grip the right grape, make it work". Added `calib goto/line --min-z` (lowered floor, fit error still added).
 - Sequence that worked (wrist as-is, not `--down`: motor 6 hits its limit fingers-down): hover 70 -> open gripper (hw jog 8 +200 x4 / `set_gripper(100)`) -> `goto X Y 40 --travel-z 70 --min-z 0 --mm-per-s 10` -> `goto X Y 18 --travel-z 50 --min-z 0 --mm-per-s 8` -> `set_gripper(0)` -> lift `goto X Y 90`.
