@@ -9,6 +9,12 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~08:45, claude for Jafer): grip rule = fingers vertical down; blocked by motor 6 zero
+- Jafer: gripping must always be done with the gripper looking vertically down. Skill `grip-object` now requires `--down`.
+- `--down` over the bowl grapes is refused: motor 6 lands at 1028 or 3048 (its range ends), or out of reach. Motors 5-7 zeros (1870/1898/2342) are still the OLD arm's; only 2-4 were refitted. Table camera shows the fingers much steeper than the model's 24 deg below horizontal.
+- BLOCKER / next: Jafer holds the arm in the URDF zero pose (torque off) -> `./cli.sh calib zero --write` -> 8 touches -> `calib fit --refine --write`, then retry `--down`.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~08:35, claude for Jafer): grip from the bowl FAILED x3
 - "grab any grape from the bowl": 3 tries with `--close-after`, all missed (4 grapes still in the bowl, bowl nudged once).
 - Every descent stopped at ~40 mm by joints (17-25 commanded) and the jaws stalled at ~1650 (grape on the table held at 1486); after lifting the jaws closed to 1590 on their own = empty. The jaw tips touch the curved bowl floor/side, drag on it while closing and push the grape away. `--close-after` printed "holding" each time (bowl stall looks like a grasp).

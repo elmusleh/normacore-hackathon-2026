@@ -13,6 +13,13 @@ Before moving, check that `.ai-sync/HANDOFF.md` still names `hardware_owner: "ja
 
 Worked first on 2026-11-22 (right grape, temporary arm `5B61034679`). See the HANDOFF entry "FIRST GRAPE GRASP".
 
+## RULE: grip only with the fingers pointing vertically down (Jafer, 2026-11-22)
+
+Every grasp move uses `--down` (hover, the 40 mm check and the descent+close). If `--down` is refused, do NOT fall
+back to the angled wrist: report the refusal. On the temporary arm `--down` is refused over the bowl because motor 6
+lands on its range ends; motors 5-7 zeros in `config/calibration.json` are still the old arm's -> redo
+`calib zero --write` (arm in the zero pose) and `calib fit --refine --write` first.
+
 ## Steps (fast: Jafer wants quick decisions and quick moves; no dry runs unless a move is refused)
 
 1. **Look.** `look("table")`. Find the object's centre pixel. Two could match: ask. Cannot see it: say so.
@@ -20,7 +27,7 @@ Worked first on 2026-11-22 (right grape, temporary arm `5B61034679`). See the HA
    Pre-correct for the jaws landing short: add about **25 mm along the finger direction** (left side of the
    table: about (-11, -25) mm in table x/y; right side: about (+15, -10)). Torque off? `./cli.sh hw torque on`.
 2. **Hover + open in one command:** `./cli.sh calib goto X Y 70 --travel-z 100 --mm-per-s 70 --open-after --yes`.
-   Wrist as is (no `--down`). Refused: retry once with `--travel-z` 90 or 120.
+   Add `--down`. Refused: retry once with `--travel-z` 90 or 120; still refused, stop and report (see RULE).
 3. **Down to 40 mm:** `./cli.sh calib goto X Y 40 --travel-z 70 --min-z 0 --mm-per-s 40 --yes`, then `look("gripper")`.
    The object should be between the jaws at the fingertips; correct X/Y by what the picture shows
    (object beyond the tips -> move along the finger direction). Note the joint-reading z (sag).
