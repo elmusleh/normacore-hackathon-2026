@@ -1,15 +1,26 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T06:45:00Z
-status: submission-form-prepared
+timestamp: 2026-11-22T06:51:00Z
+status: docs-readme-findings-and-deck-synced
 current_phase: "Phase 5: Demo Polishing & Sunday Pitch"
-current_task: "Prepared complete copy-paste Tally submission inputs and pre-deadline checklist in docs/Hackathon_submission_requirements.md"
+current_task: "Refreshed README.md for Team 6 CareArm, added Team 6 roster to pitch deck Slides 1 & 10, and updated FINDINGS.md with verified 2026-11-22 bench observations"
 stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-22T05:18 — final-pitch-deck-ready
+previous_session: antigravity 2026-11-22T06:45 — submission-form-prepared
 ---
 
-## Latest session (2026-11-22 06:45): Hackathon Tally Submission Prep (`docs/Hackathon_submission_requirements.md`)
+## Latest session (2026-11-22 06:51): README Refresh, Pitch Deck Team 6 Roster & FINDINGS Update
+
+- **What Changed:**
+  - **GitHub Landing Page (`README.md`):** Rewrote `README.md` to match the final Team 6 (**CareArm — Assistive Feeding Robot**) submission: 4-layer architecture, 3-camera MediaPipe vision, 15 MCP tools, 3-layer guardrails, verified benchmarks (123/123 tests), accurate `./cli.sh` command table, Team 6 roster, and links to all submission & design docs.
+  - **Pitch Deck Roster (`scripts/generate_pitch_deck.py`, `docs/Assistive_Feeding_Robot_Pitch.pptx`):** Added `TEAM 6 · CAREARM` and all 3 team member names (`Jan Schulz · Jafer Sharfeddin · Mohammad El-Musleh`) to Slide 1 and Slide 10, regenerated the `.pptx`, and visually verified Slides 1 and 10.
+  - **Verified Hardware & Vision Facts (`FINDINGS.md`):** Appended 6 verified 2026-11-22 findings at the top of `FINDINGS.md` (confirmed Follower `5B61034962` / Leader `5B61037051` serials, multi-laptop USB camera ports + manual exposure, live OBSBOT MAR calibration `0.00–0.02` closed vs `0.30–0.50` open, ST3215 gravity settle tolerance, 4× torque-off readback retries, and 123 passing tests).
+- **Files Changed:** `README.md`, `scripts/generate_pitch_deck.py`, `docs/Assistive_Feeding_Robot_Pitch.pptx`, `FINDINGS.md`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
+- **Next Steps:**
+  1. Re-upload `docs/Assistive_Feeding_Robot_Pitch.pptx` to Google Slides and upload the 3-minute demo video to the shared Google Drive folder.
+  2. Verify Drive, Slides, and GitHub links in an incognito window, then submit `https://tally.so/r/GexoxQ` before **16:30**.
+
+## Session (2026-11-22 06:45): Hackathon Tally Submission Prep (`docs/Hackathon_submission_requirements.md`)
 
 - **What Changed:**
   - Added a complete, copy-paste-ready **Ready-to-Submit Form Inputs** section to `docs/Hackathon_submission_requirements.md` mapping 1-to-1 to every required field of `https://tally.so/r/GexoxQ`: submitter email (`elmusleh.mohammad@gmail.com`), Team 6 (+ name placeholder & suggestions), all 3 team members, judge-ready "What are you building?" description, Google Drive video folder link, Google Slides presentation link, GitHub repository link, **Normacore** track selection, Terms & Conditions agreement, and a pre-16:30 submission checklist.

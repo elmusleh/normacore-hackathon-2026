@@ -1,25 +1,32 @@
 ### Post-Implementation Suggestions
 
+1. Re-upload the updated `docs/Assistive_Feeding_Robot_Pitch.pptx` (now with Team 6 roster) to Google Slides — Priority 91% (Critical) [Professionalism]
+   What: Import the regenerated `docs/Assistive_Feeding_Robot_Pitch.pptx` into your shared Google Slides presentation URL so the online slides match the local deck with Team 6 (`CareArm`) and all 3 member names.
+   Why: Judges and stage AV staff open the Google Slides link from the Tally submission form; keeping it synced avoids showing an older draft without team names.
+   How: Open your Google Slides link (`File -> Import slides` or replace file in Google Drive) and upload `docs/Assistive_Feeding_Robot_Pitch.pptx`, then confirm "Anyone with the link can view".
+   Status: ⏳ Unimplemented
+   Reason Deferred: Requires uploading directly in the browser to your Google Drive / Slides account.
+
+2. Add a 60-second "Judge Q&A Cheat Sheet" section to `docs/Hackathon_submission_requirements.md` — Priority 68% (Nice to have) [Professionalism]
+   What: Append 5 concise answers to likely robotics judge questions (why waypoints + bounded visual servoing over raw IK, how E-stop guarantees no arm drop, how prompt injections are blocked, BOM cost vs $10k commercial feeders, and spoon roadmap).
+   Why: Helps all 3 teammates answer technical deep-dives consistently and confidently during the 2-minute stage Q&A.
+   How: Add a short `## Stage Q&A Cheat Sheet` table at the bottom of `docs/Hackathon_submission_requirements.md`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Kept this turn focused on README, pitch deck roster, and FINDINGS updates.
+
+3. Close the LibreOffice lockfile `docs/.~lock.Assistive_Feeding_Robot_Pitch.pptx#` and add `.~lock.*#` to `.gitignore` — Priority 52% (Nice to have) [Best practices]
+   What: Add `*.~lock.*#` (or `.~lock.*`) to `.gitignore` so LibreOffice Impress temporary lockfiles never clutter `git status` while editing the deck.
+   Why: Prevents accidental staging of temporary editor lockfiles during frantic pre-deadline hackathon commits.
+   How: Append `**/.~lock.*#` to `.gitignore` and close LibreOffice Impress when finished viewing the deck.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Non-blocking cleanup; lockfile was left untracked and excluded from commits.
+
 1. Verify all 3 submission links in an incognito browser window 15 minutes before the 16:30 deadline — Priority 94% (Critical) [Security]
    What: Open the Google Drive video folder, Google Slides link, and GitHub repository URL in a logged-out incognito browser tab to confirm judges can access every asset without login prompts.
    Why: A private repo or restricted Google Drive permission can automatically disqualify a team or prevent judges from watching your demo video.
    How: Open a new Private/Incognito window, paste all three links from `docs/Hackathon_submission_requirements.md`, and verify each loads cleanly without signing in.
    Status: ⏳ Unimplemented
    Reason Deferred: Pending final video upload, Google Slides import, and GitHub push.
-
-2. Update `README.md` top summary to match the Assistive Feeding Robot submission before judges inspect GitHub — Priority 82% (High value) [Professionalism]
-   What: Update the Overview and Architecture sections of `README.md` so the repository landing page immediately highlights the Assistive Feeding Robot, 3-camera MediaPipe mouth-open gate, 15 MCP tools, and 3-layer guardrails instead of the earlier Day-1 tabletop sorting draft.
-   Why: Judges open the GitHub repository link directly from the Tally submission form; an up-to-date `README.md` reinforces everything shown in your video and slides.
-   How: Refresh the top half of `README.md` to mirror the architecture and results in `docs/Assistive_Feeding_Robot_Pitch.pptx` and link to `docs/GUARDRAILS_AND_TRACE.md` and `docs/FEEDING_ASSISTANT_PLAN.md`.
-   Status: ⏳ Unimplemented
-   Reason Deferred: Kept this turn focused strictly on preparing the Tally submission fields in `docs/Hackathon_submission_requirements.md`.
-
-3. Add the chosen Team 6 name and all 3 team member names to Slide 1 of the pitch deck — Priority 72% (High value) [Professionalism]
-   What: Once Team 6 finalizes its team name, add the team name and Jan Schulz, Jafer Sharfeddin, and Mohammad El-Musleh to Slide 1 of `scripts/generate_pitch_deck.py` and regenerate `docs/Assistive_Feeding_Robot_Pitch.pptx`.
-   Why: Putting your team number, name, and full roster on the opening slide makes the stage presentation and Google Slides deck immediately identifiable to judges.
-   How: Edit the bottom metadata line on Slide 1 in `scripts/generate_pitch_deck.py`, run `python3 scripts/generate_pitch_deck.py`, and re-upload to Google Slides.
-   Status: ⏳ Unimplemented
-   Reason Deferred: Team 6 has not locked its final team name yet.
 
 1. Embed real bench photos and a 3-camera console screenshot into the pitch deck — Priority 86% (High value) [Professionalism]
    What: Add live screenshots of `http://localhost:8890` (showing the annotated `Table`, `Gripper`, and `OBSBOT` feeds with `Mouth: OPEN ✓`) and a photo of the ElRobot arm to Slides 5 and 7 of `docs/Assistive_Feeding_Robot_Pitch.pptx`.

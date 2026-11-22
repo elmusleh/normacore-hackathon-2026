@@ -319,12 +319,12 @@ def build_deck(output_path: Path) -> None:
         s1,
         Inches(0.85),
         Inches(0.85),
-        Inches(5.6),
+        Inches(6.35),
         Inches(0.42),
-        "2ND BERLIN ROBOTICS & AI HACKATHON  ·  NORMACORE TRACK",
+        "TEAM 6 · CAREARM  |  BERLIN ROBOTICS & AI HACKATHON · NORMACORE",
         RGBColor(0x13, 0x2A, 0x35),
         TEAL_BRIGHT,
-        font_size=11,
+        font_size=10.5,
         border_color=TEAL,
     )
 
@@ -371,15 +371,26 @@ def build_deck(output_path: Path) -> None:
         line_spacing=1.25,
     )
 
-    # Bottom metadata
+    # Bottom metadata (Team 6 roster + event)
     add_textbox(
         s1,
         Inches(0.85),
-        Inches(6.45),
-        Inches(7.8),
-        Inches(0.45),
+        Inches(6.02),
+        Inches(8.1),
+        Inches(0.36),
+        "Team 6 (CareArm):  Jan Schulz  ·  Jafer Sharfeddin  ·  Mohammad El-Musleh",
+        font_size=13.5,
+        color=TEXT_LIGHT,
+        bold=True,
+    )
+    add_textbox(
+        s1,
+        Inches(0.85),
+        Inches(6.42),
+        Inches(8.1),
+        Inches(0.36),
         "HackLab × BRISA  ·  Berlin, Germany  ·  November 21–22, 2026",
-        font_size=13,
+        font_size=12.5,
         color=TEXT_SUB_LIGHT,
     )
 
@@ -1050,10 +1061,10 @@ Within 6 months, moving to local edge inference on an affordable sub-$1,000 hard
     add_textbox(
         s10,
         Inches(0.9),
-        Inches(6.62),
+        Inches(6.58),
         Inches(11.53),
-        Inches(0.4),
-        "2nd Edition Berlin Robotics & AI Hackathon (HackLab × BRISA)  ·  NormaCore ElRobot  ·  November 22, 2026",
+        Inches(0.45),
+        "Team 6 (CareArm): Jan Schulz · Jafer Sharfeddin · Mohammad El-Musleh  |  NormaCore Track · Nov 22, 2026",
         font_size=12,
         color=TEXT_SUB_LIGHT,
         align=PP_ALIGN.CENTER,

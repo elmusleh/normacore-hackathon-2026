@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Updated `README.md` to reflect Team 6 (**CareArm — Assistive Feeding Robot**), its 4-layer architecture, 3-camera MediaPipe vision, 15 MCP tools, 3-layer guardrails, verified benchmarks (123/123 tests), `./cli.sh` reference, and Team 6 roster.
+- Added Team 6 (`CareArm`) and all 3 team member names (Jan Schulz, Jafer Sharfeddin, Mohammad El-Musleh) to Slides 1 and 10 of `scripts/generate_pitch_deck.py` and regenerated `docs/Assistive_Feeding_Robot_Pitch.pptx`.
+- Recorded 6 verified 2026-11-22 hardware, camera, MediaPipe MAR, gravity-settle, torque-readback, and test-suite findings at the top of `FINDINGS.md`.
 - `config/elrobot.json`: `table` and `gripper` camera names swapped (table = port 3-5.2.2, gripper = port 3-5.2.4). The old mapping showed the gripper view as `table`; confirmed by the user 2026-11-21.
 - `.mcp.json`: `ELROBOT_ALLOW_MOTION` set to `"1"`, so Claude's MCP tools move the real arm (was dry-run).
 
