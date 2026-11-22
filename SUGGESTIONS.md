@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Add a test that catches docs naming the wrong arm or camera port — Priority 72% (High value) [Best practices]
+   What: A small offline test that reads `config/elrobot.json` and fails if a doc names a different follower bus serial or camera USB port as the current one.
+   Why: The team plan still named the arm that is out for repair and old camera ports a day after they changed, and agents read that plan first; a wrong serial means commands go to the wrong arm or no arm.
+   How: In `tests/`, load the config, take `station.bus` and the `port:` values, grep `docs/FEEDING_ASSISTANT_PLAN.md` and `docs/mcp_server.md` for lines marked as current state, and assert they match. Keep history sections out of the check.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 handover; fixing the stale text came first.
+
+2. Protect `main` on GitHub: review and passing tests before merge — Priority 66% (Nice to have) [Security]
+   What: Turn on GitHub branch protection so nobody can push straight to `main` or merge a PR without one review.
+   Why: Four people and their agents push to the same repo; one accidental push to `main` (or a force-push) can wipe teammates' work right before the demo.
+   How: GitHub → repository Settings → Branches → Add rule for `main`: require a pull request with 1 approval, block force pushes. If CI exists later, also require its check.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the repository owner's account; not something an agent should change.
+
+3. A short handover checklist at the top of HANDOFF.md — Priority 50% (Nice to have) [Professionalism]
+   What: Five tick boxes every person fills in before leaving: commits pushed, PR link, hardware owner updated, arm left in a safe pose, open blockers listed.
+   Why: At this handover HANDOFF said "pushed to origin" while the last two commits were still only on the laptop; a checklist makes such gaps visible before the person walks away.
+   How: Add the checklist block under the front matter of `.ai-sync/HANDOFF.md`, and one line in AGENTS.md "On Stop" asking to tick it; `git status -sb` shows "ahead N" when commits are unpushed.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Process change for the whole team; propose it at the next checkpoint.
+
 1. Confirm a grasp by lifting a little and watching the jaws — Priority 82% (High value) [Security]
    What: After closing, lift 1 cm and re-read the gripper; if the jaws kept closing, call it a miss instead of "holding".
    Why: A stall on the bowl or the table looks exactly like a grasp today, so the robot can carry "nothing" to a person and believe it is feeding them.

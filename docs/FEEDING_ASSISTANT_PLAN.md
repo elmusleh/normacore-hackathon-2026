@@ -1,7 +1,8 @@
 # Feeding Assistant: Team Plan
 
 **Read this first if you are a teammate or an AI agent working in this repo.** It replaces the earlier
-Cartesian pick_at/place_at plan. **Diagrams:** [FEEDING_ASSISTANT_DIAGRAMS.md](FEEDING_ASSISTANT_DIAGRAMS.md). Last updated 2026-11-21 (Saturday afternoon). Demo is Sunday.
+Cartesian pick_at/place_at plan. **Diagrams:** [FEEDING_ASSISTANT_DIAGRAMS.md](FEEDING_ASSISTANT_DIAGRAMS.md). Last updated 2026-11-22 (Sunday morning handover). Demo is Sunday.
+**Live state (which arm, who owns the hardware, what works, blockers) is in `.ai-sync/HANDOFF.md`, "START HERE" entry. Where this plan and HANDOFF disagree, HANDOFF wins.**
 
 > **Decision 2026-11-21 late (Jafer): the ACT imitation-learning approach is dropped.** Motion now
 > targets come from one calibrated **table frame**: 4 AprilTags (36h11, IDs 0-3) on the table corners
@@ -55,28 +56,33 @@ tools, and too slow for following a face or stopping the arm. So:
 | Voice "stop" | **Local keyword listener**, straight to the arm | Must act in well under a second |
 | Speed, force, range limits | **Local code** (`src/robot_tools.py`, `src/elrobot_hardware.py`) | Never left to a model |
 
-**The arm moves between taught joint poses ("waypoints") plus small capped nudges.** There is no x/y/z
-(Cartesian) control: the Station only takes joint targets, and no kinematics model is verified on this arm.
+**How the arm moves (updated 2026-11-22).** x/y/z moves now exist: `./cli.sh calib goto X Y Z` uses the
+AprilTag table frame (table camera) and URDF inverse kinematics, and the skills `hover-above-object`,
+`grip-object` and `drop-in-bowl` (`.claude/skills/`) are built on it. Expect 1-2 cm error plus 10-25 mm
+gravity sag, so check the joint-reading height after each move and correct with the gripper camera.
+Details: [docs/tcp_calibration.md](tcp_calibration.md). Taught waypoints and small nudges remain as a fallback.
 Do not build on `pick_at`/`place_at` in `src/mcp_server.py`; that file is an offline simulator only.
 
-**Fixed table zones.** Because moves are waypoints, food and tools sit in fixed **zones** with taught poses
+**Fixed table zones (optional).** With `calib goto` the arm can reach a point seen on the camera, so zones are
+no longer required. They are still a simple fallback if calibration is off: food and tools in fixed **zones** with taught poses
 (e.g. `zone_a` plate, `zone_b` bowl, `spoon_holder`). Claude's vision job is to say *what is in which zone*,
 not to compute coordinates. Mark the zones on the table with tape.
 
-## 3. Current state (what works today)
+## 3. Current state (snapshot 2026-11-22 ~09:30; HANDOFF.md is the live version)
 
 | Thing | State |
 | :--- | :--- |
-| Station | `./cli.sh station` from the repo root. Web viewer: http://localhost:8889 |
-| Arms | Follower bus `5B61034962` (`/dev/ttyACM0`), leader bus `5B61037051`. Both calibrated (calibration persists in `station_data/`) |
-| Teleop | Works: on the follower's card in the web viewer, pick the leader serial in the dropdown. Set back to **(Self-controlled)** before Claude moves the arm |
-| MCP server | `src/robot_mcp_server.py`, registered in `.mcp.json` as `elrobot`. Tested offline and read-only on the real arm. **No motion run yet** |
-| Cameras | `table` (USB port 3-2.4) and `gripper` (port 3-2.2). Need `scripts/99-normacore-cameras.rules` installed (done on the main laptop) |
-| Camera exposure | Auto exposure washes out under the Station. Fixed exposure in `config/elrobot.json` → `camera_settings`; apply with `./cli.sh cameras` **while the Station is stopped**; find a value with `./cli.sh cameras --tune`. Not yet confirmed that the Station keeps it after restart. `look()` returns the camera's own picture, with no software clean-up |
-| Waypoints | None taught yet (`config/waypoints.json` is empty) |
-| Gripper | Direction (which end is "open") **not verified**. Grasp detection is tuned for firm objects, not grapes |
-| Voice, mouth tracking, food zones | Not started |
-| Tests | `.venv/bin/python -m pytest tests/` → 60 pass |
+| Code | All current work is on branch `feat/vision-apriltag-ik`, PR into `main` open. `main` lacks the calib/IK code and skills |
+| Hardware owner | `jafer` (see `hardware_owner` in HANDOFF). Only the owner runs motion; hand over by editing that line and committing |
+| Arms | Usual follower `5B61034962` is out for a motor repair. **Temporary follower `5B61034679`** in use (`config/elrobot.json`, `.mcp.json`). Leader `5B61037051` |
+| Waypoints / sequences | Taught on the OLD arm. **Do not play them on the temporary arm** |
+| Calibration | AprilTag table frame (2.4 mm RMS) and arm fit (15.6 mm RMS, target < 10) in `config/calibration.json`. Wrist zeros (motors 5-7) look wrong: blocks fingers-down grips |
+| Cameras | `table` 3-5.1, `gripper` 3-5.2.4, `face` 3-5.3 (OBSBOT, points at the person). USB hub in laptop port 5. Udev rule `scripts/99-normacore-cameras.rules` covers all three |
+| Works on the arm | Hover above an object seen on the table camera; grip a grape from the flat table (wrist as-is); drop it in the bowl |
+| Does not work yet | Fingers-down grip (team rule: every grip fingers down); grip from inside the bowl; gripper motor 8 range not fully calibrated, so "holding" can be a false positive |
+| Not started | Mouth tracking / serve pose, voice |
+| Station, console | `./cli.sh station` (web 8889), `./cli.sh console` (8890) |
+| Tests | `python3 -m pytest tests/` → 144 pass |
 
 ### MCP tools Claude has (server `elrobot`)
 
