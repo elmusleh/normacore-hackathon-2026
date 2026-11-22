@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- HANDOFF and `grip-object`: grip from the bowl failed 3 times (jaw tips stall on the curved bowl; false "holding"), 2026-11-22.
 - `calib goto` gets `--open-after` / `--close-after` (gripper on the same Station connection; close stops at the stall and keeps `squeeze_steps` from a fresh reading) and a faster default speed (25 -> 60 mm/s). New skill `drop-in-bowl`; `grip-object` rewritten to fewer, faster calls. Grape dropped into the bowl at 70 mm/s (2026-11-22). Tests added.
 - Gripper hold squeeze `squeeze_steps` 10 -> 57: Jafer asked for half the grip actually applied (~115 steps, caused by a stale MCP reading). `grip-object` skill notes how to spot the stale reading (2026-11-22).
 - `grip-object` skill: notes on the along-finger offset and on commanding ~25 mm when the arm sags (left grape gripped first try, 2026-11-22).

@@ -9,6 +9,14 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~08:35, claude for Jafer): grip from the bowl FAILED x3
+- "grab any grape from the bowl": 3 tries with `--close-after`, all missed (4 grapes still in the bowl, bowl nudged once).
+- Every descent stopped at ~40 mm by joints (17-25 commanded) and the jaws stalled at ~1650 (grape on the table held at 1486); after lifting the jaws closed to 1590 on their own = empty. The jaw tips touch the curved bowl floor/side, drag on it while closing and push the grape away. `--close-after` printed "holding" each time (bowl stall looks like a grasp).
+- Gripper camera: a grape low in the picture = under the palm -> pull back; high = beyond the tips -> push forward.
+- Next options: grape at the flat bowl centre + lift 5 mm before closing; fingers-down (needs motor 6 room); holding check = jaws must not keep closing after the lift.
+- Arm now: ~ (418, 37, 68) mm over the bowl, gripper empty (1590), torque on.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~08:20, claude for Jafer): drop-in-bowl skill, faster moves
 - Jafer: new skill "drop into the bowl" (pre-stage for the mouth), and make decisions and moves much faster.
 - `calib goto --open-after / --close-after` (gripper without MCP, fresh readings), default 60 mm/s. Skill `drop-in-bowl`: `calib goto 365 28 130 --travel-z 130 --mm-per-s 70 --open-after` dropped the left grape into the blue bowl (bowl centre ~ (365, 28) mm). The dropped grape looks split (from the earlier hard grip).

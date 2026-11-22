@@ -32,6 +32,13 @@ Worked first on 2026-11-22 (right grape, temporary arm `5B61034679`). See the HA
    object pinched between the jaw tips. "closed empty" or nothing in the jaws = miss.
 6. **Missed?** Retries are OK: step 2 again from where the object is now (it may have moved), up to 3 tries, then report.
 
+## Known limits (2026-11-22)
+
+- **Inside a bowl it fails**: the angled jaw tips touch the curved bowl and stall (~1650) before reaching the grape;
+  `--close-after` then says "holding" falsely. Only grip from a bowl at its flat centre, and check the jaws after the
+  lift (`hw motors`: if motor 8 kept closing well past the stall value, it is empty).
+- Gripper camera: object low in the picture = under the palm (pull back); high = beyond the tips (push forward).
+
 ## Stop if unsafe
 
 Overload stop, a strange path, the object crushed or knocked off the table, or the arm touching something it
