@@ -115,6 +115,11 @@
       </button>
       <div class="hf-pill" id="hf-pill">STANDBY</div>
       <div class="hf-meter" id="hf-meter"><div class="hf-meter-fill" id="hf-meter-fill"></div></div>
+      <div id="hf-sens-wrap" style="display:none; font-size:11px; color:var(--muted); align-items:center; gap:6px;">
+        <span>Mic threshold:</span>
+        <input id="hf-sens" type="range" min="0.006" max="0.060" step="0.002" value="0.018" style="width:110px;">
+        <span id="hf-sens-val">0.018</span>
+      </div>
       <div id="mic-status">Checking speech-to-text…</div>
     </div>
 
@@ -523,12 +528,24 @@ document.addEventListener("keyup", (e) => {
 });
 
 // ---------------------------------------------------------------- hands-free voice loop (VAD + wake word)
-const HF_RMS_THRESHOLD = 0.045;     // ignores background hum / breathing
-const HF_SILENCE_MS = 1350;         // natural pause before sending
-const HF_MIN_SPEECH_MS = 400;       // ignores short clicks / coughs
+let hfRmsThreshold = 0.018;         // adjustable via Mic threshold slider
+const HF_SILENCE_MS = 1200;         // natural pause before sending
+const HF_MIN_SPEECH_MS = 350;       // ignores short clicks / coughs
 const HF_MAX_UTTERANCE_MS = 7500;
 const STOP_RE = /\b(stop|stopp|halt|freeze|wait)\b/i;
 const WAKE_RE = /^\W*(robo|robbo|roboh)\b[\s,.:;!?-]*(.*)$/i;
+
+const sensEl = $("hf-sens");
+if (sensEl) {
+  const savedSens = localStorage.getItem("console_hf_sens");
+  if (savedSens) { sensEl.value = savedSens; hfRmsThreshold = parseFloat(savedSens); }
+  if ($("hf-sens-val")) $("hf-sens-val").textContent = hfRmsThreshold.toFixed(3);
+  sensEl.addEventListener("input", () => {
+    hfRmsThreshold = parseFloat(sensEl.value);
+    localStorage.setItem("console_hf_sens", sensEl.value);
+    if ($("hf-sens-val")) $("hf-sens-val").textContent = hfRmsThreshold.toFixed(3);
+  });
+}
 
 let hfActive = false;
 let hfStream = null, hfCtx = null, hfAnalyser = null, hfTimer = null;
@@ -549,6 +566,8 @@ function setHfState(mode, msg) {
     pill.textContent = labels[mode] || mode.toUpperCase();
   }
   if (meter) meter.classList.toggle("on", hfActive);
+  const sw = $("hf-sens-wrap");
+  if (sw) sw.style.display = hfActive ? "flex" : "none";
   if (msg) setStatus(msg);
 }
 
@@ -637,16 +656,16 @@ async function startHandsFree() {
     const rms = Math.sqrt(sum / buf.length);
     const fill = $("hf-meter-fill");
     if (fill) {
-      const pct = Math.min(100, Math.round((rms / (HF_RMS_THRESHOLD * 2.2)) * 100));
+      const pct = Math.min(100, Math.round((rms / (hfRmsThreshold * 2.2)) * 100));
       fill.style.width = `${pct}%`;
-      fill.style.background = rms >= HF_RMS_THRESHOLD ? "var(--bad)" : "var(--ok)";
+      fill.style.background = rms >= hfRmsThreshold ? "var(--bad)" : "var(--ok)";
     }
     const now = performance.now();
 
     if (!hfSpeaking) {
-      if (rms >= HF_RMS_THRESHOLD) {
+      if (rms >= hfRmsThreshold) {
         hfSpeechFrames++;
-        if (hfSpeechFrames >= 3) {
+        if (hfSpeechFrames >= 2) {
           hfSpeaking = true;
           hfStartedAt = now;
           hfLastVoiceAt = now;
@@ -685,7 +704,7 @@ async function startHandsFree() {
         hfSpeechFrames = 0;
       }
     } else {
-      if (rms >= HF_RMS_THRESHOLD * 0.75) hfLastVoiceAt = now;
+      if (rms >= hfRmsThreshold * 0.75) hfLastVoiceAt = now;
       if ((now - hfLastVoiceAt) >= HF_SILENCE_MS || (now - hfStartedAt) >= HF_MAX_UTTERANCE_MS) {
         hfSpeaking = false;
         hfSpeechFrames = 0;
