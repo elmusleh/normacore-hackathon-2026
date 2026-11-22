@@ -186,6 +186,82 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
 
     v4l2_lock = threading.Lock()
     v4l2_state: Dict[str, Any] = {"caps": {}, "last_frame": {}, "last_jpeg": {}}
+    vision_lock = threading.Lock()
+    vision_box: Dict[str, Any] = {"detector": None}
+
+    def _get_vision_detector():
+        det = vision_box["detector"]
+        if det is None:
+            from feeding_vision import FeedingVisionDetector
+            det = FeedingVisionDetector()
+            vision_box["detector"] = det
+        return det
+
+    def _annotate_bgr(bgr, role: str):
+        """Draw the same MediaPipe person/table overlays as Mission Control (./cli.sh start)."""
+        if role not in ("person", "table") or bgr is None:
+            return bgr
+        import cv2
+        with vision_lock:
+            det = _get_vision_detector()
+            out = bgr.copy()
+            if role == "person":
+                mouth = det.detect_mouth(bgr)
+                if mouth and not (mouth.extra or {}).get("fallback", False):
+                    extra = dict(mouth.extra or {})
+                    u, v, w, h = mouth.u_px, mouth.v_px, mouth.width_px, mouth.height_px
+                    at_standoff = bool(extra.get("at_standoff", False))
+                    mouth_open = bool(extra.get("mouth_open", False))
+                    confirmed = bool(extra.get("mouth_open_confirmed", False))
+                    mar = extra.get("mar")
+                    color = (0, 220, 120) if not at_standoff else (0, 165, 255)
+                    cv2.rectangle(out, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), color, 2)
+                    for pt in extra.get("lip_points") or []:
+                        cv2.circle(out, (int(pt[0]), int(pt[1])), 3, (0, 255, 255), -1)
+                    mouth_tag = "OPEN!" if confirmed else ("opening" if mouth_open else "closed")
+                    mar_tag = f" MAR={mar:.2f}" if mar is not None else ""
+                    cv2.putText(
+                        out,
+                        f"MOUTH {mouth_tag}{mar_tag} ({extra.get('standoff_cm', '?')}cm)",
+                        (max(8, u - 75), max(22, v - h // 2 - 8)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2,
+                    )
+            elif role == "table":
+                if det._object_detector is not None:
+                    for t in det.detect_table_objects(bgr):
+                        u, v, w, h = t.u_px, t.v_px, t.width_px, t.height_px
+                        extra = dict(t.extra or {})
+                        color = (180, 60, 240) if t.label == "bowl" else (50, 210, 100)
+                        cv2.rectangle(out, (u - w // 2, v - h // 2), (u + w // 2, v + h // 2), color, 2)
+                        tag = f"{t.label.upper()} ({int(t.confidence * 100)}%)"
+                        if extra.get("food_piece_count"):
+                            tag += f" [{extra['food_piece_count']} pcs]"
+                        cv2.putText(
+                            out, tag,
+                            (max(8, u - w // 2), max(22, v - h // 2 - 6)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2,
+                        )
+                        for fp in extra.get("food_pieces_px") or []:
+                            fu, fv, fw, fh = fp
+                            cv2.circle(out, (int(fu), int(fv)), max(4, int(max(fw, fh) // 2)), (80, 255, 160), 2)
+            return out
+
+    def _annotate_jpeg(jpeg: bytes, role: str) -> bytes:
+        """Decode JPEG, apply role overlay, re-encode; returns original bytes on any decode error."""
+        if role not in ("person", "table"):
+            return jpeg
+        try:
+            import cv2
+            import numpy as np
+            arr = np.frombuffer(jpeg, dtype=np.uint8)
+            bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            if bgr is None:
+                return jpeg
+            annotated = _annotate_bgr(bgr, role)
+            ok, buf = cv2.imencode(".jpg", annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+            return buf.tobytes() if ok else jpeg
+        except Exception:  # noqa: BLE001 - fall back to raw frame cleanly
+            return jpeg
 
     def _v4l2_device_for(cam_name: str) -> Optional[str]:
         target = load_config().get("cameras", {}).get(cam_name)
@@ -249,6 +325,8 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
             bgr, jpeg, err = await run_in_threadpool(_grab_v4l2_frame, dev_path)
             if jpeg is None:
                 return JSONResponse({"ok": False, "error": err or f"camera {name!r} unavailable"}, status_code=503)
+            if bgr is not None and name in ("person", "table"):
+                jpeg = await run_in_threadpool(_annotate_jpeg, jpeg, name)
             h, w = bgr.shape[:2] if bgr is not None else (0, 0)
             return Response(jpeg, media_type="image/jpeg", headers={
                 "Cache-Control": "no-store",
@@ -264,6 +342,8 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         meta, jpeg = result
         if jpeg is None:
             return JSONResponse(meta, status_code=503)
+        if name in ("person", "table"):
+            jpeg = await run_in_threadpool(_annotate_jpeg, jpeg, name)
         age = meta.get("age_seconds")
         return Response(jpeg, media_type="image/jpeg", headers={
             "Cache-Control": "no-store",
@@ -420,12 +500,9 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
                     "mar": None, "error": err or f"cannot open person camera {dev_path}",
                 }
             else:
-                det = mouth_probe_state.get("detector")
-                if det is None:
-                    from feeding_vision import FeedingVisionDetector
-                    det = FeedingVisionDetector()
-                    mouth_probe_state["detector"] = det
-                m = det.detect_mouth(bgr)
+                with vision_lock:
+                    det = _get_vision_detector()
+                    m = det.detect_mouth(bgr)
                 extra = dict(m.extra or {})
                 out = {
                     "ok": True,

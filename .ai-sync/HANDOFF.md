@@ -17,6 +17,7 @@ previous_session: antigravity 2026-11-22T03:26 — hands-free-voice-chimes-and-m
   - **Live Badge + Visual/Spoken Waiting Cue (`src/web/console.html`):** Added `#mouth-badge` (`Mouth: OPEN ✓` / `Closed` / `No Face` / `OBSBOT: Offline`) next to the `Wait for Mouth-Open (OBSBOT)` checkbox and `#mouth-banner` amber cue + TTS prompt (*"Ready. Open your mouth when you want the bite."*) whenever `play_sequence` pauses for mouth-open confirmation.
   - **Tests (`tests/test_robot_mcp.py`):** Added unit tests for `mouth_gate_timeout_s` clamping and `data/mouth_gate_state.json` round-trip/staleness.
   - **False-Stop & Live OBSBOT Feed Fixes (`src/web/console.html`, `src/web_console.py`):** Tightened `STOP_RE` to explicit stop commands only (removed `wait`, anchored full command) and tagged voice stops in `POST /api/stop`; served `v4l2:*` cameras (`person: "v4l2:2"`) directly in `GET /api/frame/{camera}` without needing Station, sharing the V4L2 handle with `/api/mouth_status` and releasing cleanly while the agent is busy.
+  - **Unified Vision Overlays on `http://localhost:8890` (`src/web_console.py`):** Applied live `FeedingVisionDetector` overlays (MediaPipe lip landmarks + MAR + `MOUTH OPEN!/closed` on `person`; bowl + food-piece boxes on `table`) directly to `GET /api/frame/{camera}`, matching Mission Control (`./cli.sh start`).
 - **Next Steps:**
   1. Hard-refresh `http://localhost:8890` (`Ctrl+Shift+R`), check `Wait for Mouth-Open (OBSBOT)`, and verify the live badge flips between `Mouth: Closed` and `Mouth: OPEN ✓` on your OBSBOT camera.
 
