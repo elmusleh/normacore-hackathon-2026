@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- `config/elrobot.json`: camera exposure table 250 -> 20, gripper 250 -> 50 (`./cli.sh cameras --tune`, daylight 2026-11-22). At 250 the table camera was 71% pure white and the grape was invisible.
 - `FINDINGS.md`/`HANDOFF.md`: gripper direction (`open_at: "max"`) verified on follower `5B61034962`; calibration position check on tag 1 within 1.5 cm.
 - `config/calibration.json`: joint zeros and arm base re-measured on follower `5B61034962` (upright L zero pose + 8 AprilTag touches; fit 16.4 mm RMS, base yaw 177.7°). Replaces the values taken on the temporary arm.
 - `config/elrobot.json`: follower bus back to `5B61034962` (the usual arm is back from repair; the temporary arm `5B61034679` from `049a4fe` is no longer on the bench). Confirmed by the hardware owner 2026-11-22.
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/vision_check.py` and `feeding_vision.mediapipe_status()`; a one-time warning when MediaPipe face detection is unavailable.
 
 ### Fixed
+- `./cli.sh cameras --tune <name>` now tunes the port that is plugged in when the config lists several ports for one camera (one per laptop); before, it only tried the last listed port and failed with "not configured or not plugged in".
 - Every `./cli.sh` Python command (including `hw`, `calib`, `cameras`, `feed`) now runs with `.venv/bin/python` when it exists.
 - OpenCV Haar and skin-tone mouth guesses are marked `fallback`, so the dashboard, web console and MCP mouth check never show or trust a mouth MediaPipe did not find.
 - `requirements.txt` now lists `mediapipe` and `pyyaml`; setup docs cover the venv, models, HD frames, and camera/bus troubleshooting.

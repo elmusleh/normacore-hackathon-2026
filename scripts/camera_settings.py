@@ -198,7 +198,11 @@ def main() -> int:
 
 def run_tune(cfg: dict, devices: dict, names: dict, wanted: list, write: bool) -> int:
     """--tune: sweep exposures per camera, print the best, optionally save it."""
-    by_name = {n: p for p, n in names.items()}
+    # A name can list several ports (one per laptop); tune the one that is plugged in here.
+    by_name: dict = {}
+    for p, n in names.items():
+        if p in devices or n not in by_name:
+            by_name[n] = p
     targets = wanted or sorted(by_name)
     status = 0
     print("Point each camera at the real scene (table, bowl, food) under the real light.")

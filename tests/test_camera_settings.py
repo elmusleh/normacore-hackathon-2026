@@ -70,3 +70,18 @@ def test_pick_exposure_avoids_blown_out_and_dark():
         160: {"mean": 230.0, "clipped_share": 0.60, "dark_share": 0.0},
     }
     assert cs.pick_exposure(results) == 70
+
+
+def test_tune_uses_the_plugged_in_port_when_a_name_lists_several(monkeypatch):
+    """config lists one table port per laptop; --tune must pick the one that is plugged in."""
+    cs = _camera_settings()
+    tuned = []
+    monkeypatch.setattr(cs, "tune", lambda dev, name: tuned.append((dev, name)) or {20: {"verdict": "ok"}})
+    monkeypatch.setattr(cs, "pick_exposure", lambda results: 20)
+    monkeypatch.setattr(cs.subprocess, "run", lambda *a, **k: None)
+    names = {"3-5.1": "table", "3-1.1": "table", "2-1.2.2": "table"}  # last one wins in a plain dict flip
+    devices = {"3-1.1": "/dev/video2"}
+    cfg = {"camera_settings": {}}
+    assert cs.run_tune(cfg, devices, names, ["table"], write=False) == 0
+    assert tuned == [("/dev/video2", "table")]
+    assert cfg["camera_settings"]["table"]["exposure"] == 20
