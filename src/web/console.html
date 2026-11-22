@@ -184,19 +184,50 @@ fetch("/api/cameras").then(r => r.json())
   });
 
 // ---------------------------------------------------------------- text to speech (TTS)
-function speakText(text) {
-  if (!$("tts")?.checked || !("speechSynthesis" in window) || !text) return;
+let currentAudio = null;
+
+async function speakText(text, force = false) {
+  if ((!force && !$("tts")?.checked) || !text) return;
   try {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.0;
-    u.pitch = 1.0;
-    window.speechSynthesis.speak(u);
-  } catch (_) { /* ignore browser TTS errors */ }
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    const r = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!r.ok) {
+      const info = await r.json().catch(() => ({}));
+      throw new Error(info.error || `HTTP ${r.status}`);
+    }
+    const url = URL.createObjectURL(await r.blob());
+    currentAudio = new Audio(url);
+    currentAudio.onended = () => URL.revokeObjectURL(url);
+    await currentAudio.play();
+  } catch (e) {
+    // Fallback to browser speechSynthesis if server TTS fails
+    if ("speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+      } catch (_) {}
+    }
+    if (force) setStatus(`TTS error: ${e.message}`, true);
+  }
 }
 
-$("tts-test")?.addEventListener("click", () => {
-  speakText("Hello! I am your feeding assistant. Tell me if you would like grapes or chocolate, or say stop anytime.");
+// Persist checkbox states across refreshes
+for (const id of ["autosend", "tts"]) {
+  const el = $(id);
+  if (!el) continue;
+  const saved = localStorage.getItem(`console_${id}`);
+  if (saved !== null) el.checked = saved === "1";
+  el.addEventListener("change", () => localStorage.setItem(`console_${id}`, el.checked ? "1" : "0"));
+}
+
+$("tts-test")?.addEventListener("click", async () => {
+  setStatus("Playing test voice…");
+  await speakText("Hello! I am your feeding assistant. Tell me if you would like grapes or chocolate, or say stop anytime.", true);
+  setStatus("Test voice played.");
 });
 
 // ---------------------------------------------------------------- chat

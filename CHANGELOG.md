@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Leader/follower serial roles were swapped in `scripts/teleop_sync.py` (it drove the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` and `docs/team_setup.md`. Confirmed on the arm 2026-11-21: follower `5B61034962`, leader `5B61037051`.
 
 ### Added
+- Added server-side `POST /api/tts` endpoint in `src/web_console.py` (OpenAI `tts-1` voice `nova` MP3 with offline `espeak-ng` WAV fallback) so TTS works reliably on Linux browsers without system browser voices, plus `localStorage` persistence for `autosend` and `tts` checkboxes in `src/web/console.html`.
 - Fixed `src/console_agent.py` compatibility with standard `anthropic` SDK versions (falls back from `beta.messages.create(..., fallbacks=...)` to `messages.create(...)` on `TypeError`).
 - Fixed `src/speech.py` compatibility with OpenAI Python SDK 2.x (automatically falls back from `languages`/`keywords` to `gpt-4o-mini-transcribe` with `prompt` when `TypeError` is raised).
 - Added browser Text-to-Speech (`Speak replies (TTS)` toggle + `Test Voice` button) in `src/web/console.html` and refined `CONSOLE_PROMPT` in `src/console_agent.py` for natural spoken feeding guidance (including `grapes` and `chocolate`).

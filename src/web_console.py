@@ -31,6 +31,7 @@ import logging
 import os
 import re
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -244,6 +245,24 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
             await agent_box["agent"].submit(text)
         return JSONResponse({"ok": True, "message": msg})
 
+    def synthesize_speech(text: str) -> tuple[bytes, str]:
+        """Synthesize spoken audio via OpenAI TTS (MP3) with offline espeak-ng (WAV) fallback."""
+        clean = text.strip()[:600]
+        if os.environ.get("OPENAI_API_KEY", "").strip():
+            try:
+                from openai import OpenAI
+
+                client = OpenAI(timeout=15.0, max_retries=1)
+                resp = client.audio.speech.create(model="tts-1", voice="nova", input=clean)
+                return resp.content, "audio/mpeg"
+            except Exception as exc:  # noqa: BLE001 - fall back to local espeak-ng
+                log.warning("OpenAI TTS failed, falling back to espeak-ng: %s", exc)
+        proc = subprocess.run(["espeak-ng", "--stdout", clean], capture_output=True, timeout=10)
+        if proc.returncode == 0 and proc.stdout:
+            return proc.stdout, "audio/wav"
+        raise RuntimeError("No TTS backend available (OpenAI TTS and espeak-ng both failed)")
+
+
     async def stop(_: Request):
         agent = agent_box["agent"]
         chat.add("user", "Stop (button)")
@@ -252,6 +271,17 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
             return JSONResponse({"ok": False}, status_code=503)
         await agent.emergency_stop()
         return JSONResponse({"ok": True})
+
+    async def tts(request: Request):
+        body = await request.json()
+        text = str(body.get("text", "")).strip()
+        if not text:
+            return JSONResponse({"ok": False, "error": "no text"}, status_code=400)
+        try:
+            audio_bytes, media_type = await run_in_threadpool(synthesize_speech, text)
+        except Exception as exc:  # noqa: BLE001 - reported to browser
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+        return Response(audio_bytes, media_type=media_type, headers={"Cache-Control": "no-store"})
 
     @contextlib.asynccontextmanager
     async def lifespan(_app):
@@ -272,6 +302,7 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         Route("/api/frame/{camera}", frame),
         Route("/api/stt", stt_status),
         Route("/api/transcribe", transcribe, methods=["POST"]),
+        Route("/api/tts", tts, methods=["POST"]),
         Route("/api/messages", messages, methods=["GET", "POST"]),
         Route("/api/stop", stop, methods=["POST"]),
     ], lifespan=lifespan)
