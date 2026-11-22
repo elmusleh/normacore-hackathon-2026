@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Confirm a grasp by lifting a little and watching the jaws — Priority 82% (High value) [Security]
+   What: After closing, lift 1 cm and re-read the gripper; if the jaws kept closing, call it a miss instead of "holding".
+   Why: A stall on the bowl or the table looks exactly like a grasp today, so the robot can carry "nothing" to a person and believe it is feeding them.
+   How: In `scripts/calib.py` `_gripper_after`, after the squeeze, move the arm up 10 mm, read motor 8 again, and print "closed empty" if it moved more than ~30 steps past the stall value. Add an offline test with the fake gripper.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found at the end of the 2026-11-22 session (bowl grips); handover came first.
+
+2. Refuse gripper commands when the MCP server's reading is old — Priority 74% (High value) [Security]
+   What: Have `set_gripper` and `get_robot_state` check how old the motor reading is and refuse (with a "reconnect /mcp" hint) when it is frozen.
+   Why: A frozen reading made the gripper squeeze 11x harder than set and split a grape; the same could hurt a fingertip during a handover.
+   How: In `src/robot_tools.py`, compare the reading's timestamp (or two reads a moment apart while a motor is moving) and return ok=false with a clear message when it is stale. Test it with a fake reader that never changes.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Workaround exists (`calib goto --close-after` reads fresh); needs a look at how the Station frames carry time.
+
+3. Store the bowl (and other fixed places) as named table points — Priority 48% (Nice to have) [Best practices]
+   What: Keep `places: {"bowl": [365, 28, 130]}` in `config/elrobot.json` and let `calib goto bowl` use it.
+   Why: The drop then needs no camera step and no pixel guessing, which makes it faster and the same every time; the camera is only needed when the bowl was moved.
+   How: Add the `places` block, accept a place name instead of X Y Z in `calib goto`, and update `drop-in-bowl` to try the stored place first and re-measure with `calib pixel` only if the look shows the bowl elsewhere.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The bowl was moved during the session; wait until its position on the table is fixed.
+
 1. Hardware-owner check inside the motion commands — Priority 80% (High value) [Security]
    What: `calib goto`, `calib line` and `hw jog/goto` read `hardware_owner` from `.ai-sync/HANDOFF.md` and refuse to move unless `git config user.name` (or an `ELROBOT_OPERATOR` variable) matches it.
    Why: With several teammates and their agents on the same repo, the single-writer rule is only written down; a second agent could move the arm while the owner is working on it.
