@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Choose one primary stage deck (or combine Slides 2–4 of `CareArm_Use_Case_Pitch.pptx` with Slides 4–8 of `Assistive_Feeding_Robot_Pitch.pptx`) before uploading to Google Slides — Priority 89% (High value) [Professionalism]
+   What: Decide whether to present the human-centered `docs/CareArm_Use_Case_Pitch.pptx` (9 slides) for the main-stage 5-minute pitch, the technical `docs/Assistive_Feeding_Robot_Pitch.pptx` (10 slides) for track judges, or a merged 10-slide hybrid.
+   Why: Keeping a single cohesive narrative ensures you stay comfortably inside the 3-minute video / 5-minute main-stage time cap without rushing slides.
+   How: Review both decks side-by-side in LibreOffice Impress and upload your chosen version to your shared Google Slides URL.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Both decks are ready locally so the team can pick the best balance of story vs. technical depth for the final stage.
+
+2. Add a real user/caregiver quote or Berlin care-statistics citation to Slide 2 of `CareArm_Use_Case_Pitch.pptx` — Priority 65% (Nice to have) [Professionalism]
+   What: Add one concrete healthcare statistic (e.g., German long-term care staffing gap or stroke incidence) or a short quote from a teammate who tested the mouth-open standoff on the bench.
+   Why: Grounding the persona slide in a real number or firsthand test quote makes the emotional hook even more memorable for non-robotics judges.
+   How: Update Slide 2 in `scripts/generate_use_case_deck.py` and re-run `python3 scripts/generate_use_case_deck.py`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Kept this pass strictly aligned to verified project facts without introducing unverified external statistics.
+
+3. Prepare a 30-second spoken voiceover script synced to Slides 1–4 for the 3-minute hackathon submission video — Priority 76% (High value) [Best practices]
+   What: Use the embedded speaker notes in `CareArm_Use_Case_Pitch.pptx` Slides 1–4 as the opening 60 seconds of your 3-minute showcase video, followed by 90 seconds of live robot feeding and 30 seconds of safety/E-stop proof.
+   Why: Judges evaluate tracks primarily on the 3-minute video; pairing a clear human story up front with live robot footage maximizes both impact and technical score.
+   How: Open Presenter Notes in LibreOffice Impress while recording your webcam + bench demo video, then upload to your shared Google Drive folder.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Ready to record once the team runs the final bench video capture.
+
 1. Re-upload the updated `docs/Assistive_Feeding_Robot_Pitch.pptx` (now with Team 6 roster) to Google Slides — Priority 91% (Critical) [Professionalism]
    What: Import the regenerated `docs/Assistive_Feeding_Robot_Pitch.pptx` into your shared Google Slides presentation URL so the online slides match the local deck with Team 6 (`CareArm`) and all 3 member names.
    Why: Judges and stage AV staff open the Google Slides link from the Tally submission form; keeping it synced avoids showing an older draft without team names.

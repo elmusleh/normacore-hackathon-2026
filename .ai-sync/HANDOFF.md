@@ -1,15 +1,26 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T06:51:00Z
-status: docs-readme-findings-and-deck-synced
+timestamp: 2026-11-22T07:14:00Z
+status: use-case-pitch-deck-ready
 current_phase: "Phase 5: Demo Polishing & Sunday Pitch"
-current_task: "Refreshed README.md for Team 6 CareArm, added Team 6 roster to pitch deck Slides 1 & 10, and updated FINDINGS.md with verified 2026-11-22 bench observations"
+current_task: "Created 9-slide use-case & human-impact presentation (docs/CareArm_Use_Case_Pitch.pptx) with embedded speaker notes"
 stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-22T06:45 — submission-form-prepared
+previous_session: antigravity 2026-11-22T06:51 — docs-readme-findings-and-deck-synced
 ---
 
-## Latest session (2026-11-22 06:51): README Refresh, Pitch Deck Team 6 Roster & FINDINGS Update
+## Latest session (2026-11-22 07:14): Use-Case & Human-Impact Pitch Deck (`docs/CareArm_Use_Case_Pitch.pptx`)
+
+- **What Changed:**
+  - Created `scripts/generate_use_case_deck.py` and generated a new 9-slide, warm human-centered presentation at `docs/CareArm_Use_Case_Pitch.pptx` with presenter speaker notes on every slide.
+  - Focuses on the human use case: who CareArm serves (upper-limb paralysis, post-stroke rehab, caregivers/nurses), Before vs. With CareArm transformation, a 4-scene real mealtime storyboard, 6 patient-trust guarantees near the face, 3 real deployment settings (home, rehab clinics, assisted living), 10× cost & usability comparison vs. $6k–$12k commercial feeders, proven today + path to full meals, and closing call-to-action.
+  - Visually verified all 9 slides via LibreOffice PDF export + `pdftoppm` PNG inspection.
+- **Files Changed:** `scripts/generate_use_case_deck.py`, `docs/CareArm_Use_Case_Pitch.pptx`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`, `.ai-sync/PROGRESS.md`.
+- **Next Steps:**
+  1. Review both `docs/CareArm_Use_Case_Pitch.pptx` (use-case focus) and `docs/Assistive_Feeding_Robot_Pitch.pptx` (technical focus) and upload the chosen deck to Google Slides.
+  2. Record the 3-minute showcase video and submit `https://tally.so/r/GexoxQ` before **16:30**.
+
+## Session (2026-11-22 06:51): README Refresh, Pitch Deck Team 6 Roster & FINDINGS Update
 
 - **What Changed:**
   - **GitHub Landing Page (`README.md`):** Rewrote `README.md` to match the final Team 6 (**CareArm — Assistive Feeding Robot**) submission: 4-layer architecture, 3-camera MediaPipe vision, 15 MCP tools, 3-layer guardrails, verified benchmarks (123/123 tests), accurate `./cli.sh` command table, Team 6 roster, and links to all submission & design docs.
