@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- `config/calibration.json`: joint zeros and arm base re-measured on follower `5B61034962` (upright L zero pose + 8 AprilTag touches; fit 16.4 mm RMS, base yaw 177.7°). Replaces the values taken on the temporary arm.
 - `config/elrobot.json`: follower bus back to `5B61034962` (the usual arm is back from repair; the temporary arm `5B61034679` from `049a4fe` is no longer on the bench). Confirmed by the hardware owner 2026-11-22.
 
 ### Added

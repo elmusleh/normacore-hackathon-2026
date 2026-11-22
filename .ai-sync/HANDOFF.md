@@ -22,9 +22,10 @@ previous_session: antigravity 2026-11-22T07:28 — diagrams-png-pdf-and-illustra
 - **Files Changed:** `cli.sh`, `CHANGELOG.md`, `FINDINGS.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
 - **Build Status:** `.venv/bin/python -m pytest tests/` 163 passed; `bash -n cli.sh` OK.
 - **Follow-up (same session): made the fixes permanent for the team.** Every `./cli.sh` command uses `.venv/bin/python` (hardware owner steve approved this for `hw`/`calib`/`feed`); OpenCV mouth guesses are marked `fallback` in `src/feeding_vision.py`; new `./cli.sh setup-vision`, `scripts/vision_check.py`, `scripts/station_config.py` (HD formats auto-added to `station.yaml`); `requirements.txt` gains `mediapipe`, `pyyaml`; `docs/team_setup.md` and `docs/mcp_server.md` updated. Tests: 169 passed. Teammates: pull, then run `.venv/bin/pip install -r requirements.txt` and `./cli.sh setup-vision` once.
+- **Follow-up (same session): follower back and recalibrated.** `config/elrobot.json` bus back to `5B61034962` (55e1840, steve confirmed; arm self-controlled, torque off, 8/8 motors OK). Station auto-calibrate set the motor ranges; joint zeros + base fit re-measured on this arm (f6a5d8e): L-pose zero, 8 tag touches, 16.4 mm RMS, base yaw 177.7°. Gripper direction (`gripper.open_at`) is still the temporary arm's measurement; recheck with one nudge on motor 8 before the first grip.
 - **Next Steps:**
-  1. Find out who turned torque on for the follower, and set it to (Self-controlled) in http://localhost:8889.
-  2. Point `station.bus` back at `5B61034962` (calibration commit by the arm's owner).
+  1. Done: follower is (Self-controlled) and `station.bus` is `5B61034962`.
+  2. Check the calibration with `./cli.sh calib where` with the fingertips on a marked spot (should match within ~1-2 cm).
   3. Re-check the gripper direction on `5B61034962` (`./cli.sh hw identify 8`), then continue Stage 1 with the `hover-above-object` and `grip-object` skills.
 
 ## Latest session (2026-11-22 07:34): Narrated 1080p Story Film ("Marta's Dinner")
