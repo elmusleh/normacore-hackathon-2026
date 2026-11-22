@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `./cli.sh calib goto X Y Z [--down] [--speed N] [--yes]`: moves the fingertip to a table point. Plans lift -> across at 150 mm -> descend (`plan_cartesian_goto` in `src/arm_kinematics.py`), shows the plan, asks for MOVE, then drives each leg with the `hw goto` machinery (torque check, speed cap 800, overload watch). Refuses without a measured calibration, below 50 mm + fit error, when out of reach (> 5 mm) or when any goal leaves a motor's range (no clamping). Not yet run on the arm.
 
 ### Fixed
+- `calib goto` stopped with `timeout` on its first live run: motors 2-4 settled 18-48 steps short of the lift pose under gravity. It now accepts a joint that stopped within 60 steps without overload (`near`, same rule as the sequence player) and prints how far short each joint settled.
 - `calib fit --refine` with too few touches prints a short error instead of a Python traceback.
 - `calib reach` with real motor ranges: motor readings wrap from 4095 to 0 and the ranges cross that point (e.g. 3726..1565). Step <-> radian conversion now wraps (`wrap_steps`), `to_steps` returns 0..4095, the range check and step change handle wrapping ranges (`step_in_range`, `step_delta`), and the IK limits use the real ranges (they were skipped before because min > max). Before the fix every motor showed OUT OF RANGE with wrong step changes.
 

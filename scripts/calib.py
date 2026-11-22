@@ -347,6 +347,7 @@ def cmd_goto(args, cal):
     import hw_day  # motion helpers: Station connection, MOVE prompt, torque check, speed cap
     from elrobot_config import current_threshold_for
     from elrobot_hardware import DEFAULT_MAX_ACCEL
+    from sequence_player import SEQ_NEAR_TOLERANCE
     for key, what in (("joints", "joint zeros (calib zero + calib fit --refine)"),
                       ("base_in_table", "arm base (calib fit --write)")):
         if not cal[key].get("measured"):
@@ -385,13 +386,16 @@ def cmd_goto(args, cal):
             return 0
         thresholds = {m: current_threshold_for(cfg, m) for m in ARM_MOTORS}
         for label, p, goals in legs:
+            # Loaded joints settle 20-45 steps short under gravity: accept "near" like the sequence player.
             status = hw.move_and_watch(goals, enable_motion=True, max_speed=speed, max_accel=DEFAULT_MAX_ACCEL,
-                                       thresholds=thresholds)
-            if not all(st == "reached" for st in status.values()):
+                                       thresholds=thresholds, near_tolerance=SEQ_NEAR_TOLERANCE)
+            if not all(st in ("reached", "near") for st in status.values()):
                 print(f"Stopped during '{label}': " + ", ".join(f"{m}={st}" for m, st in sorted(status.items())))
                 print("The arm holds where it stopped. Check for an obstacle, then ./cli.sh logs.")
                 return 1
-            print(f"  {label}: reached")
+            short = {m: goals[m] - st for m, st in ((m, r.present) for m, r in hw.snapshot().items())
+                     if m in goals and abs(goals[m] - st) > 12}
+            print(f"  {label}: reached" + (f" (settled short, steps: {short})" if short else ""))
         final = hw.snapshot()
         tip = base.base_to_table(model.tcp(jc.to_radians({m: final[m].present for m in ARM_MOTORS})))
         print(f"Arrived. Fingertip by the joint readings: {_fmt(tip)} mm (target {_fmt(target)}).")

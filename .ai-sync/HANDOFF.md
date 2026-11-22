@@ -14,6 +14,7 @@ previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP serve
 - Jafer recalibrated the Station motor ranges, then redid `calib zero` (03:53) and 8 touches; fit 16.0 mm RMS, base z -36.9 mm (implausible: expected >= 0). Committed as measured, but treat targets as +-3 cm until the ruler fit.
 - New `./cli.sh calib goto X Y Z [--down]` (MOVES the arm; see docs/tcp_calibration.md). NOT run on the arm yet. Dry plan from live readings: targets at the table middle plan fine without `--down`; with `--down` the wrist cannot point straight down there (motor 6 range, motor 2 range 1532..2564 is narrow).
 - Next: 1) Jafer runs the bench checklist (docs/bench_safety.md), `./cli.sh hw torque on` while holding the arm, then `./cli.sh calib goto 228 114 120 --speed 200`, type MOVE, hand on the 12 V switch. 2) Recalibrate motor 2 through its full travel (waypoints use down to 1016). 3) Ruler layout, zero, touches, fit < 10 mm.
+- 04:08: first live goto stopped in the lift leg (timeout: motors 2-4 settled 18-48 steps short under gravity). Fixed to accept `near` like the sequence player. Arm holding at the lift pose with torque on. Motor 2's range was 994..3102 yesterday, 1532..2564 now: recalibrate it.
 - Hardware owner: jafer.
 
 ## Latest session (2026-11-22, ~02:20, claude for Jafer): camera resolution, console sees all cameras
