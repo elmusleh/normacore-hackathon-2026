@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `config/elrobot.json`: follower bus back to `5B61034962` (the usual arm is back from repair; the temporary arm `5B61034679` from `049a4fe` is no longer on the bench). Confirmed by the hardware owner 2026-11-22.
+
 ### Added
 - `./cli.sh setup-vision`: installs MediaPipe into `.venv`, downloads `data/face_landmarker.task` and `data/efficientdet_lite0.tflite`, then runs `scripts/vision_check.py`.
 - `scripts/station_config.py`: `./cli.sh station` and `./cli.sh start` add the HD camera `formats` list and `resize_target: 1080` to a local `station.yaml` that has none (backup `station.yaml.bak`; opt out with `ELROBOT_KEEP_STATION_YAML=1`).
