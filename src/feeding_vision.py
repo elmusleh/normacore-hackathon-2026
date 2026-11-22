@@ -243,6 +243,7 @@ class FeedingVisionDetector:
         self.safety_fsm = FeedingSafetyFSM()
         self._landmarker = self._load_mediapipe_landmarker()
         self._object_detector = self._load_mediapipe_object_detector()
+        self._ema_bowl: Optional[Tuple[float, float, float, float]] = None
 
     @staticmethod
     def _load_mediapipe_object_detector():
@@ -352,21 +353,51 @@ class FeedingVisionDetector:
         # Chroma distance (ignores white ceramic glare!) + strong dark-object drop (for dark chocolate)
         chroma_dist = np.hypot(lab[:, :, 1] - med_a, lab[:, :, 2] - med_b)
         dark_drop = med_l - lab[:, :, 0]
-        food_mask = (((chroma_dist > 14.0) | (dark_drop > 38.0)) & (inner_mask > 0)).astype(np.uint8) * 255
+        # Exclude specular white highlights (very high L and low saturation)
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        not_glare = ~((hsv[:, :, 2] > 235) & (hsv[:, :, 1] < 35))
+        food_mask = (((chroma_dist > 16.0) | (dark_drop > 42.0)) & (inner_mask > 0) & not_glare).astype(np.uint8) * 255
 
         fk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         food_mask = cv2.morphologyEx(food_mask, cv2.MORPH_OPEN, fk)
         food_mask = cv2.morphologyEx(food_mask, cv2.MORPH_CLOSE, fk)
 
+        # Split touching grapes using distance-transform peaks inside each contour
         fcnts, _ = cv2.findContours(food_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         pieces: List[Tuple[float, int, int, int, int]] = []
-        min_a = max(40.0, bowl_area * 0.003)
-        max_a = bowl_area * 0.14
+        min_a = max(55.0, bowl_area * 0.0035)
+        max_a = bowl_area * 0.16
         for fc in fcnts:
             fa = cv2.contourArea(fc)
-            if min_a <= fa <= max_a:
-                fx, fy, fw, fh = cv2.boundingRect(fc)
-                pieces.append((fa, fx + fw // 2, fy + fh // 2, fw, fh))
+            if fa < min_a or fa > max_a:
+                continue
+            fx, fy, fw, fh = cv2.boundingRect(fc)
+            aspect = max(fw, fh) / max(1, min(fw, fh))
+            perim = cv2.arcLength(fc, True)
+            circ = (4.0 * math.pi * fa / (perim * perim)) if perim > 0 else 0.0
+            # Reject long thin rim-glare slivers
+            if aspect > 2.4 or circ < 0.30:
+                continue
+            # If this blob is large enough to be a cluster of touching grapes, find individual peaks
+            if fa > bowl_area * 0.025:
+                sub_mask = np.zeros((fh + 4, fw + 4), dtype=np.uint8)
+                shifted = fc - np.array([[[fx - 2, fy - 2]]])
+                cv2.drawContours(sub_mask, [shifted], -1, 255, -1)
+                dist_map = cv2.distanceTransform(sub_mask, cv2.DIST_L2, 5)
+                max_d = float(dist_map.max())
+                if max_d >= 6.0:
+                    peaks_mask = (dist_map >= max_d * 0.58).astype(np.uint8) * 255
+                    pcnts, _ = cv2.findContours(peaks_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    if len(pcnts) >= 2:
+                        r_est = int(round(max_d * 2.0))
+                        for pc in pcnts:
+                            M = cv2.moments(pc)
+                            if M["m00"] > 0:
+                                pu = int(round(M["m10"] / M["m00"])) + fx - 2
+                                pv = int(round(M["m01"] / M["m00"])) + fy - 2
+                                pieces.append((max_d * max_d * math.pi, pu, pv, r_est, r_est))
+                        continue
+            pieces.append((fa, fx + fw // 2, fy + fh // 2, fw, fh))
         pieces.sort(key=lambda p: p[0], reverse=True)
         return [(int(p[1]), int(p[2]), int(p[3]), int(p[4])) for p in pieces]
 
@@ -405,8 +436,23 @@ class FeedingVisionDetector:
             return None
 
         hull, x, y, bw, bh, circ = best
-        u = min(w_img - 1, x + bw // 2)
-        v = min(h_img - 1, y + bh // 2)
+        raw_u = min(w_img - 1, x + bw // 2)
+        raw_v = min(h_img - 1, y + bh // 2)
+        # EMA-smooth bowl box across frames to eliminate jitter/flicker
+        if self._ema_bowl is None:
+            self._ema_bowl = (float(raw_u), float(raw_v), float(bw), float(bh))
+        else:
+            a = 0.40
+            self._ema_bowl = (
+                a * raw_u + (1 - a) * self._ema_bowl[0],
+                a * raw_v + (1 - a) * self._ema_bowl[1],
+                a * bw + (1 - a) * self._ema_bowl[2],
+                a * bh + (1 - a) * self._ema_bowl[3],
+            )
+        u = int(round(self._ema_bowl[0]))
+        v = int(round(self._ema_bowl[1]))
+        bw = int(round(self._ema_bowl[2]))
+        bh = int(round(self._ema_bowl[3]))
         x_mm, y_mm = self.pixel_to_mm(u, v)
 
         bowl_mask = np.zeros((h_img, w_img), dtype=np.uint8)
