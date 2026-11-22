@@ -396,3 +396,42 @@ def test_stop_interrupts_a_running_plan_without_waiting_for_the_lock(plans):
     res = tools.call(tools.play_sequence, "grapes")
     assert not res["ok"] and "stopped by request" in res["error"]
     assert len(arm.moves) == 2
+
+
+def test_set_mouth_gate_persists_to_config(plans):
+    tools, arm, tmp = plans
+    r1 = tools.set_mouth_gate(True)
+    assert r1["ok"] and r1["mouth_gate_enabled"] is True
+    cfg = json.loads((tmp / "elrobot.json").read_text())
+    assert cfg["feeding_vision"]["mouth_gate_enabled"] is True
+
+    r2 = tools.set_mouth_gate(False)
+    assert r2["ok"] and r2["mouth_gate_enabled"] is False
+    cfg2 = json.loads((tmp / "elrobot.json").read_text())
+    assert cfg2["feeding_vision"]["mouth_gate_enabled"] is False
+
+
+def test_sequence_player_after_leg_can_halt_sequence(plans):
+    tools, arm, tmp = plans
+    seen = []
+
+    def gate(leg_name, stop_event):
+        seen.append(leg_name)
+        if leg_name == "grape":
+            return False, "mouth did not open before release"
+        return True, ""
+
+    named = [
+        ("start", {int(k): v for k, v in pose(2000).items()}),
+        ("grape", {int(k): v for k, v in pose(2100).items()}),
+        ("mouth", {int(k): v for k, v in pose(2200).items()}),
+    ]
+    legs = sequence_player.plan_legs(arm.snapshot(), named)
+    thresholds = {m: 400 for m in ELROBOT_MOTOR_IDS}
+    res = sequence_player.run_legs(arm, legs, speed=200, thresholds=thresholds, after_leg=gate)
+    assert not res["ok"]
+    assert res["stopped_at"] == "grape"
+    assert "mouth did not open" in res["error"]
+    assert seen == ["start", "grape"]
+    assert len(arm.moves) == 2
+

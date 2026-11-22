@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Add a live OBSBOT mouth-status badge (`Mouth: Open / Closed / No Face`) to `http://localhost:8890` — Priority 84% (High value) [Professionalism]
+   What: Show a compact real-time indicator next to the `Wait for Mouth-Open (OBSBOT)` checkbox displaying whether OBSBOT currently sees a face and whether the mouth is open or closed.
+   Why: Gives judges and the user immediate visual confidence before starting a feeding sequence that the camera sees their face and the threshold is calibrated.
+   How: Expose a read-only `GET /api/mouth_status` endpoint in `src/web_console.py` backed by `check_person_mouth()` (cached ~500 ms so it doesn't contend with the camera) and poll it lightly when the checkbox is enabled.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Kept this turn focused on the core mouth-open gate, MCP tools, and toggle without adding background camera polling from the console page.
+
+2. Add a visual + spoken cue when `play_sequence` pauses for mouth-open confirmation — Priority 78% (High value) [Best practices]
+   What: Emit a console status event (and optional TTS prompt like "Ready — open your mouth when you want the bite") the moment the arm reaches the mouth-standoff waypoint and begins waiting for `mouth_open_confirmed`.
+   Why: A paralyzed user watching the arm stop in front of them immediately knows the robot is waiting for their mouth-open cue rather than stalled.
+   How: Pass a status callback or update `web_console.py`'s SSE stream from `_mouth_gate_check` in `src/robot_tools.py` so the browser shows an amber "Waiting for mouth open..." banner and speaks a short cue.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Requires wiring a progress event hook from `RobotTools` into `console_agent.py`'s SSE stream.
+
+3. Add a hardware-independent timeout/watchdog setting in `config/elrobot.json` for `mouth_gate_timeout_s` — Priority 58% (Nice to have) [Security]
+   What: Make the 12-second mouth-open wait timeout configurable in `config/elrobot.json` under `feeding_vision.mouth_gate_timeout_s` (clamped between 3 s and 30 s) instead of hardcoded in `src/robot_tools.py`.
+   Why: Different users (especially those with limited mobility or dysphagia) need more or less time to prepare for a bite, while clamping prevents an unbounded hang near the face.
+   How: Read `feeding_vision.get("mouth_gate_timeout_s", 12.0)` in `_mouth_gate_check` in `src/robot_tools.py`, clamp to `[3.0, 30.0]`, and add a unit test in `tests/test_robot_mcp.py`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Default 12.0 s timeout is sensible for the hackathon demo; per-user tuning can be added if needed during rehearsal.
+
 1. Raise `resize_target` in `station.yaml` (224 -> 480) and apply manual exposure via `v4l-utils` — Priority 93% (Critical) [Best practices]
    What: Increase `usb-video.resize_target` from `224` to `480` in `station.yaml`, install `v4l-utils`, and run `./cli.sh cameras` before starting the Station.
    Why: Fixes both causes of poor Station camera image quality permanently — removes the 224px blurriness and eliminates the washed-out libuvc auto-exposure bug so AI vision sees food clearly.
@@ -48,13 +69,6 @@
    How: With the Station running and torque off, guide the gripper to each position and run `./cli.sh hw teach clear`, `./cli.sh hw teach zone_a_hover`, `./cli.sh hw teach zone_a`, and `./cli.sh hw teach serve`, then commit `config/waypoints.json`.
    Status: ⏳ Unimplemented
    Reason Deferred: Requires the physical USB hub to be re-seated and the hardware owner to position the arm at the bench.
-
-2. Add a live mouth-open trigger confirmation before releasing a grape at the facial standoff — Priority 86% (High value) [Security]
-   What: Require the camera detector to see the diner's mouth stay open for 3 consecutive frames at the `serve` standoff pose before opening the gripper to release the grape.
-   Why: Prevents dropping a grape prematurely while the diner is still leaning in or speaking, making the feeding handover safe and comfortable.
-   How: In `src/feeding_vision.py`, poll `detect_mouth()` 3 times at 0.2 s intervals after reaching the `serve` waypoint and only call `set_gripper(60)` once `mouth_open` is true in all 3 frames.
-   Status: ⏳ Unimplemented
-   Reason Deferred: Best tuned with a teammate sitting in front of the live camera during the Stage 2 bench rehearsal.
 
 3. Add an automatic USB hub health banner to `./cli.sh feed` and Mission Control — Priority 76% (High value) [Professionalism]
    What: Check whether `/dev/video4` and `/dev/ttyACM0`–`1` are present before starting a feeding cycle, and print a clear warning if the USB hub has dropped them.

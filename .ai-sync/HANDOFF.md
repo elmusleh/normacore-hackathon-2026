@@ -1,15 +1,30 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T02:11:00Z
-status: merged-jan-and-jafer-ready-for-demo
-current_phase: "Phase 3: Full Team Integration (Dual-Camera MediaPipe + Recorded Sequences + MCP)"
-current_task: "Merged origin/jan and origin/jafer into feat/agent-commit-and-push-policy"
-stop_reason: ready-for-demo
+timestamp: 2026-11-22T03:26:00Z
+status: hands-free-voice-chimes-and-mouth-gate-live
+current_phase: "Phase 3: Full Team Integration (Hands-Free Voice Console + OBSBOT MediaPipe Mouth-Open Gate)"
+current_task: "Added Web Audio chimes, wired OBSBOT MediaPipe mouth-open gate into play_sequence & MCP with UI toggle, removed push-prompt rule from AGENTS.md"
+stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-21T20:51 — dual-camera-dashboard-and-mediapipe
+previous_session: antigravity 2026-11-22T02:11 — merged-jan-and-jafer-ready-for-demo
 ---
 
-## Latest session (2026-11-22 02:11): Merged `origin/jan` + `origin/jafer`
+## Latest session (2026-11-22 03:26): Hands-Free Voice Chimes, OBSBOT Mouth-Open Gate & `AGENTS.md` Policy
+
+- **What Changed:**
+  - **`AGENTS.md`:** Removed the mandatory push-to-remote prompt from `Commit Every Change`, `Definition of Done`, and `On Stop` (push only when the user explicitly asks).
+  - **Voice Console Accessibility Chimes (`src/web/console.html`):** Added soft Web Audio API chimes (`playChime("start" | "sent" | "stop")`) for Hands-Free mode (rising ding on speech start, warm double-note on send, descending tone on stop/cancel), respecting the `Read replies aloud` checkbox.
+  - **OBSBOT MediaPipe Mouth-Open Gate (`src/sequence_player.py`, `src/robot_tools.py`, `src/robot_mcp_server.py`, `src/web_console.py`, `src/web/console.html`):**
+    - Added optional `after_leg` callback hook to `sequence_player.run_legs()`.
+    - Wired live OBSBOT MediaPipe `MouthStateTracker` into `play_sequence()` when `feeding_vision.mouth_gate_enabled` is enabled in `config/elrobot.json` (default `false`): pauses at mouth-standoff waypoints (`serve`, `feed_3`, `feed_4`, `choc_feed_7`) up to `12.0s` until `mouth_open_confirmed == True`, halting cleanly on `stop_event` or >0.6s face-loss watchdog.
+    - Registered 2 new MCP tools (`check_person_mouth`, `set_mouth_gate`) and added `GET/POST /api/mouth_gate` plus the **Wait for Mouth-Open (OBSBOT)** checkbox in `http://localhost:8890`.
+  - **Tests (`tests/test_robot_mcp.py`):** Added unit tests for `set_mouth_gate` config persistence and `sequence_player.run_legs(..., after_leg=...)` halting behavior.
+  - **Live Server:** Restarted `./cli.sh console 8890` (`14 MCP tools`, `motion=1`, `GET/POST /api/mouth_gate` verified live). Not tested on physical arm motion in this turn.
+- **Next Steps:**
+  1. Hard-refresh `http://localhost:8890` (`Ctrl+Shift+R`) to load the audio chimes and `Wait for Mouth-Open (OBSBOT)` toggle.
+  2. Do a quick dry-run or live mouth-open demo test with the checkbox enabled and OBSBOT aimed at the diner's face.
+
+## Session (2026-11-22 02:11): Merged `origin/jan` + `origin/jafer`
 
 - **What Changed:**
   - Merged `origin/jan` (which includes all of `origin/jafer`: recorded `grapes` & `choc` feeding waypoints/sequences in `config/waypoints.json` + `config/sequences.json`, `src/sequence_player.py`, MCP `list_sequences`/`play_sequence`, `move_and_watch(near_tolerance=...)`, `src/speech.py`, macOS + multi-port camera support in `src/elrobot_camera.py`) while keeping our MediaPipe lip/bowl tracking, per-user calibration, 720p HD V4L2 dashboard, `./cli.sh reset`, and `set_torque` readback retry fix.

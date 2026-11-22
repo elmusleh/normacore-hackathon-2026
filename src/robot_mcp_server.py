@@ -158,6 +158,22 @@ def play_sequence(name: str) -> dict:
 
 
 @server.tool(structured_output=False)
+def check_person_mouth() -> dict:
+    """Check the live OBSBOT Person Cam with MediaPipe FaceLandmarker: returns face_detected,
+    MAR (Mouth Aspect Ratio), mouth_open, mouth_open_confirmed (3-frame debounce), standoff_cm,
+    and whether the mouth-open safety gate is enabled. Moves nothing."""
+    return tools.call(tools.check_person_mouth)
+
+
+@server.tool(structured_output=False)
+def set_mouth_gate(enabled: bool) -> dict:
+    """Enable or disable the OBSBOT MediaPipe mouth-open safety gate during play_sequence.
+    When enabled, play_sequence holds at the serve/feed waypoint until the person opens their
+    mouth (3 frames confirmed) and stops if they turn away."""
+    return tools.call(tools.set_mouth_gate, enabled)
+
+
+@server.tool(structured_output=False)
 def stop() -> dict:
     """Stop: hold every motor where it is right now. Always allowed, also while play_sequence is
     running (it interrupts the plan). Use if anything looks wrong."""

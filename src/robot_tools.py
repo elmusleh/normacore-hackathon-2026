@@ -452,13 +452,108 @@ class RobotTools:
             return {"ok": False, "error": f"goal registers of motors {drifting} change on their own: teleop "
                                           "(leader arm) is probably on. Ask the operator to turn it off."}
         self._abort.clear()
-        log.info("play_sequence %s: %s", name, steps)
+        fv_cfg = cfg.get("feeding_vision", {})
+        mouth_gate_on = bool(fv_cfg.get("mouth_gate_enabled", False))
+        gate_waypoints = set(fv_cfg.get("mouth_gate_waypoints") or ["serve", "feed_3", "feed_4", "choc_feed_7"])
+        gate_timeout_s = float(fv_cfg.get("mouth_gate_timeout_s", 12.0))
+        after_leg_cb = (
+            (lambda leg_name, ev: self._mouth_gate_check(leg_name, ev, gate_waypoints, gate_timeout_s))
+            if mouth_gate_on
+            else None
+        )
+        log.info("play_sequence %s: %s (mouth_gate=%s)", name, steps, mouth_gate_on)
         result = run_legs(hw, legs, speed=speed, thresholds={m: current_threshold_for(cfg, m) for m in ELROBOT_MOTOR_IDS},
-                          tolerance=tolerance, pause=pause, stop_event=self._abort, title=name)
-        result.update(sequence=name, steps=steps)
+                          tolerance=tolerance, pause=pause, stop_event=self._abort,
+                          after_leg=after_leg_cb, title=name)
+        result.update(sequence=name, steps=steps, mouth_gate_enabled=mouth_gate_on)
         if not result["ok"]:
             result["hint"] = "The arm is holding where it stopped. Look at the camera and tell the person; do not rerun blindly."
         return result
+
+    def set_mouth_gate(self, enabled: bool) -> Dict[str, Any]:
+        """Enable or disable the OBSBOT MediaPipe mouth-open safety gate during play_sequence."""
+        from elrobot_config import save_config
+        cfg = self._cfg()
+        fv = dict(cfg.get("feeding_vision") or {})
+        fv["mouth_gate_enabled"] = bool(enabled)
+        cfg["feeding_vision"] = fv
+        save_config(cfg)
+        return {"ok": True, "mouth_gate_enabled": bool(enabled)}
+
+    def check_person_mouth(self) -> Dict[str, Any]:
+        """Capture one live frame from the configured Person Cam (OBSBOT) and run MediaPipe mouth check."""
+        import cv2
+        from feeding_vision import FeedingVisionDetector
+
+        cfg = self._cfg()
+        fv_cfg = cfg.get("feeding_vision", {})
+        person_src = cfg.get("cameras", {}).get("person", "v4l2:2")
+        if isinstance(person_src, list):
+            person_src = person_src[0] if person_src else "v4l2:2"
+        dev_path = f"/dev/video{person_src[5:]}" if str(person_src).startswith("v4l2:") else str(person_src)
+
+        cap = cv2.VideoCapture(dev_path, cv2.CAP_V4L2)
+        if not cap.isOpened():
+            return {"ok": False, "error": f"cannot open person camera {dev_path}",
+                    "mouth_gate_enabled": bool(fv_cfg.get("mouth_gate_enabled", False))}
+        try:
+            ret, frame = cap.read()
+        finally:
+            cap.release()
+        if not ret or frame is None:
+            return {"ok": False, "error": f"empty frame from person camera {dev_path}",
+                    "mouth_gate_enabled": bool(fv_cfg.get("mouth_gate_enabled", False))}
+
+        det = getattr(self, "_mouth_detector", None)
+        if det is None:
+            det = FeedingVisionDetector()
+            self._mouth_detector = det
+        m = det.detect_mouth(frame)
+        extra = dict(m.extra or {})
+        return {
+            "ok": True,
+            "face_detected": bool(extra.get("face_detected", False)) and not bool(extra.get("fallback", False)),
+            "mar": extra.get("mar"),
+            "mouth_open": bool(extra.get("mouth_open", False)),
+            "mouth_open_confirmed": bool(extra.get("mouth_open_confirmed", False)),
+            "standoff_cm": extra.get("standoff_cm"),
+            "at_standoff": bool(extra.get("at_standoff", False)),
+            "mouth_gate_enabled": bool(fv_cfg.get("mouth_gate_enabled", False)),
+        }
+
+    def _mouth_gate_check(
+        self,
+        leg_name: str,
+        stop_event: Optional[threading.Event],
+        gate_waypoints: set,
+        timeout_s: float,
+    ) -> Tuple[bool, str]:
+        """Hold at a serve/feed waypoint until MediaPipe confirms mouth open (3 frames) or face-loss/timeout."""
+        if leg_name not in gate_waypoints:
+            return True, ""
+        log.info("mouth gate active at '%s': waiting up to %.1fs for mouth_open_confirmed", leg_name, timeout_s)
+        deadline = time.monotonic() + timeout_s
+        saw_face = False
+        lost_since: Optional[float] = None
+        while time.monotonic() < deadline:
+            if stop_event is not None and stop_event.is_set():
+                return False, "stopped by request while waiting for mouth open"
+            res = self.check_person_mouth()
+            if not res.get("ok"):
+                return False, f"mouth gate failed ({res.get('error')}); holding safely"
+            if res.get("face_detected"):
+                saw_face = True
+                lost_since = None
+                if res.get("mouth_open_confirmed"):
+                    log.info("mouth_open_confirmed at '%s' (MAR=%s); continuing sequence", leg_name, res.get("mar"))
+                    return True, ""
+            elif saw_face:
+                now = time.monotonic()
+                lost_since = lost_since or now
+                if now - lost_since > 0.6:
+                    return False, "person turned away (face lost watchdog) at serve standoff; holding safely"
+            time.sleep(0.12)
+        return False, f"mouth did not open within {timeout_s:g}s at '{leg_name}'; holding safely"
 
     def stop_now(self) -> Dict[str, Any]:
         """stop() without waiting for the tool lock, so it can interrupt a running play_sequence."""

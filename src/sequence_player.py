@@ -96,6 +96,7 @@ def wait_settled(hw, motors, tolerance=None, hold_s=None, timeout_s=None, poll_s
 def run_legs(hw, legs: List[Leg], *, speed: int, thresholds: Dict[int, int],
              tolerance: int = SEQ_NEAR_TOLERANCE, pause: float = SEQ_DEFAULT_PAUSE,
              stop_event: Optional[threading.Event] = None,
+             after_leg: Optional[Callable[[str, Optional[threading.Event]], Tuple[bool, str]]] = None,
              report: Callable[[str], Any] = lambda _msg: None, title: str = "") -> Dict[str, Any]:
     """Run planned legs in order. Returns {"ok", "done": [names], ...}; on failure the arm is held."""
     done: List[str] = []
@@ -135,6 +136,10 @@ def run_legs(hw, legs: List[Leg], *, speed: int, thresholds: Dict[int, int],
         log.info("sequence %s step %d '%s' reached and settled in %.1fs", title, i, name, time.monotonic() - t0)
         note = f"; stopped short (steps): {short}" if short else ""
         report(f"  at '{name}', stopped ({time.monotonic() - t0:.1f} s){note}")
+        if after_leg is not None:
+            ok_gate, gate_msg = after_leg(name, stop_event)
+            if not ok_gate:
+                return fail(i, name, gate_msg or f"safety gate blocked continuation after '{name}'")
         if i < len(legs) and pause > 0:
             if stop_event is not None:
                 if stop_event.wait(pause):

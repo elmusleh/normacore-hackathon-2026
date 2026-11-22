@@ -131,6 +131,7 @@
       <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
         <label><input type="checkbox" id="handsfree"> Hands-Free (Auto-Listen)</label>
         <label><input type="checkbox" id="wakeword" checked> Wake word ("Robo")</label>
+        <label><input type="checkbox" id="mouthgate"> Wait for Mouth-Open (OBSBOT)</label>
         <label><input type="checkbox" id="autosend"> Send right after speaking</label>
         <label><input type="checkbox" id="tts" checked> Speak replies (TTS)</label>
         <button type="button" id="tts-test" style="padding:2px 8px; border-radius:5px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:11px; cursor:pointer;">Test Voice</button>
@@ -201,6 +202,57 @@ fetch("/api/cameras").then(r => r.json())
     $("cams").style.gridTemplateRows = `repeat(${names.length}, 1fr)`;
     names.forEach(addCamera);
   });
+
+// ---------------------------------------------------------------- gentle audio chimes (Web Audio API)
+let chimeCtx = null;
+function playChime(kind) {
+  if (!$("tts")?.checked) return;
+  try {
+    chimeCtx = chimeCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (chimeCtx.state === "suspended") chimeCtx.resume();
+    const notes = {
+      start: [[523, 0.08], [659, 0.09]],   // soft rising ding (listening)
+      sent:  [[659, 0.08], [880, 0.11]],   // warm confirm chime (command sent)
+      stop:  [[440, 0.09], [311, 0.12]],   // gentle low tone (stopped)
+    }[kind] || [[587, 0.08]];
+    let t = chimeCtx.currentTime;
+    for (const [freq, dur] of notes) {
+      const osc = chimeCtx.createOscillator();
+      const gain = chimeCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.exponentialRampToValueAtTime(0.08, t + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(gain);
+      gain.connect(chimeCtx.destination);
+      osc.start(t);
+      osc.stop(t + dur + 0.01);
+      t += dur * 0.85;
+    }
+  } catch (_) { /* ignore audio context errors */ }
+}
+
+// Sync Mouth-Open Gate checkbox with backend config/elrobot.json
+const mgEl = $("mouthgate");
+if (mgEl) {
+  fetch("/api/mouth_gate").then(r => r.json()).then(d => {
+    if (typeof d.enabled === "boolean") mgEl.checked = d.enabled;
+  }).catch(() => {});
+  mgEl.addEventListener("change", async () => {
+    try {
+      const r = await fetch("/api/mouth_gate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: mgEl.checked }),
+      });
+      const d = await r.json();
+      setStatus(`Mouth-Open Gate (OBSBOT): ${d.enabled ? "ENABLED" : "DISABLED"}`);
+    } catch (e) {
+      setStatus(`Failed to update Mouth-Open Gate: ${e.message}`, true);
+    }
+  });
+}
 
 // ---------------------------------------------------------------- text to speech (TTS)
 let currentAudio = null;
@@ -589,11 +641,13 @@ async function handleHandsFreeTranscript(rawText) {
       return;
     }
     if (STOP_RE.test(cmd)) {
+      playChime("stop");
       setHfState("busy", "Robo STOP heard — halting arm!");
       await fetch("/api/stop", { method: "POST" });
       await speakText("Stopped, holding still.");
       return;
     }
+    playChime("sent");
     setHfState("busy", `Sending: "${cmd}"`);
     await send(text);
     return;
@@ -601,11 +655,13 @@ async function handleHandsFreeTranscript(rawText) {
 
   // Wake word unchecked: send directly
   if (STOP_RE.test(text)) {
+    playChime("stop");
     setHfState("busy", "STOP heard — halting arm!");
     await fetch("/api/stop", { method: "POST" });
     await speakText("Stopped, holding still.");
     return;
   }
+  playChime("sent");
   setHfState("busy", `Sending: "${text}"`);
   await send(text);
 }
@@ -698,7 +754,8 @@ async function startHandsFree() {
           };
           hfRecorder.start();
           setRecording(true);
-          setHfState("hearing", "Hearing you… pause 1.3s to finish");
+          playChime("start");
+          setHfState("hearing", "Hearing you… pause 1.2s to finish");
         }
       } else {
         hfSpeechFrames = 0;

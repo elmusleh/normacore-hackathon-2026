@@ -283,6 +283,19 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
         return Response(audio_bytes, media_type=media_type, headers={"Cache-Control": "no-store"})
 
+    async def mouth_gate(request: Request):
+        from elrobot_config import save_config
+        cfg = load_config()
+        fv = dict(cfg.get("feeding_vision") or {})
+        if request.method == "GET":
+            return JSONResponse({"enabled": bool(fv.get("mouth_gate_enabled", False))})
+        body = await request.json()
+        enabled = bool(body.get("enabled", False))
+        fv["mouth_gate_enabled"] = enabled
+        cfg["feeding_vision"] = fv
+        save_config(cfg)
+        return JSONResponse({"ok": True, "enabled": enabled})
+
     @contextlib.asynccontextmanager
     async def lifespan(_app):
         if stt is not None:
@@ -303,6 +316,7 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         Route("/api/stt", stt_status),
         Route("/api/transcribe", transcribe, methods=["POST"]),
         Route("/api/tts", tts, methods=["POST"]),
+        Route("/api/mouth_gate", mouth_gate, methods=["GET", "POST"]),
         Route("/api/messages", messages, methods=["GET", "POST"]),
         Route("/api/stop", stop, methods=["POST"]),
     ], lifespan=lifespan)
