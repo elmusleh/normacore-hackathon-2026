@@ -1,25 +1,25 @@
 ### Post-Implementation Suggestions
 
-1. Make every `./cli.sh` Python command use the project venv — Priority 78% (High value) [Best practices]
-   What: Set `PY` once at the top of `cli.sh` (`.venv/bin/python` if present, else `python3`) and use it for every subcommand, not just `console`, `mcp`, `start` and `digital-twin`.
-   Why: `hw`, `calib`, `cameras`, `feed` and `test` still call plain `python3`, so any of them can silently lose MediaPipe or other venv-only packages, as the dashboard did.
-   How: Add `PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"` near the top, replace `python3 ` in each case branch with `"$PY" `, run `bash -n cli.sh` and the tests.
+1. Apply camera exposure automatically before the Station starts — Priority 75% (High value) [Best practices]
+   What: Have `./cli.sh station` and `./cli.sh start` run the `./cli.sh cameras` exposure step right before launching the Station.
+   Why: Exposure only works while the Station is stopped, so teammates keep getting nearly white table/gripper frames and have to stop, fix and restart by hand.
+   How: In `cli.sh`, before `./bin/station` in both commands, call `"$PY" scripts/camera_settings.py || true`; keep a flag such as `ELROBOT_SKIP_EXPOSURE=1` to skip it.
    Status: ⏳ Unimplemented
-   Reason Deferred: Touches every subcommand, including motion ones (`hw`, `calib`), so it needs the hardware owner's OK.
+   Reason Deferred: Needs a check that it never fights a camera the Station already holds on other laptops.
 
-2. Have the dashboard refuse the OpenCV mouth fallback on the person camera — Priority 70% (High value) [Security]
-   What: When MediaPipe cannot load, show "face detection unavailable" on the person tile instead of running the Haar fallback.
-   Why: A false mouth box on an empty scene could let a feeding step continue toward nobody; failing closed is safer than guessing.
-   How: In `src/digital_twin_server.py`, skip drawing when `mouth.extra["detector"] != "mediapipe"`, log a one-time warning, and add a test with the landmarker set to `None`.
+2. Verify the downloaded MediaPipe models by checksum — Priority 60% (Nice to have) [Security]
+   What: Pin the SHA-256 of `face_landmarker.task` and `efficientdet_lite0.tflite` and check them in `./cli.sh setup-vision` and `scripts/vision_check.py`.
+   Why: The models decide whether the robot thinks a mouth is open; a corrupted or swapped file should be refused, not loaded.
+   How: Record `sha256sum data/*.task data/*.tflite` from a known-good laptop, store the values in `scripts/vision_check.py`, compare after download and fail with a clear message on mismatch.
    Status: ⏳ Unimplemented
-   Reason Deferred: Changes vision behaviour used by feeding; wants a team decision.
+   Reason Deferred: Needs the hashes from a known-good download agreed by the team.
 
-3. Ship a committed `station.example.yaml` with the Full HD camera list — Priority 55% (Nice to have) [Professionalism]
-   What: A tracked template of the local, gitignored `station.yaml` containing the documented `formats` list and `resize_target: 1080`.
-   Why: Each laptop currently starts at 320x240 until someone remembers to edit `station.yaml`, which breaks the 1920x1080 calibration in the grip skills.
-   How: Copy the working `station.yaml` to `station.example.yaml`, commit it, and have `./cli.sh station` copy it to `station.yaml` when the local file is missing or has `formats: []`.
+3. Add a test that `cli.sh` never calls bare `python3` — Priority 45% (Nice to have) [Professionalism]
+   What: A small offline test that fails if a new `cli.sh` command uses `python3 ...` instead of `"$PY" ...`.
+   Why: Stops the venv problem coming back the next time someone adds a command in a hurry.
+   How: In `tests/`, read `cli.sh`, ignore comment and echo lines and the `PY=` default, and assert no line starts with `python3 `.
    Status: ⏳ Unimplemented
-   Reason Deferred: Awaiting team agreement on Station defaults across laptops.
+   Reason Deferred: Low risk now that all commands are converted; do it with the next `cli.sh` change.
 
 1. Splice a 30–60 second real ElRobot bench demo clip right after Scene 5 of `data/carearm_story_film_1080p.mp4` before uploading to Google Drive — Priority 92% (Critical) [Professionalism]
    What: Insert a short real-hardware clip showing the physical ElRobot picking a grape and pausing for the OBSBOT Mouth-Open gate between Scene 5 (architecture) and Scene 6 (family dinner) in CapCut or ffmpeg.

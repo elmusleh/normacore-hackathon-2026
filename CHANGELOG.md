@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `./cli.sh setup-vision`: installs MediaPipe into `.venv`, downloads `data/face_landmarker.task` and `data/efficientdet_lite0.tflite`, then runs `scripts/vision_check.py`.
+- `scripts/station_config.py`: `./cli.sh station` and `./cli.sh start` add the HD camera `formats` list and `resize_target: 1080` to a local `station.yaml` that has none (backup `station.yaml.bak`; opt out with `ELROBOT_KEEP_STATION_YAML=1`).
+- `scripts/vision_check.py` and `feeding_vision.mediapipe_status()`; a one-time warning when MediaPipe face detection is unavailable.
+
 ### Fixed
+- Every `./cli.sh` Python command (including `hw`, `calib`, `cameras`, `feed`) now runs with `.venv/bin/python` when it exists.
+- OpenCV Haar and skin-tone mouth guesses are marked `fallback`, so the dashboard, web console and MCP mouth check never show or trust a mouth MediaPipe did not find.
+- `requirements.txt` now lists `mediapipe` and `pyyaml`; setup docs cover the venv, models, HD frames, and camera/bus troubleshooting.
 - `./cli.sh start` and `./cli.sh digital-twin` now run the dashboard with `.venv/bin/python` (falling back to `python3`), like `console` and `mcp`. Under plain `python3` MediaPipe is missing, so the person camera fell back to the OpenCV Haar detector and drew a false "MOUTH closed" box on an empty scene.
 
 ### Changed

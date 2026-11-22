@@ -21,6 +21,7 @@ previous_session: antigravity 2026-11-22T07:28 — diagrams-png-pdf-and-illustra
   - At ~09:38 all 8 follower motors on `5B61034962` showed torque ON, though the Station reported torque off at 08:26. Source unknown; ask before any motion.
 - **Files Changed:** `cli.sh`, `CHANGELOG.md`, `FINDINGS.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
 - **Build Status:** `.venv/bin/python -m pytest tests/` 163 passed; `bash -n cli.sh` OK.
+- **Follow-up (same session): made the fixes permanent for the team.** Every `./cli.sh` command uses `.venv/bin/python` (hardware owner steve approved this for `hw`/`calib`/`feed`); OpenCV mouth guesses are marked `fallback` in `src/feeding_vision.py`; new `./cli.sh setup-vision`, `scripts/vision_check.py`, `scripts/station_config.py` (HD formats auto-added to `station.yaml`); `requirements.txt` gains `mediapipe`, `pyyaml`; `docs/team_setup.md` and `docs/mcp_server.md` updated. Tests: 169 passed. Teammates: pull, then run `.venv/bin/pip install -r requirements.txt` and `./cli.sh setup-vision` once.
 - **Next Steps:**
   1. Find out who turned torque on for the follower, and set it to (Self-controlled) in http://localhost:8889.
   2. Point `station.bus` back at `5B61034962` (calibration commit by the arm's owner).

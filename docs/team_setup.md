@@ -1,6 +1,6 @@
 # Team Setup: New Machine
 
-Read this before the first run on a new computer. Owner: the team. Last reviewed 2026-11-21.
+Read this before the first run on a new computer. Owner: the team. Last reviewed 2026-11-22.
 
 ## 1. Get the code (with the NormaCore submodule)
 ```bash
@@ -15,10 +15,12 @@ Already cloned without it? Run `git submodule update --init --recursive`. `./cli
 ## 2. Python environment (Python 3.10 or newer)
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate        # run this in every new terminal
-pip install -r requirements.txt
+.venv/bin/pip install -r requirements.txt
+./cli.sh setup-vision            # MediaPipe + face model into data/ (needed for real mouth detection)
 ```
-`.venv/` is gitignored. Activate it before any `./cli.sh` command, because `cli.sh` calls `python3`.
+`.venv/` and `data/` are gitignored, so every laptop needs this once. Every `./cli.sh` command runs with `.venv/bin/python` automatically, so you do not need to activate the venv for them. If you run a script directly (`python3 src/...`), use `.venv/bin/python` instead, or the person camera loses MediaPipe and shows no mouth.
+
+Check it any time with `.venv/bin/python scripts/vision_check.py`.
 
 ## 3. Offline check (no hardware needed)
 ```bash
@@ -64,6 +66,10 @@ ls -l /dev/ttyACM*               # group should be dialout, mode rw-rw-rw-
 ## 6. Cameras
 Camera numbers (`/dev/video0`, `/dev/video2`, ...) change after replugging. Do not hard-code them. Use `/dev/v4l/by-path/` to find the stable port path for each camera. Two of our cameras share the same USB name, so the port path is the only reliable way to tell them apart. Confirm each one with a test frame before you assign it as overhead or wrist.
 
+**Frame size.** `./cli.sh station` and `./cli.sh start` check the local, gitignored `station.yaml` first (`scripts/station_config.py`). If it has no camera `formats`, they add the HD list and `resize_target: 1080` (old file kept as `station.yaml.bak`), so table and gripper frames are stored at 1920x1080, which the calibration and grip skills expect. The KD-USB cameras share one USB 2.0 link, so they capture at 1280x720 and the Station scales up. To keep your own `station.yaml` untouched, set `ELROBOT_KEEP_STATION_YAML=1`.
+
+**Exposure.** Washed-out (nearly white) table or gripper frames: stop the Station, run `./cli.sh cameras`, then start it again.
+
 ## 7. Bench check (read-only)
 1. In its own terminal: `./cli.sh station` (leave it running). It listens on port 8888.
 2. `./cli.sh preflight --bus <serial>`. This only reads; it never moves the arm.
@@ -86,6 +92,10 @@ Record which serial number is which arm in `HANDOFF.md` once it is confirmed. Co
 | `--bus auto needs exactly one bus` | Two adapters are plugged in. Pass `--bus <serial>`. |
 | Every motor shows MISSING | Usually the permission error above. Check the Station log in `logs/station/`. |
 | Cameras missing after a USB drop | Reseat the cable, or try another port. Then restart the Station, because it does not recover on its own. |
+| `./cli.sh cameras` says table/gripper NOT PLUGGED IN right after stopping the Station | The Station takes the cameras from the kernel driver and does not hand them back. Unplug and replug just the two camera cables (not the hub: the arm adapters are on it), then run `./cli.sh cameras` again. |
+| Table/gripper frames are 320x240 | `station.yaml` has `formats: []`. Restart with `./cli.sh station`, which adds the HD formats. |
+| Person camera shows a mouth box with nobody there, or never shows a mouth | MediaPipe or `data/face_landmarker.task` is missing, or a tool was started with plain `python3`. Run `./cli.sh setup-vision` and start tools through `./cli.sh`. |
+| Dashboard shows no Station cameras, log says `bus ... not on station` | `station.bus` in `config/elrobot.json` names an arm that is not plugged in. Start with `ELROBOT_BUS=<serial> ./cli.sh start` and tell the arm's owner. |
 | Station exited | Restart it with `./cli.sh station`. Check `logs/station/` for the last error. |
 | Port 8888 not listening | The Station is not running. |
 | `external/norma-core/` is empty | Run `git submodule update --init --recursive`. |

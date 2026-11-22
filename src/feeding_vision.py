@@ -48,6 +48,41 @@ MOUTH_OPEN_DEBOUNCE_FRAMES = 3
 FACE_WATCHDOG_TIMEOUT_S = 0.5
 DEFAULT_FACE_LANDMARKER_MODEL = Path(__file__).resolve().parent.parent / "data" / "face_landmarker.task"
 DEFAULT_OBJECT_DETECTOR_MODEL = Path(__file__).resolve().parent.parent / "data" / "efficientdet_lite0.tflite"
+
+
+_NO_MEDIAPIPE_WARNED = False
+
+
+def mediapipe_status() -> Dict[str, Any]:
+    """Whether MediaPipe face detection can run here, and what to do if not."""
+    import sys as _sys
+
+    status: Dict[str, Any] = {"python": _sys.executable, "ok": False, "problem": ""}
+    try:
+        import mediapipe as mp  # noqa: F401
+
+        status["mediapipe"] = getattr(mp, "__version__", "installed")
+    except Exception:  # noqa: BLE001
+        status["mediapipe"] = "MISSING"
+    status["face_model"] = (str(DEFAULT_FACE_LANDMARKER_MODEL) if DEFAULT_FACE_LANDMARKER_MODEL.is_file()
+                            else f"MISSING ({DEFAULT_FACE_LANDMARKER_MODEL})")
+    if status["mediapipe"] == "MISSING" or status["face_model"].startswith("MISSING"):
+        status["problem"] = ("No MediaPipe face detection, so no mouth is shown on the person camera. "
+                             "Run ./cli.sh setup-vision, and start tools through ./cli.sh (it uses .venv).")
+    else:
+        status["ok"] = True
+    return status
+
+
+def _warn_no_mediapipe_once() -> None:
+    global _NO_MEDIAPIPE_WARNED
+    if _NO_MEDIAPIPE_WARNED:
+        return
+    _NO_MEDIAPIPE_WARNED = True
+    status = mediapipe_status()
+    log.warning("%s (python=%s, mediapipe=%s, face_model=%s)", status["problem"] or
+                "MediaPipe FaceLandmarker failed to load; no mouth is shown on the person camera.",
+                status["python"], status["mediapipe"], status["face_model"])
 TABLE_RELEVANT_LABELS = {
     "bowl", "cup", "spoon", "fork", "knife", "bottle",
     "apple", "orange", "banana", "broccoli", "carrot", "cake", "donut", "sandwich", "pizza",
@@ -290,6 +325,8 @@ class FeedingVisionDetector:
         self.mouth_tracker = MouthStateTracker(mar_threshold=mar_thr)
         self.safety_fsm = FeedingSafetyFSM()
         self._landmarker = self._load_mediapipe_landmarker()
+        if self._landmarker is None:
+            _warn_no_mediapipe_once()
         self._object_detector = self._load_mediapipe_object_detector()
         self._ema_bowl: Optional[Tuple[float, float, float, float]] = None
 
@@ -818,6 +855,9 @@ class FeedingVisionDetector:
                 height_px=mh,
                 confidence=0.92,
                 extra={
+                    # OpenCV guesses: shown nowhere and never trusted (false boxes on walls).
+                    "detector": "opencv",
+                    "fallback": True,
                     "face_detected": True,
                     "mouth_open": mouth_open,
                     "at_standoff": at_standoff,
@@ -852,6 +892,8 @@ class FeedingVisionDetector:
                 height_px=mh,
                 confidence=0.78,
                 extra={
+                    "detector": "opencv-skin",
+                    "fallback": True,
                     "face_detected": True,
                     "mouth_open": True,
                     "at_standoff": mw >= STANDOFF_MOUTH_WIDTH_PX,

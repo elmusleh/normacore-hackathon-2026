@@ -10,7 +10,8 @@ Server: [src/robot_mcp_server.py](../src/robot_mcp_server.py). Tool logic: [src/
 ```bash
 # Python env
 python3 -m venv .venv
-.venv/bin/pip install "mcp>=2" pytest numpy pillow
+.venv/bin/pip install -r requirements.txt
+./cli.sh setup-vision      # MediaPipe + face model (person-camera mouth detection)
 
 # NormaCore SDK
 git clone --depth 1 https://github.com/norma-core/norma-core external/norma-core
@@ -153,7 +154,8 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
    `{"gain": 0, "white_balance_automatic": 0, "white_balance_temperature": 4600, "backlight_compensation": 0}`.
 3. **Frame size.** With an empty `formats` list the Station picks a small camera mode (320x240), and
    `resize_target` (default 224) shrinks it further. At 320x240 the AprilTag detector finds only the 2 near
-   tags. Set the camera mode and size in `station.yaml` (local, so set it on each machine), then restart the Station:
+   tags. `./cli.sh station` and `./cli.sh start` now add the list below automatically when `station.yaml` has no
+   `formats` (`scripts/station_config.py`). To set it by hand instead, put this in `station.yaml` and restart the Station:
    ```yaml
    usb-video:
      enabled: true

@@ -26,6 +26,7 @@ print_usage() {
     echo -e "${C_BOLD}System Health & Diagnostics:${C_RESET}"
     echo -e "  ${C_CYAN}check${C_RESET}               Diagnostic check of cameras, serial arms, Station, and rules"
     echo -e "  ${C_CYAN}reset [opts]${C_RESET}        Quick bench reset (relax leader torque / apply camera exposure)"
+    echo -e "  ${C_CYAN}setup-vision${C_RESET}        Install MediaPipe + face model (needed for real mouth detection)"
     echo ""
     echo -e "${C_BOLD}Mission Control (Web & Unified):${C_RESET}"
     echo -e "  ${C_CYAN}start [port]${C_RESET}        Launch unified Mission Control Web Dashboard & daemons (Default: 8080)"
@@ -83,16 +84,22 @@ print_usage() {
     echo -e "${C_BOLD}${C_BLUE}================================================================${C_RESET}"
 }
 
+# Every Python command runs in the project venv when it exists. The venv holds
+# packages the system python3 lacks (MediaPipe for face/mouth detection), and
+# without them some features silently fall back to weaker code paths.
+PY="python3"
+if [ -x ".venv/bin/python" ]; then PY=".venv/bin/python"; fi
+
 COMMAND="${1:-help}"
 shift || true
 
 case "$COMMAND" in
     check|status|health)
-        python3 scripts/system_health.py "$@"
+        "$PY" scripts/system_health.py "$@"
         ;;
 
     reset)
-        python3 scripts/reset_bench.py "$@"
+        "$PY" scripts/reset_bench.py "$@"
         ;;
 
     setup-cameras)
@@ -107,24 +114,41 @@ case "$COMMAND" in
         fi
         ;;
 
+    setup-vision)
+        echo -e "${C_YELLOW}[+] Installing MediaPipe and the face/object models for person-camera vision...${C_RESET}"
+        if [ ! -x ".venv/bin/python" ]; then
+            echo -e "${C_RED}[ERROR] No .venv found. Run: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt${C_RESET}"
+            exit 1
+        fi
+        .venv/bin/pip install "mediapipe>=0.10"
+        mkdir -p data
+        MP="https://storage.googleapis.com/mediapipe-models"
+        [ -s data/face_landmarker.task ] || curl -fL -o data/face_landmarker.task \
+            "$MP/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+        [ -s data/efficientdet_lite0.tflite ] || curl -fL -o data/efficientdet_lite0.tflite \
+            "$MP/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite"
+        .venv/bin/python scripts/vision_check.py
+        ;;
+
     test)
         echo -e "${C_GREEN}[+] Running pytest test suite...${C_RESET}"
         if [ -n "$1" ]; then
-            python3 -m pytest tests/test_pipeline.py -k "$1" -v
+            "$PY" -m pytest tests/test_pipeline.py -k "$1" -v
         else
-            python3 -m pytest tests/test_pipeline.py -v
+            "$PY" -m pytest tests/test_pipeline.py -v
         fi
         ;;
 
     demo)
         echo -e "${C_GREEN}[+] Running Autonomous Recovery Demo...${C_RESET}"
-        python3 src/agent_prompts.py
+        "$PY" src/agent_prompts.py
         ;;
 
     start|mission-control)
         PORT="${1:-8080}"
         echo -e "${C_CYAN}[+] Launching Unified NormaCore Mission Control (http://localhost:${PORT})...${C_RESET}"
         
+        "$PY" scripts/station_config.py || echo -e "${C_YELLOW}[!] Could not check station.yaml; continuing.${C_RESET}"
         # Check if station is already running; if not, launch it in a new terminal window
         if ! ss -tulpn | grep -q ":8888"; then
             echo -e "${C_YELLOW}[+] Launching NormaCore Station daemon in a new terminal...${C_RESET}"
@@ -145,9 +169,6 @@ case "$COMMAND" in
         if command -v xdg-open > /dev/null 2>&1; then
             (sleep 1 && xdg-open "http://localhost:${PORT}") &
         fi
-        # The venv has MediaPipe; without it the person camera falls back to a Haar
-        # detector that draws false mouth boxes when nobody is in view.
-        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
         "$PY" src/digital_twin_server.py "$PORT"
         ;;
 
@@ -157,9 +178,6 @@ case "$COMMAND" in
         if command -v xdg-open > /dev/null 2>&1; then
             (sleep 1 && xdg-open "http://localhost:${PORT}") &
         fi
-        # The venv has MediaPipe; without it the person camera falls back to a Haar
-        # detector that draws false mouth boxes when nobody is in view.
-        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
         "$PY" src/digital_twin_server.py "$PORT"
         ;;
 
@@ -169,6 +187,7 @@ case "$COMMAND" in
             echo -e "${C_RED}[ERROR] bin/station binary not found.${C_RESET}"
             exit 1
         fi
+        "$PY" scripts/station_config.py || echo -e "${C_YELLOW}[!] Could not check station.yaml; continuing.${C_RESET}"
         ./bin/station --web --tcp
         ;;
 
@@ -179,7 +198,7 @@ case "$COMMAND" in
 
     apriltags)
         echo -e "${C_GREEN}[+] Generating 4-corner AprilTags calibration sheet...${C_RESET}"
-        python3 scripts/generate_apriltags.py
+        "$PY" scripts/generate_apriltags.py
         if command -v xdg-open > /dev/null 2>&1; then
             xdg-open docs/apriltags_printable.html &
         fi
@@ -187,7 +206,7 @@ case "$COMMAND" in
 
     view-camera)
         echo -e "${C_GREEN}[+] Capturing fresh calibrated camera frame...${C_RESET}"
-        python3 -c "
+        "$PY" -c "
 from src.mcp_server import NormaCoreMCPServer
 import base64
 s = NormaCoreMCPServer()
@@ -202,7 +221,6 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         ;;
 
     console)
-        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
         # Load secrets such as ANTHROPIC_API_KEY from .env (gitignored) if present.
         if [ -f .env ]; then set -a; . ./.env; set +a; fi
         echo -e "${C_GREEN}[+] Starting ElRobot web console (cameras + voice chat)...${C_RESET}"
@@ -213,7 +231,6 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
 
     mcp)
         # stdout carries the MCP protocol, so messages go to stderr.
-        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
         echo -e "${C_CYAN}[+] Starting ElRobot MCP server (stdio, motion ${ELROBOT_ALLOW_MOTION:-0})...${C_RESET}" >&2
         exec "$PY" src/robot_mcp_server.py
         ;;
@@ -230,32 +247,31 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
     teleop)
         echo -e "${C_GREEN}[+] Starting Master -> Slave Real-time Sync...${C_RESET}"
         shift || true
-        python3 scripts/teleop_sync.py "$@"
+        "$PY" scripts/teleop_sync.py "$@"
         ;;
 
     feed)
         MODE="${1:-grapes}"
         shift || true
         echo -e "${C_GREEN}[+] Running Camera-Guided Assistive Feeding (${MODE})...${C_RESET}"
-        python3 scripts/camera_feed_arm.py --mode "$MODE" "$@"
+        "$PY" scripts/camera_feed_arm.py --mode "$MODE" "$@"
         ;;
 
     hw)
-        python3 scripts/hw_day.py "$@"
+        "$PY" scripts/hw_day.py "$@"
         ;;
 
     cameras)
-        python3 scripts/camera_settings.py "$@"
+        "$PY" scripts/camera_settings.py "$@"
         ;;
 
     calib)
         # Table frame from 4 corner AprilTags, arm base pose, joint zeros, IK lookups. Reads only.
-        python3 scripts/calib.py "$@"
+        "$PY" scripts/calib.py "$@"
         ;;
 
     demos)
         # Teleop demonstrations for ACT training (reads only), e.g. demos record --skill pick --food grape
-        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
         "$PY" scripts/record_demos.py "$@"
         ;;
 
@@ -266,11 +282,11 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
 
     sdk-check)
         # Read-only: SDK version, imports, Station build and archive checksum must match.
-        python3 scripts/sdk_check.py "$@"
+        "$PY" scripts/sdk_check.py "$@"
         ;;
 
     preflight)
-        python3 scripts/hardware_preflight.py "$@"
+        "$PY" scripts/hardware_preflight.py "$@"
         ;;
 
     logs)

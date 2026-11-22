@@ -4,11 +4,13 @@
 # Core Numerics & Vision
 numpy>=1.26.0
 opencv-python>=4.8.0.76
+mediapipe>=0.10           # face/mouth landmarks on the person camera; models: ./cli.sh setup-vision
 Pillow>=10.2.0
 
 # Hardware & Serialization
 pyserial>=3.5
 protobuf>=4.25.0
+pyyaml>=6.0               # scripts/station_config.py keeps station.yaml on HD camera formats
 
 # AI Agent & Model Context Protocol
 mcp>=2.0.0  # MCPServer API (FastMCP was renamed in 2.x)
