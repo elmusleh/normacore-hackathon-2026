@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Log every `calib goto` with its plan and result — Priority 80% (High value) [Security]
+   What: Write each goto's target, planned legs, motor goals and final status to `logs/` (as `hw` commands already do).
+   Why: If the arm hits something, the log shows exactly what was commanded and where it stopped, which is the first thing anyone needs after an incident.
+   How: Call `setup_logging("calib", ...)` from `src/elrobot_log.py` in `scripts/calib.py` and log the plan before the MOVE prompt and the status after each leg.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The first live goto had not run yet.
+
+2. Compare the fingertip with the camera after each goto — Priority 60% (Nice to have) [Best practices]
+   What: After arriving, take a table-camera frame and save it with the target drawn on it.
+   Why: The joint readings only say where the arm thinks it is; the camera shows where it really is, which is the honest check of the calibration.
+   How: Reuse `_grab_frame` and `TableCamera.table_to_pixel` to draw the target point into a picture in `data/calibration/`, and print its path.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the calibration below ~10 mm to be meaningful.
+
+3. Return to `clear` with one command after a test — Priority 45% (Nice to have) [Professionalism]
+   What: `calib goto ... --then clear` (or a short doc line) to lift and go back to the taught `clear` pose after the test.
+   Why: Leaving the arm stretched out over the table is where people bump into it; a standard retreat keeps tests tidy.
+   How: After the last leg, run the same lift leg, then call the existing waypoint goto for `clear`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: `clear` is outside motor 2's current range; recalibrate motor 2 first.
+
 1. Refuse a Cartesian move when the fit error is above 10 mm — Priority 92% (Critical) [Security]
    What: The future move command reads `base_in_table.rms_mm` from `config/calibration.json` and refuses to move when it is above 10 mm.
    Why: A fit of 19-21 mm (what we have now) means the fingertip can land 2 cm off, for example on the table or near a person's face. A hard check stops that before the arm moves.
