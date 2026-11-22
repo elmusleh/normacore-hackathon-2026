@@ -1,0 +1,73 @@
+{
+  "table": {
+    "tag_family": "36h11",
+    "tag_size_mm": 45.0,
+    "tags_mm": {
+      "0": [
+        0.0,
+        0.0
+      ],
+      "1": [
+        456.0,
+        0.0
+      ],
+      "2": [
+        456.0,
+        228.0
+      ],
+      "3": [
+        0.0,
+        228.0
+      ]
+    },
+    "measured": true
+  },
+  "camera": {},
+  "joints": {
+    "motors": {
+      "1": {
+        "zero_steps": 2048,
+        "direction": 1
+      },
+      "2": {
+        "zero_steps": 2048,
+        "direction": 1
+      },
+      "3": {
+        "zero_steps": 2048,
+        "direction": 1
+      },
+      "4": {
+        "zero_steps": 2048,
+        "direction": 1
+      },
+      "5": {
+        "zero_steps": 2048,
+        "direction": 1
+      },
+      "6": {
+        "zero_steps": 2048,
+        "direction": 1
+      },
+      "7": {
+        "zero_steps": 2048,
+        "direction": 1
+      }
+    },
+    "tcp_offset_mm": [
+      0.8,
+      103.5,
+      0.0
+    ],
+    "measured": false
+  },
+  "base_in_table": {
+    "x_mm": 0.0,
+    "y_mm": 0.0,
+    "yaw_deg": 0.0,
+    "z_mm": 0.0,
+    "rms_mm": null,
+    "points": [],
+    "measured": false
+  }
+}
