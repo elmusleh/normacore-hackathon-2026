@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Upgraded Table Cam detection (`src/feeding_vision.py`, `src/digital_twin_server.py`) with a tabletop colored-bowl + LAB chroma-contrast food-piece detector combined with MediaPipe `ObjectDetector`: locks reliably onto overhead colored bowls and highlights every grape/chocolate piece inside while ignoring ceramic glare.
 - Fixed V4L2 camera opening in `src/digital_twin_server.py` to use explicit `/dev/video{idx}` device paths with `cv2.CAP_V4L2`, fixing OpenCV 5.x index-gap failures and unlocking full 1280×720 HD MJPG capture on the NormaCore KD-USB and OBSBOT cameras.
 - Enabled 1280×720 MJPG HD capture for V4L2 cameras (OBSBOT Meet SE) and raised JPEG streaming quality to 90 in `src/digital_twin_server.py`.
 - Upgraded Table Cam detection to MediaPipe `ObjectDetector` (`efficientdet_lite0.tflite`) in `src/feeding_vision.py` and `src/digital_twin_server.py`: detects real bowls, spoons, cups, and food items with zero false positives on red robot servo wires, and highlights individual food pieces (grapes/chocolate) inside detected bowls.

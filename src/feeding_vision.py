@@ -329,87 +329,181 @@ class FeedingVisionDetector:
         y_mm = 80.0 + ((440 - v) / 400.0) * 200.0
         return round(x_mm, 1), round(y_mm, 1)
 
+    @staticmethod
+    def _find_food_pieces_in_mask(
+        bgr: np.ndarray,
+        bowl_mask: np.ndarray,
+        bw: int,
+        bh: int,
+        bowl_area: float,
+    ) -> List[Tuple[int, int, int, int]]:
+        """Locate distinct food pieces (grapes, chocolate, etc.) inside a bowl mask using LAB color contrast."""
+        erode_w = max(12, int(bw * 0.24))
+        erode_h = max(12, int(bh * 0.24))
+        erode_k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_w, erode_h))
+        inner_mask = cv2.erode(bowl_mask, erode_k)
+        if cv2.countNonZero(inner_mask) < 50:
+            return []
+
+        lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
+        inner_px = lab[inner_mask > 0]
+        med_l, med_a, med_b = np.median(inner_px, axis=0)
+
+        # Chroma distance (ignores white ceramic glare!) + strong dark-object drop (for dark chocolate)
+        chroma_dist = np.hypot(lab[:, :, 1] - med_a, lab[:, :, 2] - med_b)
+        dark_drop = med_l - lab[:, :, 0]
+        food_mask = (((chroma_dist > 14.0) | (dark_drop > 38.0)) & (inner_mask > 0)).astype(np.uint8) * 255
+
+        fk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        food_mask = cv2.morphologyEx(food_mask, cv2.MORPH_OPEN, fk)
+        food_mask = cv2.morphologyEx(food_mask, cv2.MORPH_CLOSE, fk)
+
+        fcnts, _ = cv2.findContours(food_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        pieces: List[Tuple[float, int, int, int, int]] = []
+        min_a = max(40.0, bowl_area * 0.003)
+        max_a = bowl_area * 0.14
+        for fc in fcnts:
+            fa = cv2.contourArea(fc)
+            if min_a <= fa <= max_a:
+                fx, fy, fw, fh = cv2.boundingRect(fc)
+                pieces.append((fa, fx + fw // 2, fy + fh // 2, fw, fh))
+        pieces.sort(key=lambda p: p[0], reverse=True)
+        return [(int(p[1]), int(p[2]), int(p[3]), int(p[4])) for p in pieces]
+
+    def _detect_colored_table_bowl(self, bgr: np.ndarray) -> Optional[DetectedTarget]:
+        """Detect a colored bowl on the tabletop workspace (robust to overhead angles where COCO misses)."""
+        h_img, w_img = bgr.shape[:2]
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        sat_mask = cv2.inRange(hsv, np.array([0, 48, 40]), np.array([180, 255, 255]))
+        # Restrict strictly to tabletop workspace (exclude upper background & far edges)
+        sat_mask[:int(h_img * 0.28), :] = 0
+        sat_mask[:, :int(w_img * 0.10)] = 0
+        sat_mask[:, int(w_img * 0.90):] = 0
+
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+        sat_mask = cv2.morphologyEx(sat_mask, cv2.MORPH_CLOSE, k)
+        sat_mask = cv2.morphologyEx(sat_mask, cv2.MORPH_OPEN, k)
+
+        cnts, _ = cv2.findContours(sat_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        best = None
+        best_area = 0.0
+        for c in cnts:
+            hull = cv2.convexHull(c)
+            area = cv2.contourArea(hull)
+            if area < (h_img * w_img * 0.015) or area > (h_img * w_img * 0.35):
+                continue
+            perim = cv2.arcLength(hull, True)
+            circ = (4.0 * math.pi * area / (perim * perim)) if perim > 0 else 0.0
+            x, y, bw, bh = cv2.boundingRect(hull)
+            aspect = bw / max(bh, 1)
+            solidity = cv2.contourArea(c) / max(area, 1.0)
+            if circ >= 0.68 and solidity >= 0.58 and 0.65 <= aspect <= 1.65 and area > best_area:
+                best_area = area
+                best = (hull, x, y, bw, bh, circ)
+
+        if best is None:
+            return None
+
+        hull, x, y, bw, bh, circ = best
+        u = min(w_img - 1, x + bw // 2)
+        v = min(h_img - 1, y + bh // 2)
+        x_mm, y_mm = self.pixel_to_mm(u, v)
+
+        bowl_mask = np.zeros((h_img, w_img), dtype=np.uint8)
+        cv2.drawContours(bowl_mask, [hull], -1, 255, -1)
+        pieces = self._find_food_pieces_in_mask(bgr, bowl_mask, bw, bh, best_area)
+
+        extra: Dict[str, Any] = {
+            "detector": "table_bowl+lab",
+            "category": "bowl",
+            "circularity": round(circ, 2),
+            "food_piece_count": len(pieces),
+            "food_pieces_px": pieces,
+        }
+        if pieces:
+            extra["best_food_px"] = pieces[0]
+
+        return DetectedTarget(
+            label="bowl",
+            u_px=u,
+            v_px=v,
+            x_mm=x_mm,
+            y_mm=y_mm,
+            width_px=int(bw),
+            height_px=int(bh),
+            confidence=min(0.97, round(0.70 + circ * 0.27, 2)),
+            extra=extra,
+        )
+
     def detect_table_objects(self, bgr: np.ndarray) -> List[DetectedTarget]:
-        """Detect real bowls, utensils, and food items via MediaPipe ObjectDetector.
+        """Detect bowls + in-bowl food pieces (grapes/chocolate) and MediaPipe utensils/items.
 
-        Inside any detected 'bowl', also locates the largest distinct food piece
-        (grape, chocolate piece, etc.) via inner-ROI contrast segmentation.
-        Returns an empty list when MediaPipe is loaded and sees no real tabletop items
-        (avoiding false positives on robot wires/background).
+        Combines the tabletop colored-bowl + LAB chroma-contrast food detector (rock-solid on
+        overhead views) with MediaPipe ObjectDetector for spoons, cups, and additional items.
         """
-        if self._object_detector is None:
-            return []
-        try:
-            import mediapipe as mp
-
-            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-            mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-            result = self._object_detector.detect(mp_img)
-        except Exception as exc:  # noqa: BLE001
-            log.debug("MediaPipe detect_table_objects failed: %s", exc)
-            return []
-
         targets: List[DetectedTarget] = []
         h_img, w_img = bgr.shape[:2]
 
-        for det in result.detections or []:
-            if not det.categories:
-                continue
-            cat = det.categories[0]
-            name = (cat.category_name or "").lower()
-            score = round(float(cat.score), 2)
-            if name not in TABLE_RELEVANT_LABELS:
-                continue
+        # 1. Overhead colored-bowl + in-bowl food piece detector (grapes, chocolate, etc.)
+        bowl_target = self._detect_colored_table_bowl(bgr)
+        if bowl_target is not None:
+            targets.append(bowl_target)
 
-            bb = det.bounding_box
-            x0 = max(0, int(bb.origin_x))
-            y0 = max(0, int(bb.origin_y))
-            bw = max(1, int(bb.width))
-            bh = max(1, int(bb.height))
-            u = min(w_img - 1, x0 + bw // 2)
-            v = min(h_img - 1, y0 + bh // 2)
-            x_mm, y_mm = self.pixel_to_mm(u, v)
+        # 2. MediaPipe ObjectDetector for spoons, forks, cups, or bowls missed by color
+        if self._object_detector is not None:
+            try:
+                import mediapipe as mp
 
-            extra: Dict[str, Any] = {"detector": "mediapipe", "category": name}
+                rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+                mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+                result = self._object_detector.detect(mp_img)
+                for det in result.detections or []:
+                    if not det.categories:
+                        continue
+                    cat = det.categories[0]
+                    name = (cat.category_name or "").lower()
+                    score = round(float(cat.score), 2)
+                    if name not in TABLE_RELEVANT_LABELS:
+                        continue
+                    # Avoid duplicate box if we already detected the bowl cleanly
+                    if name in ("bowl", "cup") and bowl_target is not None:
+                        continue
 
-            # Inside a detected bowl, look for distinct food pieces (grapes / chocolate pieces)
-            if name == "bowl" and bw >= 24 and bh >= 24:
-                pad_x = max(4, int(bw * 0.15))
-                pad_y = max(4, int(bh * 0.15))
-                rx0, ry0 = min(w_img - 1, x0 + pad_x), min(h_img - 1, y0 + pad_y)
-                rx1, ry1 = max(rx0 + 1, min(w_img, x0 + bw - pad_x)), max(ry0 + 1, min(h_img, y0 + bh - pad_y))
-                roi = bgr[ry0:ry1, rx0:rx1]
-                if roi.size > 0:
-                    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-                    # Dark/colored pieces (chocolate, purple/green grapes) contrast against a light bowl
-                    _, thresh = cv2.threshold(gray_roi, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-                    cnts, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    roi_area = float(roi.shape[0] * roi.shape[1])
-                    pieces = []
-                    for c in cnts:
-                        a = cv2.contourArea(c)
-                        if 25.0 <= a <= roi_area * 0.45:
-                            px, py, pw, ph = cv2.boundingRect(c)
-                            pieces.append((a, rx0 + px + pw // 2, ry0 + py + ph // 2, pw, ph))
-                    pieces.sort(key=lambda item: item[0], reverse=True)
-                    if pieces:
-                        _, fu, fv, fw, fh = pieces[0]
+                    bb = det.bounding_box
+                    x0 = max(0, int(bb.origin_x))
+                    y0 = max(0, int(bb.origin_y))
+                    bw = max(1, int(bb.width))
+                    bh = max(1, int(bb.height))
+                    u = min(w_img - 1, x0 + bw // 2)
+                    v = min(h_img - 1, y0 + bh // 2)
+                    x_mm, y_mm = self.pixel_to_mm(u, v)
+
+                    extra: Dict[str, Any] = {"detector": "mediapipe", "category": name}
+                    if name in ("bowl", "cup") and bw >= 24 and bh >= 24:
+                        bmask = np.zeros((h_img, w_img), dtype=np.uint8)
+                        cv2.ellipse(bmask, (u, v), (bw // 2, bh // 2), 0, 0, 360, 255, -1)
+                        pieces = self._find_food_pieces_in_mask(bgr, bmask, bw, bh, float(bw * bh))
                         extra["food_piece_count"] = len(pieces)
-                        extra["best_food_px"] = (int(fu), int(fv), int(fw), int(fh))
+                        extra["food_pieces_px"] = pieces
+                        if pieces:
+                            extra["best_food_px"] = pieces[0]
 
-            targets.append(
-                DetectedTarget(
-                    label=name,
-                    u_px=u,
-                    v_px=v,
-                    x_mm=x_mm,
-                    y_mm=y_mm,
-                    width_px=bw,
-                    height_px=bh,
-                    confidence=score,
-                    extra=extra,
-                )
-            )
+                    targets.append(
+                        DetectedTarget(
+                            label=name,
+                            u_px=u,
+                            v_px=v,
+                            x_mm=x_mm,
+                            y_mm=y_mm,
+                            width_px=bw,
+                            height_px=bh,
+                            confidence=score,
+                            extra=extra,
+                        )
+                    )
+            except Exception as exc:  # noqa: BLE001
+                log.debug("MediaPipe detect_table_objects failed: %s", exc)
+
         return targets
 
     def detect_grape_bowl(self, bgr: np.ndarray) -> Optional[DetectedTarget]:

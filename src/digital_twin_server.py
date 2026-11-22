@@ -406,16 +406,11 @@ class CameraHub:
                             color,
                             2,
                         )
-                        if extra.get("best_food_px"):
-                            fu, fv, fw, fh = extra["best_food_px"]
-                            cv2.circle(annotated_bgr, (fu, fv), 5, (0, 255, 255), -1)
-                            cv2.rectangle(
-                                annotated_bgr,
-                                (fu - fw // 2, fv - fh // 2),
-                                (fu + fw // 2, fv + fh // 2),
-                                (0, 255, 255),
-                                1,
-                            )
+                        for pidx, fp in enumerate(extra.get("food_pieces_px") or []):
+                            fu, fv, fw, fh = fp
+                            fcol = (0, 255, 255) if pidx == 0 else (50, 230, 100)
+                            cv2.circle(annotated_bgr, (fu, fv), max(8, max(fw, fh) // 2), fcol, 2)
+                            cv2.circle(annotated_bgr, (fu, fv), 3, fcol, -1)
                         det_dict[f"{t.label}_{idx}"] = {
                             "label": t.label,
                             "u_px": u,
@@ -423,10 +418,11 @@ class CameraHub:
                             "confidence": t.confidence,
                             "extra": extra,
                         }
+                        det_src = extra.get("detector", "mediapipe")
                         if extra.get("food_piece_count"):
-                            parts.append(f"[mediapipe] {t.label} ({int(t.confidence * 100)}%, {extra['food_piece_count']} food pcs)")
+                            parts.append(f"[{det_src}] {t.label} ({int(t.confidence * 100)}%, {extra['food_piece_count']} food pcs)")
                         else:
-                            parts.append(f"[mediapipe] {t.label} ({int(t.confidence * 100)}%)")
+                            parts.append(f"[{det_src}] {t.label} ({int(t.confidence * 100)}%)")
                 else:
                     # Fallback if MediaPipe ObjectDetector model is missing
                     bowl = feeding_detector.detect_grape_bowl(frame)
