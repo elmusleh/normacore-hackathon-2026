@@ -216,3 +216,27 @@ def test_printed_v1_sheet_is_detected_and_fits():
 def test_real_36h11_is_not_read_as_printed_v1():
     img, _ = _render()
     assert {d.family for d in tc.detect_tags(img).values()} == {"36h11"}
+
+
+def test_steps_wrap_across_4095_to_0():
+    """Motor readings wrap from 4095 to 0; ranges like 3726..1565 cross that point (seen on the arm 2026-11-22)."""
+    jc = ak.JointCalibration({m: 555 for m in ak.ARM_MOTORS}, {m: 1 for m in ak.ARM_MOTORS})
+    steps = {m: 3892 for m in ak.ARM_MOTORS}
+    q = jc.to_radians(steps)
+    assert math.isclose(q[0], (3892 - 555 - 4096) * 2 * math.pi / 4096)  # -759 steps, not +3337
+    assert jc.to_steps(q) == steps
+    assert all(0 <= s < 4096 for s in jc.to_steps(np.full(7, -1.0)).values())
+    assert ak.step_delta(3885, 537) == 748
+    assert ak.step_delta(537, 3885) == -748
+    assert ak.step_in_range(3892, 3726, 1565) and ak.step_in_range(163, 3726, 1565)
+    assert not ak.step_in_range(2500, 3726, 1565)
+    assert ak.step_in_range(2000, 1900, 2300) and not ak.step_in_range(2400, 1900, 2300)
+    if ak.URDF_PATH.exists():
+        lo, hi = jc.limits_from_ranges({1: (3726, 1565)}, ak.ArmModel())
+        assert lo[0] >= (3726 - 555 - 4096) * 2 * math.pi / 4096 - 1e-9
+        assert lo[0] < 0 < hi[0]
+        assert hi[0] <= (1565 - 555) * 2 * math.pi / 4096 + 1e-9
+        # a nearly full-turn range (motor 7: 2439..2198, zero 411) must overlap the URDF limits
+        lo, hi = ak.JointCalibration({m: 411 for m in ak.ARM_MOTORS}, {m: 1 for m in ak.ARM_MOTORS}
+                                     ).limits_from_ranges({7: (2439, 2198)}, ak.ArmModel())
+        assert lo[6] < 0 < hi[6]

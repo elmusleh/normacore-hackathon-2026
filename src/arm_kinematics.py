@@ -7,7 +7,10 @@ Frames
          in config/calibration.json -> joints.tcp_offset_mm (default from the jaw meshes).
 
 Motor steps <-> URDF radians (ST3215, 4096 steps per turn):
-    rad = direction * (steps - zero_steps) * 2*pi / 4096
+    rad = direction * wrap(steps - zero_steps) * 2*pi / 4096
+The reading wraps from 4095 to 0 within one turn, and a joint's working range can cross that
+point (range min > max, e.g. 3726..1565). wrap() keeps the difference in -2048..2047 steps,
+to_steps() returns 0..4095, and step_in_range()/step_delta() handle such ranges.
 zero_steps and direction per motor live in config/calibration.json -> joints. Until they
 are measured on the arm (./cli.sh calib zero, then calib fit), every Cartesian number is
 a guess: check `joints.measured` before trusting it.
@@ -212,24 +215,47 @@ class JointCalibration:
                    {m: int(motors.get(str(m), {}).get("direction", 1)) for m in ARM_MOTORS})
 
     def to_radians(self, steps: Dict[int, int]) -> np.ndarray:
-        return np.array([self.direction[m] * (steps[m] - self.zero_steps[m]) * 2 * math.pi / STEPS_PER_TURN
-                         for m in ARM_MOTORS])
+        return np.array([self.to_radians_one(m, steps[m]) for m in ARM_MOTORS])
 
     def to_steps(self, q: Sequence[float]) -> Dict[int, int]:
         return {m: int(round(self.zero_steps[m] + self.direction[m] * q[i] * STEPS_PER_TURN / (2 * math.pi)))
-                for i, m in enumerate(ARM_MOTORS)}
+                % STEPS_PER_TURN for i, m in enumerate(ARM_MOTORS)}
 
     def limits_from_ranges(self, ranges: Dict[int, Tuple[int, int]], model: ArmModel) -> Tuple[np.ndarray, np.ndarray]:
         """Joint limits (rad): the URDF limits intersected with each motor's calibrated step range."""
         lo, hi = model.lower.copy(), model.upper.copy()
         for i, m in enumerate(ARM_MOTORS):
-            if m in ranges and ranges[m][1] > ranges[m][0]:
-                a, b = self.to_radians_one(m, ranges[m][0]), self.to_radians_one(m, ranges[m][1])
-                lo[i], hi[i] = max(lo[i], min(a, b)), min(hi[i], max(a, b))
+            if m not in ranges:
+                continue
+            span = (ranges[m][1] - ranges[m][0]) % STEPS_PER_TURN  # steps from min up to max, across 4095->0
+            if span == 0:
+                continue
+            start = wrap_steps(ranges[m][0] - self.zero_steps[m])
+            start -= round((start + span / 2) / STEPS_PER_TURN) * STEPS_PER_TURN  # range centred nearest zero
+            a = self.direction[m] * start * 2 * math.pi / STEPS_PER_TURN
+            b = self.direction[m] * (start + span) * 2 * math.pi / STEPS_PER_TURN
+            lo[i], hi[i] = max(lo[i], min(a, b)), min(hi[i], max(a, b))
         return lo, hi
 
     def to_radians_one(self, motor: int, steps: int) -> float:
-        return self.direction[motor] * (steps - self.zero_steps[motor]) * 2 * math.pi / STEPS_PER_TURN
+        return self.direction[motor] * wrap_steps(steps - self.zero_steps[motor]) * 2 * math.pi / STEPS_PER_TURN
+
+
+def wrap_steps(d: float) -> float:
+    """A step difference folded into -2048..2047 (the reading wraps from 4095 to 0)."""
+    return (d + STEPS_PER_TURN // 2) % STEPS_PER_TURN - STEPS_PER_TURN // 2
+
+
+def step_delta(frm: int, to: int) -> int:
+    """Shortest signed step change from one reading to another."""
+    return int(wrap_steps(to - frm))
+
+
+def step_in_range(steps: int, rng_min: int, rng_max: int) -> bool:
+    """True if a reading lies in a motor range; min > max means the range crosses 4095 -> 0."""
+    if rng_min <= rng_max:
+        return rng_min <= steps <= rng_max
+    return steps >= rng_min or steps <= rng_max
 
 
 # -- base frame <-> table frame -------------------------------------------------

@@ -40,6 +40,8 @@ from arm_kinematics import (  # noqa: E402
     JointCalibration,
     fit_base_in_table,
     refine_joint_zeros,
+    step_delta,
+    step_in_range,
 )
 from tag_calibration import (  # noqa: E402
     CALIBRATION_FILE,
@@ -325,9 +327,9 @@ def cmd_reach(args, cal):
     for m in ARM_MOTORS:
         rng = f"range {ranges[m][0]}..{ranges[m][1]}" if m in ranges else "range unknown (offline)"
         flag = ""
-        if m in ranges and not ranges[m][0] <= goal[m] <= ranges[m][1]:
+        if m in ranges and not step_in_range(goal[m], *ranges[m]):
             flag = "  OUT OF RANGE"
-        print(f"  motor {m}: {steps[m]:5d} -> {goal[m]:5d} ({goal[m] - steps[m]:+5d})  {rng}{flag}")
+        print(f"  motor {m}: {steps[m]:5d} -> {goal[m]:5d} ({step_delta(steps[m], goal[m]):+5d})  {rng}{flag}")
     if args.z < 5:
         print("  WARNING: z < 5 mm is at or below the table surface.")
     print("Nothing moved. Motion to Cartesian targets is not wired in yet (needs the hardware owner).")

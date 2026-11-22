@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Refuse a Cartesian move when the fit error is above 10 mm — Priority 92% (Critical) [Security]
+   What: The future move command reads `base_in_table.rms_mm` from `config/calibration.json` and refuses to move when it is above 10 mm.
+   Why: A fit of 19-21 mm (what we have now) means the fingertip can land 2 cm off, for example on the table or near a person's face. A hard check stops that before the arm moves.
+   How: In the command that will drive the arm to `calib reach` targets, load the calibration, compare `rms_mm` with a limit in `config/elrobot.json`, and exit with a clear message when it is too high. Add an offline test for both cases.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The move command does not exist yet; it needs the hardware owner's review.
+
+2. Warn when a `calib reach` goal is close to a motor's range end — Priority 70% (High value) [Best practices]
+   What: Mark any motor whose goal lies within about 50 steps of its range end (today motor 6 goes to 1199 with a limit of 1202).
+   Why: Driving a servo into its end stop strains the gear and can stall the motor; a warning lets the operator pick another target or approach angle.
+   How: In `cmd_reach` in `scripts/calib.py`, compute the distance to each range end with `step_delta` and print `NEAR LIMIT`. Add a test for a wrapping range.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Out of scope for the wraparound fix.
+
+3. Show the touch points and their errors on the camera overlay — Priority 50% (Nice to have) [Professionalism]
+   What: `calib show` draws where each touch landed according to the fit next to the tag it should have hit.
+   Why: Seeing which touches are off, and in which direction, makes a bad fit (wrong width, bad zero) much faster to diagnose than a list of numbers.
+   How: Map each touch's fitted fingertip to a pixel with `TableCamera.table_to_pixel` and draw a line from it to its tag centre in `draw_overlay`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Diagnosis aid only; the fit is still being measured.
+
 1. Test that `look()` never changes the picture — Priority 75% (High value) [Best practices]
    What: Add a small offline test that feeds a known JPEG through `RobotTools.look()` and checks that the same bytes come back.
    Why: The picture clean-up was added and then removed. A test makes sure no future change quietly starts altering what Claude sees, which would also change what the AprilTag calibration measures.
