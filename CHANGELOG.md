@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- `config/calibration.json`: joint zeros re-captured and the base-in-table fit redone from 8 AprilTag touches (rms 16.0 -> 15.55 mm, base z -36.9 -> -20.2 mm), measured 2026-11-22.
+- `config/elrobot.json`: gripper motor 8 current threshold set to 100 and the `agent` motion limits written out explicitly (same values as the code defaults); keys reordered by the config writer, 2026-11-22.
 - `grip-object`: grasps only with the fingers vertical down (`--down`), no angled fallback (Jafer, 2026-11-22).
 - HANDOFF and `grip-object`: grip from the bowl failed 3 times (jaw tips stall on the curved bowl; false "holding"), 2026-11-22.
 - `calib goto` gets `--open-after` / `--close-after` (gripper on the same Station connection; close stops at the stall and keeps `squeeze_steps` from a fresh reading) and a faster default speed (25 -> 60 mm/s). New skill `drop-in-bowl`; `grip-object` rewritten to fewer, faster calls. Grape dropped into the bowl at 70 mm/s (2026-11-22). Tests added.
