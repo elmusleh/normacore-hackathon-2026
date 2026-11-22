@@ -12,7 +12,9 @@ previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP serve
 ## Latest session (2026-11-22, claude for Jafer): camera ports, dark gripper camera
 - Jafer saw the camera view too bright, then too dark after a Station restart. Cause of the dark view: the gripper camera (port 3-5.2.4) in manual exposure 14. The hub is back on laptop port 5, so the config names pointed at missing `3-1.x` ports and `cameras --tune` could not find them.
 - Changed (with Jafer's OK): `config/elrobot.json` cameras -> table `port:3-5.1`, gripper `port:3-5.2.4`, face `port:3-5.3`. Evidence in FINDINGS.md.
-- Next: point the gripper camera at the table, Station stopped, `./cli.sh cameras --tune gripper --write`, commit the value as a calibration commit, restart the Station.
+- Exposure set to 250 for table and gripper (Jafer's choice after trying values live; committed). Applied with `./cli.sh cameras`; verified by `cameras --show` (both manual, 250). Face camera left on auto.
+- Gotcha: when the Station stops, the camera driver sometimes does not take a camera back (no /dev/video for it) and a USB reconnect resets exposure to auto. Run `./cli.sh cameras` after every replug, with the Station stopped.
+- Next: start the Station, check the console tiles at 250; if too bright, lower both a little and commit.
 
 ## Earlier session (2026-11-22, claude for Jafer): camera preprocessing removed
 - Request: "please undo any preprocessing". Read as: remove the software picture enhancement added 2026-11-21 (commit 179b423). Branch `feat/vision-apriltag-ik` (not pushed).

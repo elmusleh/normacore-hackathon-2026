@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.mcp.json`: `ELROBOT_ALLOW_MOTION` set to `"1"`, so Claude's MCP tools move the real arm (was dry-run).
 
 ### Changed
+- Camera exposure in `config/elrobot.json` → `camera_settings`: table 160 → 250, gripper 14 → 250 (set by Jafer 2026-11-22 after the live view was too bright on auto and nearly black at 14). Apply with `./cli.sh cameras` while the Station is stopped.
 - Camera ports in `config/elrobot.json` back on the `3-5` hub port: table `3-5.1`, gripper `3-5.2.4`, face `3-5.3` (checked from frames 2026-11-22; the gripper camera was stuck at manual exposure 14, which made its view nearly black).
 
 ### Removed

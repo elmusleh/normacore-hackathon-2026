@@ -25,10 +25,10 @@
   },
   "camera_settings": {
     "table": {
-      "exposure": 160
+      "exposure": 250
     },
     "gripper": {
-      "exposure": 14
+      "exposure": 250
     }
   },
   "foods": {
