@@ -13,9 +13,44 @@
   html, body { height: 100%; margin: 0; }
   body { background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
   header { height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 16px; font-weight: 600; margin: 0; }
-  header .sub { color: var(--muted); font-size: 13px; }
-  main { height: calc(100% - 48px); display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(340px, 1fr); gap: 14px; padding: 14px; }
+  header h1 { font-size: 16px; font-weight: 600; margin: 0; white-space: nowrap; }
+  .tabs { display: flex; gap: 6px; margin-left: 8px; }
+  .tab-btn { background: transparent; border: 1px solid transparent; color: var(--muted); padding: 5px 12px;
+    border-radius: 7px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+  .tab-btn:hover { color: var(--text); background: var(--panel-2); }
+  .tab-btn.active { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+  .tab-count { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--line); color: var(--text); }
+  .dev-toggle { margin-left: auto; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+    border-radius: 7px; padding: 5px 11px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .dev-toggle.on { background: rgba(79,140,255,.18); color: #93c5fd; border-color: rgba(79,140,255,.5); }
+  .tab-panel { display: none; height: calc(100% - 48px); }
+  .tab-panel.active { display: block; }
+  main { height: 100%; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(340px, 1fr); gap: 14px; padding: 14px; }
+  body:not(.dev-mode) .bubble.tool { display: none; }
+
+  /* developer trace & commands tabs */
+  .panel-wrap { height: 100%; padding: 14px; display: flex; flex-direction: column; gap: 12px; max-width: 1100px; margin: 0 auto; }
+  .trace-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .trace-bar button { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 7px;
+    padding: 5px 11px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .trace-bar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .trace-list { flex: 1; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .trace-item { background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--muted);
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+  .trace-item.tool_call { border-left-color: var(--accent); }
+  .trace-item.tool_result { border-left-color: var(--ok); }
+  .trace-item.guardrail { border-left-color: var(--warn); }
+  .trace-item.thinking { border-left-color: #a855f7; }
+  .trace-item.stop { border-left-color: var(--bad); }
+  .trace-head { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; margin-bottom: 4px; }
+  .trace-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 2px 6px; border-radius: 4px; background: var(--bg); color: var(--muted); }
+  .trace-detail { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #cbd5e1; }
+  .cmd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .cmd-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .cmd-card h3 { margin: 0 0 8px; font-size: 14px; }
+  .cmd-card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+  .cmd-card code { color: var(--text); background: var(--panel-2); padding: 1px 6px; border-radius: 4px; }
 
   /* cameras */
   .cams { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 0; }
@@ -108,8 +143,14 @@
 <body>
 <header>
   <h1>ElRobot Console</h1>
-  <span class="sub">Live cameras. Talk to Claude, which drives the arm through the elrobot MCP tools. Say or type "stop" to hold the arm.</span>
+  <nav class="tabs" role="tablist" aria-label="Console views">
+    <button type="button" class="tab-btn active" data-tab="demo" role="tab" aria-selected="true">Demo Console</button>
+    <button type="button" class="tab-btn" data-tab="trace" role="tab" aria-selected="false">Developer Trace <span class="tab-count" id="trace-count">0</span></button>
+    <button type="button" class="tab-btn" data-tab="commands" role="tab" aria-selected="false">Commands &amp; Guardrails</button>
+  </nav>
+  <button type="button" class="dev-toggle" id="dev-toggle" title="Show/hide raw arm tool calls inside the chat log">Dev Log in Chat: OFF</button>
 </header>
+<div class="tab-panel active" id="tab-demo">
 <main>
   <section class="cams" id="cams" aria-label="Cameras"></section>
 
@@ -153,6 +194,48 @@
     </div>
   </section>
 </main>
+</div>
+
+<div class="tab-panel" id="tab-trace">
+  <div class="panel-wrap">
+    <div class="trace-bar">
+      <button type="button" class="active" data-filter="all">All</button>
+      <button type="button" data-filter="arm">Arm Commands</button>
+      <button type="button" data-filter="guardrail">Guardrails</button>
+      <button type="button" data-filter="thinking">Thinking / Text</button>
+      <button type="button" id="trace-copy" style="margin-left:auto;">Copy JSON</button>
+      <button type="button" id="trace-clear">Clear Trace</button>
+    </div>
+    <div class="trace-list" id="trace-list">
+      <div class="empty">No trace events yet. Speak or send a command to see guardrail decisions, model thinking, and exact arm MCP calls here.</div>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-commands">
+  <div class="panel-wrap">
+    <div class="cmd-grid">
+      <div class="cmd-card">
+        <h3>Demo Voice Commands (Say "Robo" first)</h3>
+        <ul>
+          <li><code>"Robo, I want grapes"</code> — runs the recorded grapes feeding sequence</li>
+          <li><code>"Robo, I want chocolate"</code> — runs the recorded chocolate feeding sequence</li>
+          <li><code>"Robo, look at the table"</code> — checks the table camera and describes food</li>
+          <li><code>"Robo, turn on mouth detection"</code> — toggles OBSBOT mouth-open gate</li>
+          <li><code>"Robo, stop"</code> — immediately holds the arm in place</li>
+        </ul>
+      </div>
+      <div class="cmd-card">
+        <h3>Active Scope Guardrails</h3>
+        <ul>
+          <li><strong>Layer 1 (Fast Gatekeeper):</strong> Off-topic questions (weather, coding, jokes, general knowledge) and prompt injections are blocked in &lt;1 ms before reaching Claude.</li>
+          <li><strong>Layer 2 (XML Isolation):</strong> Every voice transcript is wrapped in <code>&lt;user_voice_transcript&gt;</code> tags so speech is treated as data, never system instructions.</li>
+          <li><strong>Layer 3 (MCP Tool Schema):</strong> Only whitelisted robot tools and recorded sequences can execute; hardware overload &amp; range clamps stay enforced in code.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -884,6 +967,118 @@ $("handsfree")?.addEventListener("change", (e) => {
   if (e.target.checked) startHandsFree();
   else stopHandsFree();
 });
+
+// ---------------------------------------------------------------- tabs + developer trace
+const tabBtns = document.querySelectorAll(".tab-btn");
+const tabPanels = {
+  demo: $("tab-demo"),
+  trace: $("tab-trace"),
+  commands: $("tab-commands"),
+};
+tabBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const key = btn.dataset.tab;
+    tabBtns.forEach(b => {
+      const on = b === btn;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    Object.entries(tabPanels).forEach(([k, el]) => el?.classList.toggle("active", k === key));
+  });
+});
+
+const devToggle = $("dev-toggle");
+function setDevMode(on) {
+  document.body.classList.toggle("dev-mode", on);
+  if (devToggle) {
+    devToggle.classList.toggle("on", on);
+    devToggle.textContent = `Dev Log in Chat: ${on ? "ON" : "OFF"}`;
+  }
+  localStorage.setItem("console_dev_mode", on ? "1" : "0");
+}
+setDevMode(localStorage.getItem("console_dev_mode") === "1");
+devToggle?.addEventListener("click", () => setDevMode(!document.body.classList.contains("dev-mode")));
+
+let traceEntries = [];
+let lastTraceId = 0;
+let traceFilter = "all";
+
+function matchesTraceFilter(entry) {
+  if (traceFilter === "all") return true;
+  if (traceFilter === "arm") return entry.kind === "tool_call" || entry.kind === "tool_result" || entry.kind === "stop";
+  return entry.kind === traceFilter;
+}
+
+function renderTrace() {
+  const list = $("trace-list");
+  if ($("trace-count")) $("trace-count").textContent = String(traceEntries.length);
+  if (!list) return;
+  const shown = traceEntries.filter(matchesTraceFilter);
+  if (!shown.length) {
+    list.innerHTML = '<div class="empty">No matching trace events yet.</div>';
+    return;
+  }
+  list.innerHTML = "";
+  for (const e of shown) {
+    const div = document.createElement("div");
+    div.className = `trace-item ${e.kind}`;
+    const ts = new Date(e.time * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const head = document.createElement("div");
+    head.className = "trace-head";
+    const left = document.createElement("span");
+    left.textContent = e.title;
+    const right = document.createElement("span");
+    right.innerHTML = `<span class="trace-kind">${e.kind}</span> ${ts}`;
+    head.append(left, right);
+    div.appendChild(head);
+    if (e.detail) {
+      const pre = document.createElement("pre");
+      pre.className = "trace-detail";
+      pre.textContent = e.detail;
+      div.appendChild(pre);
+    }
+    list.appendChild(div);
+  }
+  list.scrollTop = list.scrollHeight;
+}
+
+document.querySelectorAll(".trace-bar [data-filter]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    traceFilter = btn.dataset.filter;
+    document.querySelectorAll(".trace-bar [data-filter]").forEach(b => b.classList.toggle("active", b === btn));
+    renderTrace();
+  });
+});
+
+$("trace-clear")?.addEventListener("click", async () => {
+  await fetch("/api/trace/clear", { method: "POST" }).catch(() => {});
+  traceEntries = [];
+  renderTrace();
+});
+
+$("trace-copy")?.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(traceEntries, null, 2));
+    $("trace-copy").textContent = "Copied!";
+    setTimeout(() => { $("trace-copy").textContent = "Copy JSON"; }, 1200);
+  } catch (_) {}
+});
+
+async function pollTrace() {
+  try {
+    const r = await fetch(`/api/trace?after=${lastTraceId}`, { cache: "no-store" });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.entries && d.entries.length) {
+        traceEntries.push(...d.entries);
+        lastTraceId = d.entries[d.entries.length - 1].id;
+        renderTrace();
+      }
+    }
+  } catch (_) {}
+  setTimeout(pollTrace, 700);
+}
+pollTrace();
 
 chooseEngine();
 </script>

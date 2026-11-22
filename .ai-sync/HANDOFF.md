@@ -1,15 +1,27 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T03:38:00Z
-status: mouth-status-badge-cue-and-timeout-live
-current_phase: "Phase 3: Full Team Integration (Hands-Free Voice Console + OBSBOT MediaPipe Mouth-Open Gate)"
-current_task: "Added live OBSBOT mouth-status badge, waiting-for-mouth amber banner + spoken TTS cue, and clamped mouth_gate_timeout_s"
+timestamp: 2026-11-22T04:03:00Z
+status: guardrails-dev-trace-and-multitab-console-live
+current_phase: "Phase 3: Full Team Integration (Guardrailed Hands-Free Voice Console + Multi-Tab Developer Trace)"
+current_task: "Added 2-layer scope guardrails, live Developer Action Trace (/api/trace), and 3-tab Console UI with Dev Log toggle"
 stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-22T03:26 — hands-free-voice-chimes-and-mouth-gate-live
+previous_session: antigravity 2026-11-22T03:38 — mouth-status-badge-cue-and-timeout-live
 ---
 
-## Latest session (2026-11-22 03:38): Live OBSBOT Mouth Badge, Waiting Cue & Configurable Timeout
+## Latest session (2026-11-22 04:03): Scope Guardrails, Developer Action Trace & Multi-Tab Console
+
+- **What Changed:**
+  - **2-Layer Scope Guardrails (`src/console_agent.py`, `docs/GUARDRAILS_AND_TRACE.md`, `tests/test_console_agent.py`):**
+    - Layer 1: Fast pre-LLM `classify_intent()` blocks off-topic queries and prompt-injection attempts in <1 ms with `OUT_OF_SCOPE_REPLY` (zero Claude API calls).
+    - Layer 2: Wraps allowed user transcripts in `<user_voice_transcript>...</user_voice_transcript>` tags and adds `# Scope & Guardrails` rules to `CONSOLE_PROMPT`.
+  - **Live Developer Action Trace & 3-Tab UI (`src/console_agent.py`, `src/web_console.py`, `src/web/console.html`):**
+    - Added `ConsoleAgent.trace_after()` / `clear_trace()` and `GET /api/trace` + `POST /api/trace/clear` recording `guardrail`, `thinking`, `tool_call` (exact arm MCP arguments), `tool_result` (arm response), and `stop` events.
+    - Upgraded `http://localhost:8890` into 3 tabs (`Demo Console`, `Developer Trace` with filter pills + Copy JSON + Clear, and `Commands & Guardrails`) plus a header `Dev Log in Chat: OFF/ON` toggle button.
+- **Next Steps:**
+  1. Hard-refresh `http://localhost:8890` (`Ctrl+Shift+R`) and test an off-topic message (e.g. `"Robo, what is the weather?"`) and a real command (`"Robo, look at the table"`), then inspect the **Developer Trace** tab.
+
+## Session (2026-11-22 03:38): Live OBSBOT Mouth Badge, Waiting Cue & Configurable Timeout
 
 - **What Changed:**
   - **Configurable & Clamped Timeout (`src/robot_tools.py`):** Added `mouth_gate_timeout_s(cfg)` reading `feeding_vision.mouth_gate_timeout_s` (default `12.0s`, clamped to `[3.0, 30.0]s`), plus atomic `data/mouth_gate_state.json` telemetry written by `_mouth_gate_check`.

@@ -524,6 +524,21 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         data = await run_in_threadpool(_poll_mouth_status)
         return JSONResponse(data, headers={"Cache-Control": "no-store"})
 
+    async def trace_log(request: Request):
+        agent = agent_box["agent"]
+        try:
+            after = int(request.query_params.get("after", "0"))
+        except ValueError:
+            after = 0
+        entries = agent.trace_after(after) if agent is not None else []
+        return JSONResponse({"entries": entries}, headers={"Cache-Control": "no-store"})
+
+    async def trace_clear(_: Request):
+        agent = agent_box["agent"]
+        if agent is not None:
+            agent.clear_trace()
+        return JSONResponse({"ok": True})
+
     @contextlib.asynccontextmanager
     async def lifespan(_app):
         if stt is not None:
@@ -547,6 +562,8 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         Route("/api/tts", tts, methods=["POST"]),
         Route("/api/mouth_gate", mouth_gate, methods=["GET", "POST"]),
         Route("/api/mouth_status", mouth_status),
+        Route("/api/trace", trace_log),
+        Route("/api/trace/clear", trace_clear, methods=["POST"]),
         Route("/api/messages", messages, methods=["GET", "POST"]),
         Route("/api/stop", stop, methods=["POST"]),
     ], lifespan=lifespan)

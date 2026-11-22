@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Add a 1-click `Dry-Run Command Preview` mode toggle in the `Developer Trace` tab — Priority 79% (High value) [Security]
+   What: Add a toggle in the `Developer Trace` tab showing whether `ELROBOT_ALLOW_MOTION` is `1` (live) or `0` (dry-run) and warning loudly in red when live arm motion is armed.
+   Why: Lets developers verify at a glance whether a traced command will physically move the arm before speaking a feeding command during rehearsal.
+   How: Include `"motion_enabled": bool(motion_allowed())` in `GET /api/trace` in `src/web_console.py` and render a live `MOTION: LIVE` / `MOTION: DRY-RUN` badge in the `Developer Trace` toolbar in `src/web/console.html`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Kept this turn focused on scope guardrails, live action tracing, and multi-tab UI separation.
+
+2. Persist Developer Trace entries to a timestamped JSONL file in `logs/console_trace_*.jsonl` — Priority 68% (Nice to have) [Best practices]
+   What: Append each trace entry (`guardrail`, `thinking`, `tool_call`, `tool_result`) to a gitignored `logs/console_trace_YYYYMMDD.jsonl` file in addition to the in-memory ring buffer.
+   Why: Preserves the full post-mortem log of every arm command and guardrail decision even if the console server is restarted during a demo.
+   How: In `ConsoleAgent._trace()` (`src/console_agent.py`), append `json.dumps(entry) + "\n"` to `ROOT / "logs" / f"console_trace_{date}.jsonl"` inside a best-effort `try/except`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: In-memory trace + `Copy JSON` button covers live debugging; file persistence is a quick follow-up.
+
+3. Add a `Test Guardrail` input box inside the `Commands & Guardrails` tab — Priority 54% (Nice to have) [Professionalism]
+   What: Add a small read-only test input in the `Commands & Guardrails` tab that runs `classify_intent()` via `POST /api/guardrail_test` without sending anything to Claude or the arm.
+   Why: Lets judges test prompt-injection attempts and off-topic questions live to see the `<1 ms` gatekeeper block them cleanly.
+   How: Expose `POST /api/guardrail_test` calling `classify_intent(text)` in `src/web_console.py` and wire a tiny form in the `Commands & Guardrails` tab of `src/web/console.html`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Users can already test off-topic messages directly in the chat and inspect the `BLOCKED` event in `Developer Trace`.
+
 1. Add a one-click `Test Mouth Gate (Dry-Run)` button next to the OBSBOT badge in `http://localhost:8890` — Priority 80% (High value) [Professionalism]
    What: Add a small button beside the live mouth badge that lets the user or a judge test the full mouth-open confirmation flow (waiting banner -> open mouth -> chime + "Mouth confirmed!") without moving any robot motors.
    Why: Lets you demonstrate the MediaPipe mouth-open trigger safely to judges or calibrate a new user in 5 seconds before turning on arm motion.
