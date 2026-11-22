@@ -14,8 +14,16 @@
     "squeeze_steps": 10
   },
   "cameras": {
-    "table": ["port:3-1.1", "port:3-5.2.2", "port:2-1.2.2"],
-    "gripper": ["port:3-1.2.4", "port:3-5.2.4", "port:2-1.2.4"],
+    "table": [
+      "port:3-1.1",
+      "port:3-5.2.2",
+      "port:2-1.2.2"
+    ],
+    "gripper": [
+      "port:3-1.2.4",
+      "port:3-5.2.4",
+      "port:2-1.2.4"
+    ],
     "person": "v4l2:2"
   },
   "camera_settings": {
@@ -30,7 +38,20 @@
     "max_speed": 500,
     "max_waypoint_delta_steps": 1500,
     "max_nudge_percent": 5.0,
-    "clear_waypoint": "clear"
+    "clear_waypoint": "clear",
+    "sequence_speed": 300,
+    "sequence_pause_s": 1.5,
+    "sequence_tolerance_steps": 60
+  },
+  "foods": {
+    "grapes": {
+      "sequence": "grapes",
+      "note": "picks one grape from the bowl and brings it to the person's mouth, then returns"
+    },
+    "chocolate": {
+      "sequence": "choc",
+      "note": "picks one piece of chocolate and brings it to the person's mouth, then returns"
+    }
   },
   "workspace": {
     "x_min_mm": -180.0,
@@ -43,14 +64,7 @@
     "z_grasp_mm": 14.0,
     "measured": false
   },
-  "foods": {
-    "grapes": {
-      "sequence": "grapes",
-      "note": "picks one grape from the bowl and brings it to the person's mouth, then returns"
-    },
-    "chocolate": {
-      "sequence": "choc",
-      "note": "picks one piece of chocolate and brings it to the person's mouth, then returns"
-    }
+  "feeding_vision": {
+    "mouth_gate_enabled": false
   }
 }
