@@ -288,6 +288,15 @@ def test_cartesian_goto_travel_height_is_settable_but_never_below_the_floor():
 
 
 @pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
+def test_cartesian_goto_lowered_floor_allows_a_grasp_height_but_keeps_fit_error():
+    model, jc, base, present, ranges = _goto_setup()
+    plan = ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, 150, 20], fit_rms_mm=16, min_z_mm=0)
+    assert abs(plan[-1][1][2] - 20) < 1e-6
+    with pytest.raises(ValueError, match="below the allowed"):
+        ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, 150, 10], fit_rms_mm=16, min_z_mm=0)
+
+
+@pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
 def test_cartesian_goto_refuses_unsafe_targets():
     model, jc, base, present, ranges = _goto_setup()
     with pytest.raises(ValueError, match="below the allowed"):

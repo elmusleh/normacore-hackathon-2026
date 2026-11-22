@@ -37,6 +37,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from arm_kinematics import (  # noqa: E402
     ARM_MOTORS,
+    GOTO_MIN_Z_MM,
     GOTO_TRAVEL_Z_MM,
     ArmModel,
     BaseInTable,
@@ -364,6 +365,10 @@ def cmd_goto(args, cal):
         raise SystemExit(f"Refused: --mm-per-s must be 5-{STREAM_MAX_MM_S}. Nothing moved.")
     if not 50 <= args.travel_z <= 250:
         raise SystemExit("Refused: --travel-z must be 50-250 mm. Nothing moved.")
+    if not 0 <= args.min_z <= GOTO_MIN_Z_MM:
+        raise SystemExit(f"Refused: --min-z must be 0-{GOTO_MIN_Z_MM:.0f} mm. Nothing moved.")
+    if args.min_z < GOTO_MIN_Z_MM:
+        print(f"WARNING: --min-z {args.min_z:.0f} mm: the floor is lowered for a grasp; the fingertip may reach the table.")
     rms = float(cal["base_in_table"].get("rms_mm") or 0.0)
     model, jc, base = _model(cal), JointCalibration.from_config(cal["joints"]), _base(cal)
     if args.cmd == "line":
@@ -380,7 +385,8 @@ def cmd_goto(args, cal):
             return 1
         present = {m: readings[m].present for m in ARM_MOTORS}
         ranges = {m: (readings[m].range_min, readings[m].range_max) for m in ARM_MOTORS}
-        kw = dict(point_down=args.down, fit_rms_mm=rms, step_mm=args.step_mm, travel_z_mm=args.travel_z)
+        kw = dict(point_down=args.down, fit_rms_mm=rms, step_mm=args.step_mm, travel_z_mm=args.travel_z,
+                  min_z_mm=args.min_z)
         try:
             if end:
                 plan = plan_cartesian_line(model, jc, base, present, ranges, target, end, **kw)
@@ -501,6 +507,8 @@ def main() -> int:
     p.add_argument("--step-mm", type=float, default=3.0, help="distance between streamed points (2-20)")
     p.add_argument("--travel-z", type=float, default=GOTO_TRAVEL_Z_MM,
                    help="height (mm) to travel sideways at; never below the safety floor (default 150)")
+    p.add_argument("--min-z", type=float, default=GOTO_MIN_Z_MM,
+                   help="lower the safety floor for a grasp (0-50 mm, default 50); fit error is still added")
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
     p = sub.add_parser("line", help="MOVE: goto the start point, then along a straight line (asks MOVE first)")
     for a in ("x1", "y1", "z1", "x2", "y2", "z2"):
@@ -508,6 +516,8 @@ def main() -> int:
     p.add_argument("--step-mm", type=float, default=3.0, help="distance between streamed points (2-20)")
     p.add_argument("--travel-z", type=float, default=GOTO_TRAVEL_Z_MM,
                    help="height (mm) to travel sideways at; never below the safety floor (default 150)")
+    p.add_argument("--min-z", type=float, default=GOTO_MIN_Z_MM,
+                   help="lower the safety floor for a grasp (0-50 mm, default 50); fit error is still added")
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
     p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-70 mm/s)")
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")

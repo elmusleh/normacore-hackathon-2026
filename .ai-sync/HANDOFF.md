@@ -9,6 +9,14 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~07:40, claude for Jafer): FIRST GRAPE GRASP (right grape)
+- Jafer: "just grip the right grape, make it work". Added `calib goto/line --min-z` (lowered floor, fit error still added).
+- Sequence that worked (wrist as-is, not `--down`: motor 6 hits its limit fingers-down): hover 70 -> open gripper (hw jog 8 +200 x4 / `set_gripper(100)`) -> `goto X Y 40 --travel-z 70 --min-z 0 --mm-per-s 10` -> `goto X Y 18 --travel-z 50 --min-z 0 --mm-per-s 8` -> `set_gripper(0)` -> lift `goto X Y 90`.
+- 1st try at the camera point missed: jaws closed ~2 cm short (along the finger direction) and nudged the grape; `set_gripper` still said holding_object (false positive: gripper range low end 1245 is not fully closed, jaws stall on each other ~1372). 2nd try at (410, 140, 18), aimed from the gripper camera: grape centred between the jaws, held (gripper 8.3 %), lifted to 58 mm by joints.
+- Arm now: holding the grape at about (404, 144, 58) mm, torque on.
+- Next: 1) recalibrate motor 8 range in the Station console (holding_object is unreliable until then). 2) Offset the grasp point ~2 cm along the finger direction from the table-camera position, or centre with the gripper camera. 3) MCP tools time out now and then (ErrRequestTimeout): retry once.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~07:15, claude for Jafer): speed cap 70, gripper direction verified
 - `calib goto/line` speed cap 60 -> 70 mm/s; right->left grape at 70 mm/s arrived, same accuracy. Arm hovering above the left grape.
 - Gripper direction verified on the temp arm (low = closed, high = open): `config/elrobot.json` gripper `verified: true`. Removed a junk `joint_map` entry written by `hw identify`.
