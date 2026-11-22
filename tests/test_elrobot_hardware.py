@@ -15,6 +15,7 @@ from src.elrobot_hardware import (
     RAM_STATUS,
     RAM_TORQUE_ENABLE,
     ElRobotHardware,
+    MotorReading,
     clamp_goal,
     normal_position,
     parse_motor_state,
@@ -160,3 +161,38 @@ def test_config_override_merges_without_losing_defaults():
     assert merged["workspace"]["x_min_mm"] == DEFAULTS["workspace"]["x_min_mm"]
     assert merged["joint_map"] == {"2": {"joint": "x"}}
     assert DEFAULTS["joint_map"] == {}  # defaults themselves are not mutated
+
+
+def _watch(near_tolerance, stop_at, goal=2000, start=1500):
+    """move_and_watch against a fake bus where motor 1 stops at `stop_at` with low current."""
+    hw = ElRobotHardware(server="localhost")
+
+    async def fake_move(goals, **kwargs):
+        return {1: {"goal": goal, "present": start}}
+    hw.move_motors = fake_move
+    held = []
+
+    async def fake_hold(ids):
+        held.extend(ids)
+    hw.hold = fake_hold
+    hw.snapshot = lambda: {1: MotorReading(1, stop_at, goal, True, 0, 5, 500, 3500)}
+    status = asyncio.run(hw.move_and_watch({1: goal}, enable_motion=True, max_speed=3000, poll_s=0.01,
+                                           near_tolerance=near_tolerance, stall_s=0.05))
+    return status, held
+
+
+def test_move_and_watch_accepts_stopped_motor_near_goal():
+    status, held = _watch(near_tolerance=40, stop_at=1975)
+    assert status == {1: "near"}
+    assert held == []
+
+
+def test_move_and_watch_without_near_tolerance_times_out():
+    status, held = _watch(near_tolerance=None, stop_at=1975)
+    assert status == {1: "timeout"}
+    assert held == [1]
+
+
+def test_move_and_watch_does_not_accept_stop_far_from_goal():
+    status, _ = _watch(near_tolerance=40, stop_at=1900)
+    assert status == {1: "timeout"}

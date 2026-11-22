@@ -12,7 +12,10 @@ fault and torque checks, speed caps, overload hold):
   * Waypoint moves route through the `clear` waypoint by default, and any single
     motor moving more than agent.max_waypoint_delta_steps is refused.
   * Nudges are capped at agent.max_nudge_percent of the joint's calibrated range.
-  * One tool call at a time (a lock), so two moves never interleave.
+  * One tool call at a time (a lock), so two moves never interleave. stop() is the exception:
+    it skips the lock, so it also interrupts a recorded plan (play_sequence) that is running.
+  * play_sequence only plays plans a human recorded (./cli.sh hw record), with the same checks
+    as ./cli.sh hw play (src/sequence_player.py).
 
 Every method returns a plain dict for Claude to read. Errors that Claude should
 react to come back as {"ok": False, "error": ...} rather than exceptions.
@@ -24,6 +27,7 @@ import logging
 import os
 import re
 import threading
+import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from elrobot_camera import (
@@ -31,10 +35,17 @@ from elrobot_camera import (
     decode_frame,
     describe_camera,
     discover_camera_queues,
+    camera_ports,
     port_of,
-    usb_ports,
 )
-from elrobot_config import current_threshold_for, load_config, load_waypoints, save_waypoints
+from elrobot_config import (
+    camera_targets,
+    current_threshold_for,
+    load_config,
+    load_sequences,
+    load_waypoints,
+    save_waypoints,
+)
 from elrobot_hardware import (
     DEFAULT_SAFETY_MARGIN_STEPS,
     ELROBOT_MOTOR_IDS,
@@ -42,6 +53,7 @@ from elrobot_hardware import (
     clamp_goal,
     plan_goto,
 )
+from sequence_player import SEQ_MAX_PAUSE, TRACK_TOLERANCE, plan_legs, run_legs, waypoint_target
 
 log = logging.getLogger("elrobot.mcp")
 
@@ -49,6 +61,7 @@ WAYPOINT_NAME = re.compile(r"^[a-z0-9_-]{1,40}$")
 ARRIVAL_TOLERANCE = 12      # steps; same as ./cli.sh hw goto
 AT_WAYPOINT_TOLERANCE = 40  # steps; "already at clear" for routing purposes
 HOLDING_MARGIN_PERCENT = 3.0
+TELEOP_WATCH_S = 1.0        # goal registers must stay still this long before a sequence starts
 
 
 def motion_allowed() -> bool:
@@ -72,11 +85,12 @@ class RobotTools:
                  usb_ports_fn: Optional[Callable[[], dict]] = None):
         self._connect = connect
         self._camera_queues = camera_queues or discover_camera_queues
-        self._usb_ports = usb_ports_fn or usb_ports
+        self._usb_ports = usb_ports_fn or camera_ports
         self._camera_info: Dict[str, Dict[str, Any]] = {}  # queue -> describe_camera(); fixed per queue
         self._hw = None
         self._lock = threading.Lock()
         self._gripper_cmd_open: Optional[float] = None  # last commanded gripper opening, %
+        self._abort = threading.Event()  # set by stop(); a running play_sequence halts on it
 
     # -- plumbing -------------------------------------------------------------
 
@@ -188,7 +202,7 @@ class RobotTools:
         Config names map to "port:<usb port>" (stable across replugs) or "usbvideo/<hash>".
         """
         ports = self._usb_ports()
-        names = {v: k for k, v in cfg["cameras"].items()}
+        names = {t: name for name, targets in camera_targets(cfg).items() for t in targets}
         cams = []
         for q in self._camera_queues():
             if q not in self._camera_info:
@@ -217,19 +231,22 @@ class RobotTools:
         cams = self._cameras(cfg)
         live = [c for c in cams if c["live"]]
         want = camera or ("table" if "table" in cfg["cameras"] else "")
-        target = cfg["cameras"].get(want, want)
-        if not target:
+        targets = camera_targets(cfg).get(want, [want] if want else [])
+        port_targets = [t for t in targets if t.startswith("port:")]
+        queue_targets = [t for t in targets if not t.startswith("port:")]
+        match = [c for t in port_targets for c in live if f"port:{c['port']}" == t]
+        if not targets:
             if not live:
                 return {"ok": False, "error": "no camera plugged in; see list_cameras"}, None
             queue = live[0]["queue"]
-        elif target.startswith("port:"):
-            match = [c for c in live if f"port:{c['port']}" == target]
-            if not match:
-                return {"ok": False, "error": f"camera {camera or want!r} ({target}) is not plugged in",
-                        "live_cameras": live}, None
+        elif match:
             queue = match[0]["queue"]
+        elif queue_targets:
+            t = queue_targets[0]
+            queue = t if t.startswith("usbvideo/") else f"usbvideo/{t}"
         else:
-            queue = target if target.startswith("usbvideo/") else f"usbvideo/{target}"
+            return {"ok": False, "error": f"camera {camera or want!r} ({', '.join(port_targets)}) "
+                                          "is not plugged in", "live_cameras": live}, None
         hw = self.hw()
         for back in range(1, MAX_LOOKBACK + 1):
             data = hw.read_recent(queue, back=back)
@@ -376,6 +393,81 @@ class RobotTools:
         if not cfg["gripper"]["verified"]:
             res["warning"] = "Gripper open/close direction is not verified on this arm (config gripper.verified)."
         return res
+
+    # -- recorded plans -------------------------------------------------------
+
+    def list_sequences(self) -> Dict[str, Any]:
+        """Recorded plans, and which food each one serves (config 'foods')."""
+        cfg = self._cfg()
+        seqs = load_sequences()
+        points = load_waypoints()
+        plans = {name: {"steps": steps, "ready": all(w in points for w in steps),
+                        "missing_waypoints": [w for w in steps if w not in points]}
+                 for name, steps in seqs.items()}
+        foods = {food: {"sequence": spec.get("sequence"), "note": spec.get("note", ""),
+                        "ready": spec.get("sequence") in plans and plans[spec["sequence"]]["ready"]}
+                 for food, spec in cfg.get("foods", {}).items()}
+        return {"ok": True, "foods": foods, "sequences": plans,
+                "hint": "" if foods else "No foods configured: add 'foods' to config/elrobot.json."}
+
+    def play_sequence(self, name: str) -> Dict[str, Any]:
+        """Run a recorded plan from start to end. Holds the arm and stops on any problem or stop()."""
+        cfg = self._cfg()
+        seqs = load_sequences()
+        if name not in seqs:
+            return {"ok": False, "error": f"no recorded plan {name!r}", "known": sorted(seqs)}
+        agent = cfg["agent"]
+        speed = min(int(agent.get("sequence_speed", 300)), int(agent["max_speed"]))
+        pause = max(0.0, min(float(agent.get("sequence_pause_s", 1.5)), SEQ_MAX_PAUSE))
+        tolerance = max(TRACK_TOLERANCE, min(int(agent.get("sequence_tolerance_steps", 60)), 100))
+        points = load_waypoints()
+        targets = []
+        for wp in seqs[name]:
+            target, err = waypoint_target(points, wp)
+            if err:
+                return {"ok": False, "error": f"plan {name!r}: {err}"}
+            targets.append((wp, target))
+        hw = self.hw()
+        readings = hw.snapshot()
+        problem = self._torque_problem(readings, ELROBOT_MOTOR_IDS)
+        if problem:
+            return {"ok": False, "error": problem}
+        faulted = [m for m in ELROBOT_MOTOR_IDS if readings[m].faulted]
+        if faulted:
+            return {"ok": False, "error": f"motors {faulted} report a fault; not moving. Tell the operator."}
+        try:
+            legs = plan_legs(readings, targets, DEFAULT_SAFETY_MARGIN_STEPS)
+        except ValueError as exc:
+            return {"ok": False, "error": f"plan {name!r}: {exc}"}
+        steps = [wp for wp, _g, _d, _c in legs]
+        if not motion_allowed():
+            return {"ok": True, "dry_run": True, "sequence": name, "steps": steps,
+                    "note": "Motion is disabled (ELROBOT_ALLOW_MOTION is not 1). Nothing moved."}
+        # Station teleop (leader -> follower) would overwrite the goals mid-plan.
+        time.sleep(TELEOP_WATCH_S)
+        after = hw.snapshot()
+        drifting = [m for m in ELROBOT_MOTOR_IDS if m in after and after[m].torque_on
+                    and abs(after[m].goal - readings[m].goal) > 5]
+        if drifting:
+            return {"ok": False, "error": f"goal registers of motors {drifting} change on their own: teleop "
+                                          "(leader arm) is probably on. Ask the operator to turn it off."}
+        self._abort.clear()
+        log.info("play_sequence %s: %s", name, steps)
+        result = run_legs(hw, legs, speed=speed, thresholds={m: current_threshold_for(cfg, m) for m in ELROBOT_MOTOR_IDS},
+                          tolerance=tolerance, pause=pause, stop_event=self._abort, title=name)
+        result.update(sequence=name, steps=steps)
+        if not result["ok"]:
+            result["hint"] = "The arm is holding where it stopped. Look at the camera and tell the person; do not rerun blindly."
+        return result
+
+    def stop_now(self) -> Dict[str, Any]:
+        """stop() without waiting for the tool lock, so it can interrupt a running play_sequence."""
+        self._abort.set()
+        try:
+            return self.stop()
+        except Exception as exc:  # noqa: BLE001 - reported to Claude
+            log.exception("stop failed")
+            return {"ok": False, "error": f"{type(exc).__name__}: {exc}", "hint": "Use the power switch."}
 
     def stop(self) -> Dict[str, Any]:
         """Hold every motor where it is. Always allowed, even with motion disabled."""

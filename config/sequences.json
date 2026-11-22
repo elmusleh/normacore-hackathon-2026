@@ -1,0 +1,33 @@
+{
+  "choc": [
+    "choc_start_1",
+    "choc_pos_2",
+    "choc_open_3",
+    "choc_close_4",
+    "choc_feed_5",
+    "choc_feed_6",
+    "choc_feed_7",
+    "choc_finish_8",
+    "choc_end"
+  ],
+  "feed": [
+    "start",
+    "grape_open",
+    "grape_close",
+    "feed_4",
+    "feed_close",
+    "feed_finish",
+    "reset"
+  ],
+  "grapes": [
+    "start_position",
+    "start_2",
+    "grape_open",
+    "grape_close",
+    "feed_1",
+    "feed_2",
+    "feed_3",
+    "feed_stop",
+    "reset"
+  ]
+}

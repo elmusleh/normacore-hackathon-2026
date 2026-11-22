@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from elrobot_config import load_config  # noqa: E402
+from elrobot_config import camera_targets, load_config  # noqa: E402
 
 V4L = Path("/sys/class/video4linux")
 
@@ -57,7 +57,8 @@ def main() -> int:
             print("No cameras found (/dev/video*). Plug them in.")
         return 1
 
-    names = {v.split(":", 1)[1]: k for k, v in cfg["cameras"].items() if v.startswith("port:")}
+    names = {t.split(":", 1)[1]: k for k, targets in camera_targets(cfg).items()
+             for t in targets if t.startswith("port:")}
     status = 0
     for port, dev in devices.items():
         name = names.get(port, "(unnamed)")

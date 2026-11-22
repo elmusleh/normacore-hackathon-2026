@@ -1,15 +1,21 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-21T20:51:00Z
-status: ready-for-first-live-ai-feeding-run
-current_phase: "Phase 3: Dual-Camera Mission Control, MCP Bring-Up & Safety Hardening"
-current_task: "Dual-camera dashboard, ./cli.sh reset, torque readback fix, and live read-only MCP verification"
-stop_reason: handoff-requested
+timestamp: 2026-11-22T02:11:00Z
+status: merged-jan-and-jafer-ready-for-demo
+current_phase: "Phase 3: Full Team Integration (Dual-Camera MediaPipe + Recorded Sequences + MCP)"
+current_task: "Merged origin/jan and origin/jafer into feat/agent-commit-and-push-policy"
+stop_reason: ready-for-demo
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-21T17:25 — commit-and-push-policy-updated
+previous_session: antigravity 2026-11-21T20:51 — dual-camera-dashboard-and-mediapipe
 ---
 
-## Latest session (2026-11-21 evening): Dual-Camera Mission Control, Bench Reset & Live MCP Readiness
+## Latest session (2026-11-22 02:11): Merged `origin/jan` + `origin/jafer`
+
+- **What Changed:**
+  - Merged `origin/jan` (which includes all of `origin/jafer`: recorded `grapes` & `choc` feeding waypoints/sequences in `config/waypoints.json` + `config/sequences.json`, `src/sequence_player.py`, MCP `list_sequences`/`play_sequence`, `move_and_watch(near_tolerance=...)`, `src/speech.py`, macOS + multi-port camera support in `src/elrobot_camera.py`) while keeping our MediaPipe lip/bowl tracking, per-user calibration, 720p HD V4L2 dashboard, `./cli.sh reset`, and `set_torque` readback retry fix.
+  - `config/elrobot.json` now lists all 3 laptops' camera ports (`table`: `3-1.1`, `3-5.2.2`, `2-1.2.2`; `gripper`: `3-1.2.4`, `3-5.2.4`, `2-1.2.4`; `person`: `v4l2:2`) plus `foods` (`grapes`, `chocolate`).
+
+## Session (2026-11-21 evening): Dual-Camera Mission Control, Bench Reset & Live MCP Readiness
 
 - **What Changed:**
   - **Per-User Mouth & Distance Calibration (`src/feeding_vision.py`, `src/digital_twin_server.py`, `src/digital_twin.html`, `docs/FEEDING_FSM_MEDIAPIPE_PLAN.md`):** Added 1-click **1. Capture Closed**, **2. Capture Open**, **Set Eating Distance**, **Reset Defaults**, and manual `MAR`/`Standoff px` inputs in Mission Control (`http://localhost:8080`) persisting to `config/elrobot.json` under `feeding_vision`. Verified live on OBSBOT (`closed: 0.00–0.02`, `open: 0.30–0.50`, clean no-face watchdog when turning away).
@@ -51,6 +57,51 @@ previous_session: antigravity 2026-11-21T17:25 — commit-and-push-policy-update
 
 
 ## Latest session (2026-11-21 afternoon): Camera-Guided Assistive Feeding (`./cli.sh feed`)
+
+## Merge (2026-11-21, ~22:00, claude on Jan's Mac, branch `jan`): `origin/jafer` merged, goal agent removed
+
+- Team decision: continue with the chat agent (`src/console_agent.py`) and Jafer's recorded plans (`list_sequences` / `play_sequence`). The goal agent (`src/goal_agent.py`, commit 705007d) was reverted (a410d6b); `prompts/04-agent.md` stays as a record.
+- Conflicts resolved: `src/robot_tools.py` imports both `camera_targets` (macOS camera support) and `load_sequences`; `config/elrobot.json` cameras keep Jafer's measured Linux ports plus Jan's Mac ports: `table` = `port:3-5.2.2` or `port:2-1.2.2`, `gripper` = `port:3-5.2.4` or `port:2-1.2.4` (both laptops agree: hub port .2.2 = table, .2.4 = gripper). This handoff keeps both branches' sections.
+- `.mcp.json` from `jafer` has `ELROBOT_ALLOW_MOTION: "1"` (motion on by default).
+- Next idea written up as `prompts/05-nudging-before-gripping.md` (grasp check after closing, small base nudges from the gripper camera before closing).
+
+## Change (2026-11-21, 21:00, claude on Jan's Mac, branch `jan`): cameras work on macOS
+
+- **Problem:** the console showed "camera 'table' (port:3-2.4) is not plugged in" on macOS although the Station recorded all cameras. `usb_ports()` reads `/sys/bus/usb`, which only exists on Linux, so every camera counted as unplugged.
+- **Fix:** `src/elrobot_camera.py` gained `mac_port()` (USB location from the macOS camera id `0x<locationID><vid><pid>`, e.g. `0x21240002c7f4a60` -> `2-1.2.4`), `mac_usb_ports()` (`system_profiler SPCameraDataType -json`, cached 2 s) and `camera_ports()` (picks Linux or macOS). `port_of()` also accepts macOS ids. Linux behaviour unchanged.
+- **Config:** a camera name may now list several targets (`elrobot_config.camera_targets`), used by `robot_tools` and `scripts/camera_settings.py`. `config/elrobot.json`: `table` = `port:3-2.4` (Linux) or `port:2-1.2.2` (Jan's Mac), `gripper` = `port:3-2.2` or `port:2-1.2.4`. The Mac mapping was set from the pictures (2-1.2.2 shows the table from above, 2-1.2.4 shows the gripper). On Jan's Mac the hub sockets are the other way round from the Linux config: check the Linux mapping if table/gripper look swapped there. A third camera (OBSBOT, side view, `2-1.3`) is live but unnamed.
+- **Build status:** 95 tests pass (+4 camera tests). Live: `look("table")` and `look("gripper")` return fresh frames (< 0.1 s).
+- **Next:** restart `./cli.sh console` to load the new code.
+
+## Change (2026-11-21, 18:45, claude on Jan's Mac, branch `jan`): console speech-to-text -> OpenAI gpt-transcribe
+
+- **What changed:** `SpeechToText` in `src/web_console.py` no longer loads faster-whisper. It decodes the browser recording with PyAV, writes a 16 kHz mono WAV with `speech.write_wav` and calls `speech.transcribe` (`src/speech.py`: `gpt-transcribe`, `languages=["de","en"]`, keywords). `speech.transcribe` gained optional `model`/`keywords` arguments; its CLI behaviour is unchanged.
+- **Decisions:** state is `ready` when `OPENAI_API_KEY` is set (`./cli.sh console` loads `.env`), else `error` and the page falls back to the browser's speech recognition. `WEB_CONSOLE_STT_PROMPT` is gone; `WEB_CONSOLE_STT_KEYWORDS` (comma-separated) replaces the default keyword list (`speech.KEYWORDS` + English demo words). `WEB_CONSOLE_STT_MODEL` overrides the model (default `gpt-transcribe`). Error messages are scrubbed of `sk-...` strings. Wake word "Robo", stop words and silero-vad listening from `speech.py` were deliberately NOT ported: the console stays push-to-talk; stop = "stop" in chat or the Stop button.
+- **Dependencies:** `faster-whisper` removed, `openai>=3.57` and `av>=12` added to `requirements.txt`. Re-run `uv pip install -r requirements.txt` (or pip) in `.venv`.
+- **Files:** `src/web_console.py`, `src/web/console.html` (engine label, no-STT hint), `src/speech.py`, `requirements.txt`, `docs/mcp_server.md`, `tests/test_web_console.py` (+6 tests, mocked OpenAI client, no network).
+- **Build status:** `pytest tests/` 91 passed. Live check: console on port 8899, `/api/stt` ready, a `say`-generated German sentence transcribed correctly in 1.8 s.
+- **Next:** try it in the room with a real voice (noise, distance); add new foods to `WEB_CONSOLE_STT_KEYWORDS` or `speech.KEYWORDS`.
+
+## Latest session (2026-11-21, ~18:00): Claude picks the recorded plan from the request
+- User request: "I want grapes" -> Claude decides which recorded plan to run and runs it.
+- `config/elrobot.json` `foods`: grapes -> sequence `grapes`, chocolate -> sequence `choc` (`feed` is an older grapes plan, not mapped). Plan task 4.1/4.3.
+- New `src/sequence_player.py`: plan_legs / wait_settled / run_legs (moved out of `hw_day.cmd_play`, which now uses it). Default tolerance 60 (CLI and agent).
+- MCP tools `list_sequences`, `play_sequence(name)` (`src/robot_tools.py`, `src/robot_mcp_server.py`); `stop` now calls `RobotTools.stop_now()` which skips the tool lock and sets an abort event checked between legs and during the pause. Agent settings `agent.sequence_speed/sequence_pause_s/sequence_tolerance_steps`.
+- Prompts: MCP INSTRUCTIONS and `CONSOLE_PROMPT` say recorded plans come first; one play_sequence call, no extra moves; unknown food -> say what's available.
+- Tests: 104 pass. Committed on branch `jafer` (the old remote `jafer` was merged into main and deleted; pushed again as a new branch). Live check: foods/plans load and are ready; dry-run against the arm not possible (Station sent no motor frames at the time).
+- `.mcp.json` now has ELROBOT_ALLOW_MOTION "1" (committed by Jafer: Claude moves the real arm). NOT verified: a real play_sequence via Claude, and stop() interrupting it over MCP (unit-tested only).
+
+## Latest session (2026-11-21, 17:30): waypoint sequences `hw record` / `hw play`
+- User request: record feeding waypoints, combine them into one run, ONE MOVE prompt for the whole run, pause 1-2 s per waypoint and wait until the arm has fully stopped.
+- `./cli.sh hw record <seq>`: interactive, moves nothing. Each step saves the current pose as a waypoint (Enter = `<seq>_<n>`, existing name -> use saved pose / overwrite / cancel) and saves the order to `config/sequences.json` after every step.
+- `./cli.sh hw play <seq>` (or `hw play wp1 wp2 ...`): plans every leg up front (clamped goals, biggest move, LARGE MOVE), teleop drift check, ONE MOVE prompt. Per leg: `move_and_watch`, then `_wait_settled` (no motor moves > 2 steps for 0.5 s, timeout 5 s), then target check (<= 12 steps), then `--pause` (default 1.5 s, not after the last leg). Any failure or Ctrl-C -> `hw.hold(all)` and stop. `hw sequences` lists them.
+- Files: `scripts/hw_day.py`, `src/elrobot_config.py` (`SEQUENCES_FILE`, `load/save_sequences`), `cli.sh` (help), `docs/elrobot_hardware_bridge.md` (Sequences section), `tests/test_hw_day.py` (8 new tests).
+- Build: 93 passed, 1 failed (`test_camera_feeding_vision_and_orchestration` needs `cv2`, not installed on this laptop; unrelated). `bash -n cli.sh` OK.
+- NOT verified on the real arm. Next: `./cli.sh hw record feed` (e.g. clear, grape_hover, grape, grape_grip, grape_lift, serve, serve_release, clear), teleop off, `hw torque on`, `hw play feed --speed 200`.
+- First live runs (17:19, 17:21): legs stopped with `timeout` because motors 3/4 settle 22-32 steps short of the goal with low current (gravity; mid-range, not a limit), and the 12-step check then waited for the timeout. Fix: `move_and_watch(near_tolerance=..., stall_s=0.8)` in `src/elrobot_hardware.py` returns "near" for a motor that stopped within near_tolerance (no overload); `hw play --tolerance` (default 40) uses it and prints "stopped short". MCP/goto unchanged (still 12). Restored user's `start` waypoint (agent accidentally re-taught it from a stopped pose).
+- Arms CONFIRMED by the user: follower 5B61034962, leader 5B61037051 (as in `config/elrobot.json`). Older notes below that say the opposite are wrong. Fixed the swapped roles in `scripts/teleop_sync.py` (auto-detect and `--swap`; it used to drive the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` (comment), `docs/team_setup.md`, PROGRESS.md.
+
+## Earlier session (2026-11-21 afternoon): Camera-Guided Assistive Feeding (`./cli.sh feed`)
 
 - **What Changed:**
   - Implemented `src/feeding_vision.py` (`FeedingVisionDetector` and `run_camera_feeding_cycle`): captures frames from `/dev/video4` (overhead tabletop camera, with fallback to `/dev/video2` or `MockStation`), detects the **bowl with grapes**, **spoon holder**, and **person's mouth** (with 5–10 cm standoff protection), draws live bounding boxes and feeding vector overlays, and orchestrates slave arm motions via `RobotTools` and `KinematicsSafetyEngine`.

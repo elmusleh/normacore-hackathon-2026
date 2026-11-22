@@ -31,9 +31,11 @@ from elrobot_config import (  # noqa: E402
     current_threshold_for,
     describe_joint_map,
     load_config,
+    load_sequences,
     load_state,
     load_waypoints,
     save_config,
+    save_sequences,
     save_state,
     save_waypoints,
 )
@@ -46,6 +48,14 @@ from elrobot_hardware import (  # noqa: E402
     plan_goto,
 )
 from elrobot_log import LOG_DIR, setup_logging  # noqa: E402
+from sequence_player import (  # noqa: E402
+    SEQ_DEFAULT_PAUSE,
+    SEQ_MAX_PAUSE,
+    SEQ_NEAR_TOLERANCE,
+    plan_legs,
+    run_legs,
+    waypoint_target,
+)
 
 import logging  # noqa: E402
 
@@ -558,6 +568,177 @@ def cmd_goto(args, cfg, state):
     return _with_station(go)
 
 
+# ------------------------------------------------- sequences (record/play) ----
+
+def cmd_record(args, cfg, state):
+    """Record a sequence: pose the arm, save the pose as a waypoint, repeat. Moves nothing."""
+    seq = args.sequence
+    if not WAYPOINT_NAME.match(seq):
+        print("Sequence names: lowercase letters, digits, - or _, up to 40 characters.")
+        return 2
+    if not sys.stdin.isatty():
+        print("record is interactive; run it in a terminal.")
+        return 2
+    seqs = load_sequences()
+    if seq in seqs and not args.yes:
+        print(f"Sequence '{seq}' exists: {' -> '.join(seqs[seq])}")
+        if input("Record it again from scratch? [y/N] ").strip().lower() != "y":
+            print("Kept the old sequence.")
+            return 0
+
+    def go(hw, cfg):
+        steps = []
+        print(f"\nRecording sequence '{seq}'. Nothing moves; this only reads positions.")
+        print("For each step: pose the arm (torque off by hand, or with the leader arm), then type")
+        print(f"a waypoint name, or press Enter for '{seq}_<n>'. Include the gripper: it is saved too.")
+        print("Type 'q' when done.\n")
+        while True:
+            n = len(steps) + 1
+            default = f"{seq}_{n}"
+            answer = input(f"Step {n}: name [{default}] or q: ").strip()
+            if answer.lower() == "q":
+                break
+            name = answer or default
+            if not WAYPOINT_NAME.match(name):
+                print("  Waypoint names: lowercase letters, digits, - or _, up to 40 characters.")
+                continue
+            points = load_waypoints()
+            if name in points:
+                choice = input(f"  '{name}' exists: [u]se the saved pose, [o]verwrite with the current pose, "
+                               "[c]ancel? ").strip().lower()
+                if choice == "u":
+                    steps.append(name)
+                    save_sequences({**load_sequences(), seq: steps})
+                    print(f"  Step {n} = '{name}' (saved pose)")
+                    continue
+                if choice != "o":
+                    continue
+            readings = hw.snapshot()
+            missing = [m for m in MOTORS if m not in readings]
+            if missing:
+                print(f"  Cannot read motors {missing}. Not saved.")
+                continue
+            points[name] = {str(m): readings[m].present for m in MOTORS}
+            save_waypoints(points)
+            steps.append(name)
+            save_sequences({**load_sequences(), seq: steps})  # saved after every step, so Ctrl-C keeps them
+            print(f"  Step {n} = '{name}': " + ", ".join(f"{m}={readings[m].present}" for m in MOTORS))
+        if not steps:
+            print("No steps recorded.")
+            return 0
+        print(f"\nSaved sequence '{seq}': {' -> '.join(steps)}")
+        print(f"Play it with: ./cli.sh hw play {seq}")
+        return 0
+    return _with_station(go)
+
+
+def cmd_sequences(args, cfg, state):
+    seqs = load_sequences()
+    if not seqs:
+        print("No sequences yet. Record one with: ./cli.sh hw record <name>")
+        return 0
+    points = load_waypoints()
+    for name in sorted(seqs):
+        missing = [w for w in seqs[name] if w not in points]
+        note = f"   (missing waypoints: {', '.join(missing)})" if missing else ""
+        print(f"{name}: {' -> '.join(seqs[name])}{note}")
+    return 0
+
+
+def cmd_play(args, cfg, state):
+    """Go through several waypoints in order, with one MOVE prompt for the whole run."""
+    seqs = load_sequences()
+    if len(args.names) == 1 and args.names[0] in seqs:
+        title, names = args.names[0], list(seqs[args.names[0]])
+    else:
+        title, names = "custom", list(args.names)
+    if not names:
+        print("Nothing to play.")
+        return 2
+    if not TRACK_TOLERANCE <= args.tolerance <= 100:
+        print(f"--tolerance must be {TRACK_TOLERANCE}..100 steps.")
+        return 2
+    if not 0 <= args.pause <= SEQ_MAX_PAUSE:
+        print(f"--pause must be 0..{SEQ_MAX_PAUSE:g} seconds.")
+        return 2
+    points = load_waypoints()
+    targets = []
+    for name in names:
+        target, err = waypoint_target(points, name)
+        if err:
+            print(err)
+            return 2
+        targets.append(target)
+    speed = min(args.speed, JOG_MAX_SPEED)
+    thresholds = {m: current_threshold_for(cfg, m) for m in MOTORS}
+
+    def go(hw, cfg):
+        readings = hw.snapshot()
+        missing = [m for m in MOTORS if m not in readings]
+        if missing:
+            print(f"Motors {missing} are not on the follower bus. Run ./cli.sh preflight.")
+            return 1
+        if not _require_torque(readings, MOTORS):
+            return 1
+        faulted = {m: f"0x{readings[m].status:02x}" for m in MOTORS if readings[m].faulted}
+        if faulted:
+            print(f"Motors report faults {faulted}. Not moving. Check power and ./cli.sh hw motors.")
+            return 1
+
+        # Plan every leg up front (clamped goals), so the one MOVE prompt covers the whole run.
+        try:
+            legs = plan_legs(readings, list(zip(names, targets)))
+        except ValueError as exc:
+            print(f"Refused: {exc}")
+            return 1
+
+        print(f"\nSequence '{title}': {len(legs)} waypoints, speed {speed}, "
+              f"pause {args.pause:g} s after the arm stops at each one.")
+        print(f"  {'#':>2} {'waypoint':<20} {'biggest move':>14}  notes")
+        any_large = False
+        for i, (name, goals, deltas, clamped) in enumerate(legs, 1):
+            big = max(MOTORS, key=lambda m: abs(deltas[m]))
+            large = [m for m in MOTORS if abs(deltas[m]) > GOTO_WARN_DELTA]
+            any_large = any_large or bool(large)
+            notes = []
+            if large:
+                notes.append(f"LARGE MOVE motors {large}")
+            if clamped:
+                notes.append(f"clamped motors {clamped}")
+            print(f"  {i:>2} {name:<20} {f'm{big} {deltas[big]:+d}':>14}  {', '.join(notes)}")
+        if any_large:
+            print(f"  Warning: some legs move a motor more than {GOTO_WARN_DELTA} steps. Watch the whole path.")
+
+        # Station teleop (leader -> follower) would overwrite our goals mid-sequence.
+        time.sleep(TELEOP_WATCH_S)
+        drifting = _goals_drifting(readings, hw.snapshot(), MOTORS)
+        if drifting:
+            print(f"Goal registers of motors {drifting} changed while nothing was sent from here.\n"
+                  "Teleop (leader -> follower) is probably on. Turn it off in the Station viewer\n"
+                  "(http://localhost:8889, follower bus card) and run play again.")
+            return 1
+
+        if not _confirm_motion(args.yes, "The arm will go through ALL waypoints above without asking again.\n"
+                                         "Check the path is clear. Ctrl-C or ./cli.sh hw stop halts it."):
+            print("Cancelled. Nothing moved.")
+            return 0
+
+        try:
+            result = run_legs(hw, legs, speed=speed, thresholds=thresholds, tolerance=args.tolerance,
+                              pause=args.pause, report=lambda msg: print(msg, flush=True), title=title)
+        except KeyboardInterrupt:
+            hw.hold(MOTORS)
+            print("\nInterrupted. Arm held where it is. ./cli.sh hw stop turns torque off.")
+            return 130
+        if not result["ok"]:
+            print(f"  Stopped at step {result['step']} '{result['stopped_at']}': {result['error']}. "
+                  "Arm held in place. Details: ./cli.sh logs")
+            return 1
+        print(f"Sequence '{title}' done.")
+        return 0
+    return _with_station(go)
+
+
 def cmd_workspace(args, cfg, state):
     ws = cfg["workspace"]
     print("Workspace (mm, relative to arm base), from config/elrobot.json:")
@@ -1013,6 +1194,20 @@ def build_parser():
     g.add_argument("--allow-large", action="store_true", help="accepted for old scripts; goto no longer has a step cap")
     g.add_argument("--yes", action="store_true")
 
+    rc = sub.add_parser("record", help="record a sequence: pose the arm, save each pose as a waypoint (moves nothing)")
+    rc.add_argument("sequence", help="sequence name, e.g. feed")
+    rc.add_argument("--yes", action="store_true", help="re-record an existing sequence without asking")
+    sub.add_parser("sequences", help="list recorded sequences")
+    pl = sub.add_parser("play", help="go through a sequence (or several waypoints) with ONE MOVE prompt")
+    pl.add_argument("names", nargs="+", help="a sequence name, or waypoint names in order")
+    pl.add_argument("--speed", type=int, default=GOTO_DEFAULT_SPEED)
+    pl.add_argument("--pause", type=float, default=SEQ_DEFAULT_PAUSE,
+                    help=f"seconds to wait at each waypoint after the arm has stopped (default {SEQ_DEFAULT_PAUSE})")
+    pl.add_argument("--tolerance", type=int, default=SEQ_NEAR_TOLERANCE,
+                    help=f"accept a motor that stopped within this many steps of the target "
+                         f"(default {SEQ_NEAR_TOLERANCE}; loaded joints sag 20-35 steps)")
+    pl.add_argument("--yes", action="store_true")
+
     dm = sub.add_parser("demo", help="move each follower motor out, back and together; report per motor")
     dm.add_argument("motors", nargs="*", type=int, help="subset of motors (default all 8)")
     dm.add_argument("--amplitude", type=int, default=DEMO_DEFAULT_AMPLITUDE,
@@ -1046,9 +1241,10 @@ COMMANDS = {
     "teach": cmd_teach, "waypoints": cmd_waypoints, "goto": cmd_goto,
     "workspace": cmd_workspace, "logs": cmd_logs, "bundle": cmd_bundle,
     "demo": cmd_demo, "leader": cmd_leader,
+    "record": cmd_record, "sequences": cmd_sequences, "play": cmd_play,
 }
 HARDWARE_COMMANDS = {"run", "next", "jog", "stop", "motors", "torque", "identify", "probe-current",
-                     "teach", "goto", "map", "demo", "leader"}
+                     "teach", "goto", "map", "demo", "leader", "record", "play"}
 
 
 def main(argv=None) -> int:

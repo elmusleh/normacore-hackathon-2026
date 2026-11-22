@@ -21,6 +21,7 @@ from elrobot_config import DEFAULTS  # noqa: E402
 _spec = importlib.util.spec_from_file_location("hw_day", ROOT / "scripts" / "hw_day.py")
 hw_day = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(hw_day)
+import sequence_player  # noqa: E402  (src/ is on sys.path once hw_day is loaded)
 
 
 class FakeTTY:
@@ -35,6 +36,7 @@ class FakeBus:
     moves = []
     peak = 50
     stall = False  # if True, the moved motor does not move (simulates a block)
+    sag = {}       # motor -> steps it stops short of the goal (gravity), reported as "near"
 
     def __init__(self, server, bus):
         self.server = server
@@ -51,13 +53,14 @@ class FakeBus:
     def move_and_watch(self, goals, **kwargs):
         FakeBus.moves.append((dict(goals), kwargs))
         status = {}
+        sag = FakeBus.sag
         for m, g in goals.items():
             r = FakeBus.readings[m]
             if not r.torque_on:
                 raise RuntimeError(f"motor {m} has torque OFF")
             if not FakeBus.stall:
-                FakeBus.readings[m] = replace(r, present=g, goal=g)
-            status[m] = "reached"
+                FakeBus.readings[m] = replace(r, present=g - sag.get(m, 0), goal=g)
+            status[m] = "near" if sag.get(m) else "reached"
         return status
 
     def move_motors(self, goals, **kwargs):  # not used by the tool directly
@@ -87,12 +90,14 @@ def _fresh_reading(m, present=2000):
 @pytest.fixture
 def env(monkeypatch):
     """Wire hw_day to an in-memory config, waypoints and state, and a fake bridge."""
-    store = {"cfg": copy.deepcopy(DEFAULTS), "waypoints": {}, "state": {"done": {}}}
+    store = {"cfg": copy.deepcopy(DEFAULTS), "waypoints": {}, "state": {"done": {}}, "sequences": {}}
 
     monkeypatch.setattr(hw_day, "load_config", lambda: copy.deepcopy(store["cfg"]))
     monkeypatch.setattr(hw_day, "save_config", lambda c: store.update(cfg=copy.deepcopy(c)))
     monkeypatch.setattr(hw_day, "load_waypoints", lambda: copy.deepcopy(store["waypoints"]))
     monkeypatch.setattr(hw_day, "save_waypoints", lambda w: store.update(waypoints=copy.deepcopy(w)))
+    monkeypatch.setattr(hw_day, "load_sequences", lambda: copy.deepcopy(store["sequences"]))
+    monkeypatch.setattr(hw_day, "save_sequences", lambda q: store.update(sequences=copy.deepcopy(q)))
     monkeypatch.setattr(hw_day, "load_state", lambda: copy.deepcopy(store["state"]))
     monkeypatch.setattr(hw_day, "save_state", lambda s: store.update(state=copy.deepcopy(s)))
     monkeypatch.setattr(hw_day, "ElRobotHardwareSync", FakeBus)
@@ -102,6 +107,7 @@ def env(monkeypatch):
     FakeBus.moves = []
     FakeBus.peak = 50
     FakeBus.stall = False
+    FakeBus.sag = {}
     return store
 
 
@@ -334,3 +340,134 @@ def test_leader_summary_flags_unmoved_joints(env, monkeypatch, capsys):
     assert _run("leader", "--seconds", "0.01", "--no-follower") == 1
     out = capsys.readouterr().out
     assert "Leader summary" in out and "move it end to end" in out
+
+
+# ------------------------------------------------------- record / play ----
+
+@pytest.fixture
+def no_sleep(monkeypatch):
+    """Sequences pause and watch for teleop; skip the real waiting in tests."""
+    sleeps = []
+    monkeypatch.setattr(hw_day.time, "sleep", lambda s: sleeps.append(s))
+    monkeypatch.setattr(sequence_player, "SETTLE_HOLD_S", 0.0)
+    return sleeps
+
+
+def _pose(value):
+    return {str(m): value for m in hw_day.MOTORS}
+
+
+def test_record_saves_each_pose_and_the_sequence(env, monkeypatch):
+    env["waypoints"]["clear"] = _pose(1900)
+    answers = iter(["clear", "u", "", "lift", "q"])
+
+    def answer(prompt=""):
+        a = next(answers)
+        if a == "lift":  # the arm was moved by hand before this step
+            for m in hw_day.MOTORS:
+                FakeBus.readings[m] = _fresh_reading(m, present=2100)
+        return a
+    monkeypatch.setattr("builtins.input", answer)
+    assert _run("record", "feed") == 0
+    assert env["sequences"]["feed"] == ["clear", "feed_2", "lift"]
+    assert env["waypoints"]["clear"] == _pose(1900)       # 'use' kept the saved pose
+    assert env["waypoints"]["feed_2"] == _pose(2000)
+    assert env["waypoints"]["lift"] == _pose(2100)
+    assert FakeBus.moves == []                            # recording never moves
+
+
+def test_play_asks_move_once_and_visits_every_waypoint(env, monkeypatch, capsys, no_sleep):
+    env["waypoints"].update(a=_pose(2100), b=_pose(2200), c=_pose(2300))
+    env["sequences"]["feed"] = ["a", "b", "c"]
+    prompts = []
+
+    def answer(prompt=""):
+        prompts.append(prompt)
+        return "MOVE"
+    monkeypatch.setattr("builtins.input", answer)
+    assert _run("play", "feed", "--pause", "1.5") == 0
+    assert len(prompts) == 1
+    assert [g for g, _ in FakeBus.moves] == [{m: v for m in hw_day.MOTORS} for v in (2100, 2200, 2300)]
+    assert no_sleep.count(1.5) == 2                       # pause between waypoints, not after the last
+    assert "Sequence 'feed' done." in capsys.readouterr().out
+
+
+def test_play_accepts_waypoint_names_directly(env, monkeypatch, no_sleep):
+    env["waypoints"].update(a=_pose(2100), b=_pose(2200))
+    _answers(monkeypatch, "MOVE")
+    assert _run("play", "b", "a", "--pause", "0") == 0
+    assert [g[1] for g, _ in FakeBus.moves] == [2200, 2100]
+
+
+def test_play_cancel_moves_nothing(env, monkeypatch, no_sleep):
+    env["waypoints"].update(a=_pose(2100))
+    _answers(monkeypatch, "no")
+    assert _run("play", "a") == 0
+    assert FakeBus.moves == []
+
+
+def test_play_refuses_unknown_waypoint_before_moving(env, capsys, no_sleep):
+    env["waypoints"]["a"] = _pose(2100)
+    env["sequences"]["feed"] = ["a", "ghost"]
+    assert _run("play", "feed") == 2
+    assert "No waypoint 'ghost'" in capsys.readouterr().out
+    assert FakeBus.moves == []
+
+
+def test_play_stops_when_a_leg_does_not_arrive(env, monkeypatch, capsys, no_sleep):
+    env["waypoints"].update(a=_pose(2100), b=_pose(2200))
+    FakeBus.stall = True
+    _answers(monkeypatch, "MOVE")
+    assert _run("play", "a", "b") == 1
+    assert len(FakeBus.moves) == 1                        # never started the second leg
+    assert "Stopped at step 1 'a'" in capsys.readouterr().out
+
+
+def test_play_waits_until_the_arm_has_stopped(env, monkeypatch, capsys, no_sleep):
+    """After move_and_watch says 'reached' the arm keeps creeping; play must wait it out."""
+    env["waypoints"]["a"] = _pose(2100)
+    creep = iter([8, 5, 3, 0, 0, 0])
+    calls = {"after_move": 0}
+    real_snapshot = FakeBus.snapshot
+
+    def snapshot(self):
+        if FakeBus.moves:
+            calls["after_move"] += 1
+            step = next(creep, 0)
+            for m in hw_day.MOTORS:
+                r = FakeBus.readings[m]
+                FakeBus.readings[m] = replace(r, present=r.present + step)
+        return real_snapshot(self)
+    monkeypatch.setattr(FakeBus, "snapshot", snapshot)
+    monkeypatch.setattr(sequence_player, "SETTLE_HOLD_S", 0.0)
+    _answers(monkeypatch, "MOVE")
+    assert _run("play", "a", "--pause", "0", "--tolerance", "12") == 1
+    # Polled through the 8, 5 and 3 step creeps and judged the target only once the arm was still,
+    # so it sees the full 16-step overshoot (a check right after 'reached' would have seen 0).
+    assert calls["after_move"] == 4
+    assert "-16" in capsys.readouterr().out
+
+
+def test_wait_settled_times_out_when_arm_keeps_moving(env, monkeypatch):
+    clock = iter(range(0, 1000))
+    monkeypatch.setattr(hw_day.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(hw_day.time, "sleep", lambda s: None)
+
+    class Wobbly:
+        n = 0
+
+        def snapshot(self):
+            Wobbly.n += 1
+            return {m: _fresh_reading(m, present=2000 + 10 * (Wobbly.n % 2)) for m in hw_day.MOTORS}
+    settled, _ = sequence_player.wait_settled(Wobbly(), hw_day.MOTORS, hold_s=0.5, timeout_s=5)
+    assert settled is False
+
+
+def test_play_continues_when_loaded_joints_stop_a_little_short(env, monkeypatch, capsys, no_sleep):
+    env["waypoints"].update(a=_pose(2100), b=_pose(2200))
+    FakeBus.sag = {3: 22, 4: 32}
+    _answers(monkeypatch, "MOVE")
+    assert _run("play", "a", "b", "--pause", "0") == 0
+    assert len(FakeBus.moves) == 2
+    assert FakeBus.moves[0][1]["near_tolerance"] == hw_day.SEQ_NEAR_TOLERANCE
+    assert "stopped short" in capsys.readouterr().out

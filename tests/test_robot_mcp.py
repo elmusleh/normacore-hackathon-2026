@@ -16,6 +16,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import elrobot_config  # noqa: E402
 from elrobot_hardware import ELROBOT_MOTOR_IDS, MotorReading  # noqa: E402
+import robot_tools  # noqa: E402
+import sequence_player  # noqa: E402
 from robot_tools import RobotTools  # noqa: E402
 
 SDK = ROOT / "external" / "norma-core"
@@ -76,6 +78,7 @@ class FakeArm:
 def env(tmp_path, monkeypatch):
     monkeypatch.setattr(elrobot_config, "CONFIG_FILE", tmp_path / "elrobot.json")
     monkeypatch.setattr(elrobot_config, "WAYPOINTS_FILE", tmp_path / "waypoints.json")
+    monkeypatch.setattr(elrobot_config, "SEQUENCES_FILE", tmp_path / "sequences.json")
     monkeypatch.setattr(elrobot_config, "CONFIG_DIR", tmp_path)
     monkeypatch.setenv("ELROBOT_ALLOW_MOTION", "1")
     arm = FakeArm()
@@ -247,6 +250,59 @@ def test_camera_named_by_usb_port(env):
     assert data is None and "not plugged in" in meta["error"]
 
 
+@needs_sdk
+def test_camera_named_by_list_of_ports_on_macos(tmp_path, monkeypatch):
+    """One name lists a Linux and a macOS port; on the Mac the macOS one matches."""
+    frame_entry, connect_entry = _envelopes()
+    monkeypatch.setattr(elrobot_config, "CONFIG_FILE", tmp_path / "elrobot.json")
+    (tmp_path / "elrobot.json").write_text(json.dumps({"cameras": {
+        "table": ["port:3-2.4", "port:2-1.2.2"], "gripper": ["port:3-2.2", "port:2-1.2.4"]}}))
+    arm = FakeArm()
+    mac_id = "0x21220002c7f4a60"
+    tools = RobotTools(lambda: arm, camera_queues=lambda: ["usbvideo/mac"],
+                       usb_ports_fn=lambda: {mac_id: "2-1.2.2"})
+    arm.first["usbvideo/mac"] = connect_entry(mac_id)
+    arm.frames["usbvideo/mac"] = [frame_entry(b"jpg")]
+    meta, data = tools.look("table")
+    assert data == b"jpg" and tools.list_cameras()["cameras"][0]["name"] == "table"
+    meta, data = tools.look("gripper")
+    assert data is None and "port:2-1.2.4" in meta["error"]
+
+
+def test_mac_port_from_unique_id():
+    from elrobot_camera import mac_port, port_of
+    assert mac_port("0x21240002c7f4a60") == "2-1.2.4"
+    assert mac_port("0x21300003564fefe") == "2-1.3"
+    assert mac_port("47B4B64B-7067-4B9C-AD2B-AE273A71F4B5") is None  # built-in FaceTime camera
+    assert mac_port("11391:19040:3:26") is None  # Linux id
+    assert port_of("0x21240002c7f4a60", {"0x21240002c7f4a60": "2-1.2.4"}) == "2-1.2.4"
+    assert port_of("11391:19040:3:26", {(3, 26): "3-2.4"}) == "3-2.4"  # Linux unchanged
+
+
+def test_mac_usb_ports_lists_plugged_cameras_and_caches(monkeypatch):
+    import elrobot_camera
+    monkeypatch.setattr(elrobot_camera, "_mac_cache", {"at": 0.0, "ports": {}})
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        out = json.dumps({"SPCameraDataType": [
+            {"_name": "KD-USB Cameras", "spcamera_unique-id": "0x21240002c7f4a60"},
+            {"_name": "FaceTime HD Camera", "spcamera_unique-id": "47B4B64B-7067-4B9C-AD2B-AE273A71F4B5"}]})
+        return type("Done", (), {"stdout": out})()
+
+    assert elrobot_camera.mac_usb_ports(now=100.0, run=fake_run) == {"0x21240002c7f4a60": "2-1.2.4"}
+    elrobot_camera.mac_usb_ports(now=101.0, run=fake_run)  # within the cache window
+    assert len(calls) == 1
+    elrobot_camera.mac_usb_ports(now=103.0, run=fake_run)
+    assert len(calls) == 2
+
+
+def test_camera_targets_accepts_string_or_list():
+    assert elrobot_config.camera_targets({"cameras": {"a": "port:1-1", "b": ["port:2-2", "usbvideo/x"]}}) == {
+        "a": ["port:1-1"], "b": ["port:2-2", "usbvideo/x"]}
+
+
 def test_server_registers_tools():
     pytest.importorskip("mcp")
     import robot_mcp_server
@@ -263,3 +319,80 @@ def test_camera_discovery_finds_station_id_layout(tmp_path, monkeypatch):
     (tmp_path / "73c0ff" / "usbvideo" / "aa11" / "wal").mkdir(parents=True)
     (tmp_path / "73c0ff" / "st3215" / "inference" / "wal").mkdir(parents=True)
     assert discover_camera_queues(tmp_path) == ["usbvideo/aa11"]
+
+
+# ------------------------------------------------ recorded plans (play_sequence) ----
+
+@pytest.fixture
+def plans(env, monkeypatch):
+    """Two recorded plans and a food config; no real waiting."""
+    tools, arm, tmp = env
+    monkeypatch.setattr(robot_tools, "TELEOP_WATCH_S", 0)
+    monkeypatch.setattr(sequence_player, "SETTLE_HOLD_S", 0.0)
+    monkeypatch.setattr(sequence_player.time, "sleep", lambda s: None)
+    save_points(tmp, {"start": pose(2000), "grape": pose(2100, gripper=2500), "mouth": pose(2200, gripper=1500),
+                      "choc": pose(1900)})
+    (tmp / "sequences.json").write_text(json.dumps({"grapes": ["start", "grape", "mouth", "start"],
+                                                    "choc": ["start", "choc", "gone", "start"]}))
+    (tmp / "elrobot.json").write_text(json.dumps({"foods": {"grapes": {"sequence": "grapes"},
+                                                            "chocolate": {"sequence": "choc"}}}))
+    return tools, arm, tmp
+
+
+def test_list_sequences_maps_foods_to_plans(plans):
+    tools, arm, tmp = plans
+    res = tools.list_sequences()
+    assert res["foods"]["grapes"] == {"sequence": "grapes", "note": "", "ready": True}
+    assert res["foods"]["chocolate"]["ready"] is False                # plan uses an untaught waypoint
+    assert res["sequences"]["choc"]["missing_waypoints"] == ["gone"]
+    assert arm.moves == []
+
+
+def test_play_sequence_runs_every_step_in_order(plans):
+    tools, arm, tmp = plans
+    res = tools.play_sequence("grapes")
+    assert res["ok"] and res["done"] == ["start", "grape", "mouth", "start"]
+    assert [g[1] for g in arm.moves] == [2000, 2100, 2200, 2000]
+    assert [g[8] for g in arm.moves] == [2000, 2500, 1500, 2000]       # the gripper is part of each pose
+
+
+def test_play_sequence_dry_run_moves_nothing(plans, monkeypatch):
+    tools, arm, tmp = plans
+    monkeypatch.setenv("ELROBOT_ALLOW_MOTION", "0")
+    res = tools.play_sequence("grapes")
+    assert res["dry_run"] and res["steps"] == ["start", "grape", "mouth", "start"]
+    assert arm.moves == []
+
+
+def test_play_sequence_refuses_unknown_or_incomplete_plan(plans):
+    tools, arm, tmp = plans
+    assert "no recorded plan" in tools.play_sequence("pizza")["error"]
+    assert "No waypoint 'gone'" in tools.play_sequence("choc")["error"]
+    assert arm.moves == []
+
+
+def test_play_sequence_stops_and_holds_when_a_step_fails(plans):
+    tools, arm, tmp = plans
+    arm.stall_at = {3: 1950}                                           # motor 3 blocked (overload)
+    res = tools.play_sequence("grapes")
+    assert not res["ok"] and res["stopped_at"] == "start" and res["done"] == []
+    assert len(arm.moves) == 1 and arm.held                            # never went on to 'grape'
+    assert "holding" in res["hint"]
+
+
+def test_stop_interrupts_a_running_plan_without_waiting_for_the_lock(plans):
+    tools, arm, tmp = plans
+    real = arm.move_and_watch
+
+    def move_and_watch(goals, **kw):
+        status = real(goals, **kw)
+        if len(arm.moves) == 2:
+            # The person says stop while the arm is on its way to 'grape'. The tool lock is held by
+            # play_sequence, so this only works because stop_now() does not take it.
+            assert tools._lock.locked()
+            assert tools.stop_now()["ok"]
+        return status
+    arm.move_and_watch = move_and_watch
+    res = tools.call(tools.play_sequence, "grapes")
+    assert not res["ok"] and "stopped by request" in res["error"]
+    assert len(arm.moves) == 2

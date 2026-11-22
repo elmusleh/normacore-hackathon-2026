@@ -70,7 +70,7 @@ Camera numbers (`/dev/video0`, `/dev/video2`, ...) change after replugging. Do n
 
 Always pass `--bus` explicitly when two serial adapters are plugged in. `--bus auto` works only with exactly one.
 
-Record which serial number is which arm in `HANDOFF.md` once it is confirmed. As of 2026-11-21 the two adapters were `5B61034962` and `5B61037051`. Their arm assignment was not yet confirmed.
+Record which serial number is which arm in `HANDOFF.md` once it is confirmed. Confirmed 2026-11-21: follower `5B61034962`, leader `5B61037051` (`config/elrobot.json` `station.bus` / `station.leader_bus`).
 
 ## 8. Common problems
 

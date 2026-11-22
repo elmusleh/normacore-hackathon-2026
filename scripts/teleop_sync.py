@@ -78,7 +78,6 @@ async def identify_arms(client: Any) -> tuple[str, str]:
 
     if cfg_leader in serials and cfg_follower in serials:
         return cfg_leader, cfg_follower
-
     # Return first as leader, second as follower if unknown
     return serials[0], serials[1]
 

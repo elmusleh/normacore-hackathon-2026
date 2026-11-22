@@ -3,6 +3,7 @@
   config/elrobot.json     robot facts you decide once and commit: joint map, current
                           thresholds, workspace limits. Edit by hand or with ./cli.sh hw.
   config/waypoints.json   named joint poses taught on the arm (./cli.sh hw teach).
+  config/sequences.json   named lists of waypoints played in order (./cli.sh hw record / play).
   data/hw_day_state.json  checklist progress for this machine. Local, gitignored.
 
 The workspace defaults equal the values the code used before this file existed,
@@ -23,6 +24,7 @@ CONFIG_DIR = Path(os.environ.get("ELROBOT_CONFIG_DIR", ROOT / "config"))
 DATA_DIR = Path(os.environ.get("ELROBOT_DATA_DIR", ROOT / "data"))
 CONFIG_FILE = CONFIG_DIR / "elrobot.json"
 WAYPOINTS_FILE = CONFIG_DIR / "waypoints.json"
+SEQUENCES_FILE = CONFIG_DIR / "sequences.json"
 STATE_FILE = DATA_DIR / "hw_day_state.json"
 
 # Current threshold in raw ST3215 current units. 100 is the NormaCore teleop
@@ -40,7 +42,8 @@ DEFAULTS: Dict[str, Any] = {
     # Gripper (motor 8). open_at: which end of the calibrated range is OPEN ("max" or "min").
     # Not checked on the arm yet: run ./cli.sh hw identify and set verified to true.
     "gripper": {"motor": 8, "open_at": "max", "verified": False, "squeeze_steps": 10},
-    # Friendly camera names for the MCP server, e.g. {"table": "usbvideo/<hash>"}.
+    # Friendly camera names for the MCP server, e.g. {"table": "usbvideo/<hash>"} or "port:3-2.4".
+    # A value may be a list, to name the same camera on several laptops (Linux and macOS ports).
     "cameras": {},
     # Fixed exposure per named camera, applied by ./cli.sh cameras (auto exposure washes out under the Station).
     "camera_settings": {},
@@ -50,7 +53,15 @@ DEFAULTS: Dict[str, Any] = {
         "max_waypoint_delta_steps": 1500,
         "max_nudge_percent": 5.0,
         "clear_waypoint": "clear",
+        # play_sequence (recorded plans, config/sequences.json): speed, pause at each waypoint (s),
+        # and how far short of a waypoint a stopped motor may be (loaded joints sag 20-45 steps).
+        "sequence_speed": 300,
+        "sequence_pause_s": 1.5,
+        "sequence_tolerance_steps": 60,
     },
+    # What Claude can serve: food name -> {"sequence": <name in config/sequences.json>, "note": ...}.
+    # Claude picks the plan from the person's request ("I want grapes" -> the grapes sequence).
+    "foods": {},
     "workspace": {
         # Measured on the real table with a tape measure. Relative to the arm base, in mm.
         "x_min_mm": -180.0,
@@ -75,6 +86,15 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
             out[key] = _deep_merge(out[key], value)
         else:
             out[key] = value
+    return out
+
+
+def camera_targets(cfg: Dict[str, Any]) -> Dict[str, List[str]]:
+    """config `cameras` as name -> list of targets. A value may be one target or a list, so one
+    name can cover several machines (e.g. a Linux port and a macOS port)."""
+    out: Dict[str, List[str]] = {}
+    for name, value in cfg.get("cameras", {}).items():
+        out[name] = [value] if isinstance(value, str) else [str(v) for v in value]
     return out
 
 
@@ -111,6 +131,23 @@ def save_waypoints(points: Dict[str, Dict[str, int]]) -> None:
     tmp = WAYPOINTS_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(points, indent=2, sort_keys=True) + "\n")
     tmp.replace(WAYPOINTS_FILE)
+
+
+def load_sequences() -> Dict[str, List[str]]:
+    if not SEQUENCES_FILE.exists():
+        return {}
+    try:
+        return json.loads(SEQUENCES_FILE.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        log.error("config/sequences.json is unreadable (%s); no sequences loaded.", exc)
+        return {}
+
+
+def save_sequences(seqs: Dict[str, List[str]]) -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = SEQUENCES_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(seqs, indent=2, sort_keys=True) + "\n")
+    tmp.replace(SEQUENCES_FILE)
 
 
 def load_state() -> Dict[str, Any]:

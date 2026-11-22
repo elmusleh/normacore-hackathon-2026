@@ -183,16 +183,16 @@ class CameraHub:
             cfg_cams = load_config().get("cameras", {})
 
             def _resolve_cfg(role: str) -> Optional[str]:
-                val = cfg_cams.get(role, "")
-                if not val:
-                    return None
-                if val in valid_ids:
-                    return val
-                if val.startswith("port:"):
-                    want_port = val[len("port:"):]
-                    for c in found:
-                        if c.get("port") == want_port:
-                            return c["id"]
+                raw_val = cfg_cams.get(role, "")
+                vals = raw_val if isinstance(raw_val, list) else ([raw_val] if raw_val else [])
+                for val in vals:
+                    if val in valid_ids:
+                        return val
+                    if isinstance(val, str) and val.startswith("port:"):
+                        want_port = val[len("port:"):]
+                        for c in found:
+                            if c.get("port") == want_port:
+                                return c["id"]
                 return None
 
             # Auto-assign from config or fallback to first real cameras

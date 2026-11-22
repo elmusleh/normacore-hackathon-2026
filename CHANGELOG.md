@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `config/elrobot.json`: `table` and `gripper` camera names swapped (table = port 3-5.2.2, gripper = port 3-5.2.4). The old mapping showed the gripper view as `table`; confirmed by the user 2026-11-21.
+- `.mcp.json`: `ELROBOT_ALLOW_MOTION` set to `"1"`, so Claude's MCP tools move the real arm (was dry-run).
+
+### Fixed
+- Leader/follower serial roles were swapped in `scripts/teleop_sync.py` (it drove the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` and `docs/team_setup.md`. Confirmed on the arm 2026-11-21: follower `5B61034962`, leader `5B61037051`.
+
 ### Added
 - Improved tabletop bowl & food-piece stability (`src/feeding_vision.py`): added specular-glare rejection, thin-sliver circularity/aspect filtering, distance-transform peak splitting for touching grapes, and EMA temporal smoothing on the bowl bounding box.
 - Upgraded Table Cam detection (`src/feeding_vision.py`, `src/digital_twin_server.py`) with a tabletop colored-bowl + LAB chroma-contrast food-piece detector combined with MediaPipe `ObjectDetector`: locks reliably onto overhead colored bowls and highlights every grape/chocolate piece inside while ignoring ceramic glare.
@@ -27,8 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Confirmed hardware config in `config/elrobot.json` (follower bus `5B61034962`, `table` = `port:3-1.2.2`, `gripper` = `port:3-1.2.4`, `person` = `v4l2:6`) and config-backed default camera selection in `CameraHub` (`src/digital_twin_server.py`).
 - Dual live camera discovery and dropdown selection (`Table Cam` + `Person Cam`) in Mission Control (`src/digital_twin_server.py`, `src/digital_twin.html`): automatically discovers both NormaCore Station `usbvideo/*` queues and local `/dev/video*` V4L2 cameras, renders side-by-side annotated feeds with `FeedingVisionDetector` overlays, and streams live detection changes to the event log.
 - Explicit policy for AI agents to commit after each implementation and proactively prompt developers to push branches to remote (`AGENTS.md`, `GUIDELINES.md`).
-
-### Added
+- MCP tools `list_sequences` and `play_sequence(name)`: Claude maps a food request ("I want grapes") to a recorded plan via the `foods` config and runs it in one call. `stop` now skips the tool lock and interrupts a running plan. MCP instructions and the console prompt say recorded plans come first.
+- Waypoint sequences: `./cli.sh hw record <seq>` (interactive, moves nothing, saves each pose as a waypoint and the order to `config/sequences.json`), `./cli.sh hw play <seq|wp...>` (plans every leg, one `MOVE` prompt, waits until the arm stops at each waypoint, `--pause`, `--tolerance`) and `./cli.sh hw sequences`. Shared player logic in `src/sequence_player.py`; `load_sequences`/`save_sequences` in `src/elrobot_config.py`.
+- `move_and_watch(near_tolerance=..., stall_s=0.8)` in `src/elrobot_hardware.py`: a motor that has stopped within `near_tolerance` of its goal without overload is reported as `near` instead of waiting for the timeout (loaded joints sag 20-35 steps under gravity).
 - Camera-guided assistive feeding pipeline (`src/feeding_vision.py`, `scripts/camera_feed_arm.py`, and `./cli.sh feed [grapes|spoon]`): uses the overhead tabletop camera (`/dev/video4` with automatic Station/mock fallback) to detect the grape bowl, spoon holder, and person's mouth, and plans/executes safe slave arm motions stopping at a 5–10 cm facial standoff.
 - Mission Control Web Dashboard (`src/digital_twin.html` & `src/digital_twin_server.py`) integration for one-click `Feed Grapes (Bowl -> Mouth)` and `Feed with Spoon (Scoop -> Mouth)` actions with live annotated camera overlays.
 - Unit tests for `FeedingVisionDetector` and `run_camera_feeding_cycle` in `tests/test_pipeline.py`.

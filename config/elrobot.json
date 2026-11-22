@@ -14,8 +14,8 @@
     "squeeze_steps": 10
   },
   "cameras": {
-    "table": "port:3-1.1",
-    "gripper": "port:3-1.2.4",
+    "table": ["port:3-1.1", "port:3-5.2.2", "port:2-1.2.2"],
+    "gripper": ["port:3-1.2.4", "port:3-5.2.4", "port:2-1.2.4"],
     "person": "v4l2:2"
   },
   "camera_settings": {
@@ -42,5 +42,15 @@
     "z_hover_mm": 45.0,
     "z_grasp_mm": 14.0,
     "measured": false
+  },
+  "foods": {
+    "grapes": {
+      "sequence": "grapes",
+      "note": "picks one grape from the bowl and brings it to the person's mouth, then returns"
+    },
+    "chocolate": {
+      "sequence": "choc",
+      "note": "picks one piece of chocolate and brings it to the person's mouth, then returns"
+    }
   }
 }
