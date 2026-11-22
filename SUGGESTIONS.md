@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Embed real bench photos and a 3-camera console screenshot into the pitch deck — Priority 86% (High value) [Professionalism]
+   What: Add live screenshots of `http://localhost:8890` (showing the annotated `Table`, `Gripper`, and `OBSBOT` feeds with `Mouth: OPEN ✓`) and a photo of the ElRobot arm to Slides 5 and 7 of `docs/Assistive_Feeding_Robot_Pitch.pptx`.
+   Why: Real hardware visuals give judges immediate proof that the physical arm, 3-camera vision overlays, and multi-tab console are running live rather than mocked.
+   How: Capture a browser screenshot and bench photo into `docs/assets/`, then add `slide.shapes.add_picture(...)` calls in `scripts/generate_pitch_deck.py` and re-run `python3 scripts/generate_pitch_deck.py`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: No bench photos or live console screenshots were stored in the repository yet during this offline deck generation pass.
+
+2. Record a 45-second backup demo video of a full grape + mouth-open feeding cycle — Priority 84% (High value) [Best practices]
+   What: Capture a screen + bench video showing voice request -> grape pick -> standoff pause -> mouth open -> delivery -> voice `"Stop!"` and link/embed it as a fallback slide.
+   Why: Live robotics demos on hackathon stages can face Wi-Fi drops or lighting changes; a recorded backup ensures your 3-minute pitch finishes strongly no matter what happens on stage.
+   How: Record one clean run on the bench with OBS or a phone, save it locally (outside git), and keep it open in a media player behind the slide deck during the pitch.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Requires a live bench session with the powered arm and hardware owner present.
+
+3. Export a presenter-ready PDF copy alongside the PPTX before walking on stage — Priority 58% (Nice to have) [Best practices]
+   What: Export `docs/Assistive_Feeding_Robot_Pitch.pdf` using LibreOffice (`soffice --headless --convert-to pdf`) so the deck renders identically on any stage laptop even if fonts or PowerPoint differ.
+   Why: Eliminates last-minute font substitution or slide-layout shifts when plugging into an unfamiliar hackathon presentation machine.
+   How: Run `soffice --headless --convert-to pdf docs/Assistive_Feeding_Robot_Pitch.pptx --outdir docs/` right after any final team-name or photo edits.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Kept the repository focused on the editable `.pptx` and its Python generator until any final team customizations are added.
+
 1. Complete Stage 1B + 2B bench calibration on the real arm (`gripper.verified`, `grape_open`, `grasp_alignment`) — Priority 92% (Critical) [Best practices]
    What: Run `./cli.sh hw identify 8` and `./cli.sh hw identify 1`, re-teach an open-jaw `grape_open` waypoint, and record `grasp_alignment.camera_sign` in `config/elrobot.json`.
    Why: Activates Stage 1–2 closed-loop alignment and empty-grasp rejection on the physical follower arm without guessing motor IDs or directions.

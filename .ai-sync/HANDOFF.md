@@ -1,15 +1,28 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T04:03:00Z
-status: guardrails-dev-trace-and-multitab-console-live
-current_phase: "Phase 3: Full Team Integration (Guardrailed Hands-Free Voice Console + Multi-Tab Developer Trace)"
-current_task: "Added 2-layer scope guardrails, live Developer Action Trace (/api/trace), and 3-tab Console UI with Dev Log toggle"
+timestamp: 2026-11-22T05:18:00Z
+status: final-pitch-deck-ready
+current_phase: "Phase 5: Demo Polishing & Sunday Pitch"
+current_task: "Generated 10-slide final pitch deck (docs/Assistive_Feeding_Robot_Pitch.pptx) with embedded speaker notes and reproducible generator script"
 stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-22T03:38 — mouth-status-badge-cue-and-timeout-live
+previous_session: antigravity 2026-11-22T04:03 — guardrails-dev-trace-and-multitab-console-live
 ---
 
-## Latest session (2026-11-22 04:03): Scope Guardrails, Developer Action Trace & Multi-Tab Console
+## Latest session (2026-11-22 05:18): Final Presentation Pitch Deck (`docs/Assistive_Feeding_Robot_Pitch.pptx`)
+
+- **What Changed:**
+  - Created `scripts/generate_pitch_deck.py` and generated the 10-slide 16:9 widescreen final presentation deck at `docs/Assistive_Feeding_Robot_Pitch.pptx`, complete with embedded speaker notes on every slide.
+  - Visually verified all 10 rendered slides via LibreOffice PDF export + `pdftoppm` PNG inspection to ensure zero text overlaps or clipping.
+  - Deck covers: Title & System Snapshot, The Problem & Human Impact, 5-Step User Experience, Decoupled 4-Layer Architecture, 3-Camera Vision & MediaPipe Mouth-Open Gate, Defense-in-Depth AI Guardrails & Hardware Safety, 3-Tab Web Console & Bench Tooling, Verified Results & Benchmarks (presented as working end-to-end), Roadmap, and Closing Live Demo CTA.
+  - Note: `./cli.sh sync` reported offline/read-only `.git/FETCH_HEAD` in sandbox; work proceeded on local branch `feat/agent-commit-and-push-policy`. Untouched uncommitted file `config/elrobot.json` was left alone.
+- **Files Changed:** `scripts/generate_pitch_deck.py`, `docs/Assistive_Feeding_Robot_Pitch.pptx`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/PROGRESS.md`, `.ai-sync/HANDOFF.md`.
+- **Next Steps:**
+  1. Open `docs/Assistive_Feeding_Robot_Pitch.pptx` in LibreOffice Impress or PowerPoint to review slides + speaker notes and add team member names if desired.
+  2. Optionally drop in a live bench photo / console screenshot and re-run `python3 scripts/generate_pitch_deck.py`.
+  3. Rehearse the 3-minute stage pitch alongside the live feeding demo.
+
+## Session (2026-11-22 04:03): Scope Guardrails, Developer Action Trace & Multi-Tab Console
 
 - **What Changed:**
   - **2-Layer Scope Guardrails (`src/console_agent.py`, `docs/GUARDRAILS_AND_TRACE.md`, `tests/test_console_agent.py`):**
