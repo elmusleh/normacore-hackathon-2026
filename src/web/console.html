@@ -348,19 +348,18 @@ poll();
 async function send(text) {
   text = text.trim();
   if (!text) return;
-  // Emergency stop always goes through immediately
-  if (STOP_RE.test(text)) {
-    await fetch("/api/stop", { method: "POST" });
-    return;
-  }
-  // Enforce starting with "Robo" when wakeword gate is enabled
+  // Strictly enforce starting with "Robo" for all commands when wakeword gate is enabled
   if ($("wakeword")?.checked) {
     const m = text.match(WAKE_RE);
     if (!m || !(m[2] || "").trim()) {
-      setStatus('Ignored — start with "Robo" (e.g. "Robo, I want grapes")', true);
+      setStatus('Ignored — start with "Robo" (e.g. "Robo, I want grapes" or "Robo, stop")', true);
       return;
     }
     text = m[2].trim();
+  }
+  if (STOP_RE.test(text)) {
+    await fetch("/api/stop", { method: "POST" });
+    return;
   }
   agentBusy = true;
   if (hfActive) setHfState("busy", "Waiting for robot reply…");
@@ -557,25 +556,23 @@ async function handleHandsFreeTranscript(rawText) {
   const text = (rawText || "").trim();
   if (!text) return;
 
-  // 1. Emergency stop ALWAYS bypasses wake word immediately
-  if (STOP_RE.test(text)) {
-    setHfState("busy", "STOP heard — halting arm!");
-    await fetch("/api/stop", { method: "POST" });
-    await speakText("Stopped, holding still.");
-    return;
-  }
-
   const requireWake = $("wakeword")?.checked;
   const m = text.match(WAKE_RE);
 
   if (requireWake) {
     if (!m) {
-      setHfState("standby", `Ignored: "${text}" — start with "Robo"`);
+      setHfState("standby", `Ignored: "${text}" — must start with "Robo"`);
       return;
     }
     const cmd = (m[2] || "").trim();
     if (!cmd) {
       setHfState("standby", 'Heard "Robo" — say your full command (e.g. "Robo, I want grapes")');
+      return;
+    }
+    if (STOP_RE.test(cmd)) {
+      setHfState("busy", "Robo STOP heard — halting arm!");
+      await fetch("/api/stop", { method: "POST" });
+      await speakText("Stopped, holding still.");
       return;
     }
     setHfState("busy", `Sending: "${cmd}"`);
@@ -584,6 +581,12 @@ async function handleHandsFreeTranscript(rawText) {
   }
 
   // Wake word unchecked: send directly
+  if (STOP_RE.test(text)) {
+    setHfState("busy", "STOP heard — halting arm!");
+    await fetch("/api/stop", { method: "POST" });
+    await speakText("Stopped, holding still.");
+    return;
+  }
   setHfState("busy", `Sending: "${text}"`);
   await send(text);
 }
