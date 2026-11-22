@@ -228,7 +228,7 @@ class CameraHub:
             if cap is not None and cap.isOpened():
                 return True
             try:
-                cap = cv2.VideoCapture(idx)
+                cap = cv2.VideoCapture(f"/dev/video{idx}", cv2.CAP_V4L2)
                 if not cap.isOpened():
                     cap.release()
                     return False
@@ -301,7 +301,7 @@ class CameraHub:
             with lock:
                 cap = self._v4l2_caps.get(idx)
                 if cap is None or not cap.isOpened():
-                    cap = cv2.VideoCapture(idx)
+                    cap = cv2.VideoCapture(f"/dev/video{idx}", cv2.CAP_V4L2)
                     if cap.isOpened():
                         self._configure_v4l2_hd(cap)
                     self._v4l2_caps[idx] = cap
