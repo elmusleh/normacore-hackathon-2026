@@ -7,3 +7,4 @@
 - **Python Version:** Python 3.10+ (specifically compatible with NumPy 1.26.x and Pillow).
 - **Communication Style:** Clear, structured GitHub Markdown with clickable file links (`file://`).
 - **Testing:** Offline mock simulation first, hardware validation second. Always test with `pytest tests/test_pipeline.py`.
+- **Arm work pace (Jafer, 2026-11-22):** decide and move fast. No dry runs unless a move is refused, one look before and one after, travel at 60-70 mm/s, chain move + gripper in one command (`--open-after` / `--close-after`).

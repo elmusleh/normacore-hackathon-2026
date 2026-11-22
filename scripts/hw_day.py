@@ -47,6 +47,15 @@ from elrobot_hardware import (  # noqa: E402
     clamp_goal,
     plan_goto,
 )
+from action_space import (  # noqa: E402
+    DEFAULT_SPACING_STEPS,
+    SPACE_MOTORS,
+    ActionSpace,
+    Recorder,
+    envelope_file,
+    load_action_space,
+    save_action_space,
+)
 from elrobot_log import LOG_DIR, setup_logging  # noqa: E402
 from sequence_player import (  # noqa: E402
     SEQ_DEFAULT_PAUSE,
@@ -628,6 +637,108 @@ def cmd_record(args, cfg, state):
             return 0
         print(f"\nSaved sequence '{seq}': {' -> '.join(steps)}")
         print(f"Play it with: ./cli.sh hw play {seq}")
+        return 0
+    return _with_station(go)
+
+
+def _print_action_space(space) -> None:
+    print(f"Action space: {len(space.poses)} poses, updated {space.meta.get('updated', '?')} "
+          f"({envelope_file().name})")
+    for m, (lo, hi) in space.seen_range().items():
+        print(f"  motor {m}: recorded {lo}..{hi}  ({hi - lo} steps)")
+    if space.anchors:
+        print("  anchors: " + ", ".join(sorted(space.anchors)))
+
+
+def _stdin_lines(out) -> None:
+    for line in sys.stdin:
+        out.put(line.strip())
+    out.put("q")
+
+
+def cmd_envelope(args, cfg, state):
+    """Show, or record, the action space: poses a human drives the follower through with the leader."""
+    existing = load_action_space()
+    if args.action == "show":
+        if existing is None or existing.empty:
+            print("No action space recorded. Record one: teleop on, then ./cli.sh hw envelope record")
+            return 0
+        _print_action_space(existing)
+        return 0
+    if not sys.stdin.isatty():
+        print("envelope record is interactive; run it in a terminal.")
+        return 2
+    if existing is not None and not existing.empty and not args.append and not args.yes:
+        print(f"An action space with {len(existing.poses)} poses exists. Use --append to add to it.")
+        if input("Replace it with a new recording? [y/N] ").strip().lower() != "y":
+            print("Kept the old action space.")
+            return 0
+
+    import queue  # noqa: WPS433
+    import threading  # noqa: WPS433
+
+    def go(hw, cfg):
+        space = existing if (args.append and existing is not None) else ActionSpace([], meta={"bus": _station(cfg)[1]})
+        rec = Recorder(space, spacing=args.spacing)
+        lines: "queue.Queue[str]" = queue.Queue()
+        threading.Thread(target=_stdin_lines, args=(lines,), daemon=True).start()
+        print("\nRecording the action space. This only READS the follower; it sends nothing.")
+        print("Teleop must be ON (Station viewer: follower card -> leader serial) so the follower")
+        print("mirrors the leader. Drive the leader slowly through every place the arm may go:")
+        print("  - above the table (never touching it), over each food, lifted, turned to the person,")
+        print("  - toward the face only up to the closest SAFE point (about 10 cm).")
+        print("Type a name + Enter to mark the current pose as an anchor (e.g. above_grape, lifted,")
+        print("face_standoff). Type q + Enter (or Ctrl-C) to finish. Saved every few seconds.\n")
+        deadline = time.monotonic() + args.seconds if args.seconds else None
+        last_save = last_status = time.monotonic()
+        saved_count = len(space.poses)
+        try:
+            while deadline is None or time.monotonic() < deadline:
+                readings = hw.snapshot()
+                pose = {m: readings[m].present for m in MOTORS if m in readings}
+                # A read glitch (e.g. motor 2 reading 0 once on 2026-11-21) must not enter the space.
+                glitch = [m for m in SPACE_MOTORS if m in readings and readings[m].calibrated
+                          and not readings[m].range_min - 50 <= pose[m] <= readings[m].range_max + 50]
+                if glitch:
+                    log.warning("envelope: skipped a sample, motors %s outside their calibrated range: %s",
+                                glitch, pose)
+                elif all(m in pose for m in SPACE_MOTORS):
+                    rec.add(pose)
+                done = False
+                while not lines.empty():
+                    name = lines.get()
+                    if name.lower() == "q":
+                        done = True
+                        break
+                    if not name:
+                        continue
+                    if not WAYPOINT_NAME.match(name):
+                        print("  Anchor names: lowercase letters, digits, - or _, up to 40 characters.")
+                    elif len(pose) != len(MOTORS):
+                        print(f"  Cannot read all motors ({sorted(pose)}); anchor not saved.")
+                    else:
+                        rec.anchor(name, pose)
+                        print(f"  anchor '{name}': " + ", ".join(f"{m}={pose[m]}" for m in MOTORS))
+                if done:
+                    break
+                now = time.monotonic()
+                if now - last_save >= 3 and len(space.poses) != saved_count:
+                    save_action_space(space)
+                    saved_count, last_save = len(space.poses), now
+                if now - last_status >= 5:
+                    print(f"  ... {len(space.poses)} poses ({rec.added} new), {len(space.anchors)} anchors")
+                    last_status = now
+                time.sleep(args.interval)
+        except KeyboardInterrupt:
+            pass
+        save_action_space(space)
+        log.info("action space saved: %d poses (%d new), anchors %s", len(space.poses), rec.added,
+                 sorted(space.anchors))
+        print()
+        _print_action_space(space)
+        if rec.added < 20:
+            print("Few poses were recorded. Was teleop on and did the follower move?")
+        print("Commit config/envelope.json (calibration commit) once it is good.")
         return 0
     return _with_station(go)
 
@@ -1227,6 +1338,15 @@ def build_parser():
                     help="flag joints moved through less than this %% of their range")
     ld.add_argument("--no-follower", action="store_true", help="show the leader only")
 
+    ev = sub.add_parser("envelope", help="show or record the action space (follower poses driven with the leader)")
+    ev.add_argument("action", nargs="?", choices=("show", "record"), default="show")
+    ev.add_argument("--append", action="store_true", help="add to the recorded space instead of replacing it")
+    ev.add_argument("--seconds", type=float, default=0, help="stop after N seconds (default: until q / Ctrl-C)")
+    ev.add_argument("--interval", type=float, default=0.1, help="seconds between samples")
+    ev.add_argument("--spacing", type=int, default=DEFAULT_SPACING_STEPS,
+                    help="keep a pose only if a motor moved at least this many steps since the last kept one")
+    ev.add_argument("--yes", action="store_true", help="replace an existing space without asking")
+
     sub.add_parser("workspace", help="show workspace limits and whether they were measured")
     lg = sub.add_parser("logs", help="last lines of the latest hardware log")
     lg.add_argument("--lines", type=int, default=60)
@@ -1241,10 +1361,10 @@ COMMANDS = {
     "teach": cmd_teach, "waypoints": cmd_waypoints, "goto": cmd_goto,
     "workspace": cmd_workspace, "logs": cmd_logs, "bundle": cmd_bundle,
     "demo": cmd_demo, "leader": cmd_leader,
-    "record": cmd_record, "sequences": cmd_sequences, "play": cmd_play,
+    "record": cmd_record, "sequences": cmd_sequences, "play": cmd_play, "envelope": cmd_envelope,
 }
 HARDWARE_COMMANDS = {"run", "next", "jog", "stop", "motors", "torque", "identify", "probe-current",
-                     "teach", "goto", "map", "demo", "leader", "record", "play"}
+                     "teach", "goto", "map", "demo", "leader", "record", "play", "envelope"}
 
 
 def main(argv=None) -> int:

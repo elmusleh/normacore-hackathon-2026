@@ -155,3 +155,33 @@ def test_xml_wrapping_and_action_trace_recorded():
     kinds = [e["kind"] for e in agent.trace_after(0)]
     assert "tool_call" in kinds and "tool_result" in kinds and "thinking" in kinds
 
+
+def test_stepwise_mode_keeps_only_steering_tools():
+    from console_agent import STEPWISE_PROMPT, STEPWISE_TOOLS, select_tools
+    names = ["look", "list_cameras", "get_robot_state", "get_action_space", "nudge_joint", "set_gripper", "stop",
+             "go_to_waypoint", "list_waypoints", "play_sequence", "list_sequences", "teach_waypoint",
+             "enable_torque"]
+    tools = [NS(name=n, description="", input_schema={"type": "object"}) for n in names]
+
+    kept = {t["name"] for t in select_tools(tools, "stepwise")}
+    assert kept == set(STEPWISE_TOOLS)
+    assert not kept & {"go_to_waypoint", "play_sequence", "teach_waypoint", "enable_torque"}
+    assert {t["name"] for t in select_tools(tools, "plans")} == set(names)
+
+    agent = ConsoleAgent(lambda role, t: None, mode="stepwise")
+    assert agent._system == STEPWISE_PROMPT
+    assert "get_action_space" in kept
+    assert agent._max_rounds > 25
+
+
+def test_mode_from_env_and_unknown_mode(monkeypatch):
+    monkeypatch.setenv("WEB_CONSOLE_MODE", "stepwise")
+    assert ConsoleAgent(lambda role, t: None).mode == "stepwise"
+    monkeypatch.delenv("WEB_CONSOLE_MODE")
+    assert ConsoleAgent(lambda role, t: None).mode == "plans"
+    try:
+        ConsoleAgent(lambda role, t: None, mode="freestyle")
+    except ValueError as exc:
+        assert "freestyle" in str(exc)
+    else:
+        raise AssertionError("unknown mode accepted")

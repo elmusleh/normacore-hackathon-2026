@@ -303,6 +303,35 @@ def test_camera_targets_accepts_string_or_list():
         "a": ["port:1-1"], "b": ["port:2-2", "usbvideo/x"]}
 
 
+@needs_sdk
+def test_camera_found_when_first_entry_is_unreadable(env, monkeypatch):
+    """Live 2026-11-22: the Station returned nothing for read_first on a reopened queue, so the
+    gripper camera looked unplugged. The newest entry also names the camera."""
+    frame_entry, connect_entry = _envelopes()
+    tools, arm, tmp = env
+    (tmp / "elrobot.json").write_text(json.dumps({"cameras": {"gripper": "port:3-2.4"}}))
+    meta, data = tools.look("gripper")  # queue still empty: not plugged in, and not cached as such
+    assert data is None and "not plugged in" in meta["error"]
+    clock = [1000.0]
+    monkeypatch.setattr("robot_tools.time.monotonic", lambda: clock[0])
+    tools._camera_retry_at.clear()
+    arm.frames["usbvideo/abc"] = [frame_entry(b"jpg"), connect_entry("11391:19040:3:26")]
+    assert tools.list_cameras()["cameras"][0]["name"] == "gripper"
+    arm.frames["usbvideo/abc"] = [connect_entry("11391:19040:3:26"), frame_entry(b"jpg")]
+    meta, data = tools.look("gripper")
+    assert data == b"jpg"
+    # a queue that stays empty is asked again only after the retry delay
+    calls = []
+    arm.read_first = lambda q, timeout_s=3.0: calls.append(q)
+    tools._camera_queues = lambda: ["usbvideo/abc", "usbvideo/empty"]
+    tools.list_cameras()
+    tools.list_cameras()
+    assert calls.count("usbvideo/empty") == 1
+    clock[0] += 11
+    tools.list_cameras()
+    assert calls.count("usbvideo/empty") == 2
+
+
 def test_server_registers_tools():
     pytest.importorskip("mcp")
     import robot_mcp_server

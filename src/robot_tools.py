@@ -12,6 +12,11 @@ fault and torque checks, speed caps, overload hold):
   * Waypoint moves route through the `clear` waypoint by default, and any single
     motor moving more than agent.max_waypoint_delta_steps is refused.
   * Nudges are capped at agent.max_nudge_percent of the joint's calibrated range.
+  * Nudges stay inside the action space a human recorded with the leader arm
+    (config/envelope.json, ./cli.sh hw envelope record): a nudge that would end more than
+    agent.envelope_margin_steps from every recorded pose is refused, unless it brings the arm
+    closer to the space. With ELROBOT_REQUIRE_ENVELOPE=1 (console stepwise mode) nudges are
+    refused when no space is recorded.
   * One tool call at a time (a lock), so two moves never interleave. stop() is the exception:
     it skips the lock, so it also interrupts a recorded plan (play_sequence) that is running.
   * play_sequence only plays plans a human recorded (./cli.sh hw record), with the same checks
@@ -32,6 +37,7 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from action_space import SPACE_MOTORS, load_action_space
 from elrobot_camera import (
     MAX_LOOKBACK,
     decode_frame,
@@ -110,6 +116,10 @@ def motion_allowed() -> bool:
     return os.environ.get("ELROBOT_ALLOW_MOTION", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def envelope_required() -> bool:
+    return os.environ.get("ELROBOT_REQUIRE_ENVELOPE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def percent_of_range(r: MotorReading) -> Optional[float]:
     if not r.calibrated:
         return None
@@ -129,6 +139,7 @@ class RobotTools:
         self._camera_queues = camera_queues or discover_camera_queues
         self._usb_ports = usb_ports_fn or camera_ports
         self._camera_info: Dict[str, Dict[str, Any]] = {}  # queue -> describe_camera(); fixed per queue
+        self._camera_retry_at: Dict[str, float] = {}  # queue -> when to try describing it again
         self._hw = None
         self._lock = threading.Lock()
         self._gripper_cmd_open: Optional[float] = None  # last commanded gripper opening, %
@@ -241,6 +252,20 @@ class RobotTools:
         return {"ok": True, "waypoints": sorted(points), "clear_waypoint": cfg["agent"]["clear_waypoint"],
                 "hint": "Teach new ones with teach_waypoint or ./cli.sh hw teach <name>." if not points else ""}
 
+    def _describe_queue(self, q: str) -> Dict[str, Any]:
+        """Product and unique_id of a camera queue. The first entry (the connect event) is not
+        always readable (the Station returned nothing for queues it reopened), but every entry
+        carries the camera, so fall back to the newest one."""
+        for read in (lambda: self.hw().read_first(q), lambda: self.hw().read_recent(q, back=1)):
+            try:
+                info = describe_camera(read())
+            except Exception:  # noqa: BLE001 - description is optional
+                log.debug("describe %s failed", q, exc_info=True)
+                continue
+            if info.get("unique_id"):
+                return info
+        return {}
+
     def _cameras(self, cfg) -> List[Dict[str, Any]]:
         """Every camera queue with its product, USB port (None if unplugged) and configured name.
 
@@ -250,13 +275,14 @@ class RobotTools:
         names = {t: name for name, targets in camera_targets(cfg).items() for t in targets}
         cams = []
         for q in self._camera_queues():
-            if q not in self._camera_info:
-                try:
-                    self._camera_info[q] = describe_camera(self.hw().read_first(q))
-                except Exception:  # noqa: BLE001 - description is optional
-                    log.debug("describe %s failed", q, exc_info=True)
-                    self._camera_info[q] = {}
-            info = dict(self._camera_info[q])
+            info = self._camera_info.get(q)
+            if not info and time.monotonic() >= self._camera_retry_at.get(q, 0.0):
+                info = self._describe_queue(q)
+                if info.get("unique_id"):
+                    self._camera_info[q] = info
+                else:  # a queue the Station has not filled yet: ask again later, not every call
+                    self._camera_retry_at[q] = time.monotonic() + 10.0
+            info = dict(info or {})
             port = port_of(info.get("unique_id", ""), ports)
             cams.append({"queue": q, "port": port, "live": port is not None,
                          "name": names.get(f"port:{port}") or names.get(q), "product": info.get("product")})
@@ -270,8 +296,9 @@ class RobotTools:
                 "hint": "" if live else "No camera is plugged in, or the Station cannot open it "
                                         "(see scripts/99-normacore-cameras.rules)."}
 
-    def look(self, camera: str = "") -> Tuple[Dict[str, Any], Optional[bytes]]:
-        """Newest JPEG from a camera: a configured name ('table'), 'port:3-2.4', a queue id, or empty."""
+    def camera_queue(self, camera: str = "") -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+        """(queue id, None) for a configured name ('table'), 'port:3-2.4', a queue id, or empty;
+        (None, error result) if that camera is not plugged in."""
         cfg = self._cfg()
         cams = self._cameras(cfg)
         live = [c for c in cams if c["live"]]
@@ -282,16 +309,21 @@ class RobotTools:
         match = [c for t in port_targets for c in live if f"port:{c['port']}" == t]
         if not targets:
             if not live:
-                return {"ok": False, "error": "no camera plugged in; see list_cameras"}, None
-            queue = live[0]["queue"]
-        elif match:
-            queue = match[0]["queue"]
-        elif queue_targets:
+                return None, {"ok": False, "error": "no camera plugged in; see list_cameras"}
+            return live[0]["queue"], None
+        if match:
+            return match[0]["queue"], None
+        if queue_targets:
             t = queue_targets[0]
-            queue = t if t.startswith("usbvideo/") else f"usbvideo/{t}"
-        else:
-            return {"ok": False, "error": f"camera {camera or want!r} ({', '.join(port_targets)}) "
-                                          "is not plugged in", "live_cameras": live}, None
+            return (t if t.startswith("usbvideo/") else f"usbvideo/{t}"), None
+        return None, {"ok": False, "error": f"camera {camera or want!r} ({', '.join(port_targets)}) "
+                      "is not plugged in", "live_cameras": live}
+
+    def look(self, camera: str = "") -> Tuple[Dict[str, Any], Optional[bytes]]:
+        """Newest JPEG from a camera: a configured name ('table'), 'port:3-2.4', a queue id, or empty."""
+        queue, err = self.camera_queue(camera)
+        if err:
+            return err, None
         hw = self.hw()
         for back in range(1, MAX_LOOKBACK + 1):
             data = hw.read_recent(queue, back=back)
@@ -400,9 +432,79 @@ class RobotTools:
         if r is None or not r.calibrated:
             return {"ok": False, "error": f"motor {motor} not visible or not calibrated"}
         delta = int(round(delta_percent / 100.0 * (r.range_max - r.range_min)))
+        envelope = self._check_envelope(motor, r.present + delta, cfg)
+        if envelope is not None and not envelope["ok"]:
+            return envelope
         res = self._move({motor: r.present + delta}, cfg, speed)
         res["delta_steps"] = delta
+        if envelope is not None:
+            res["action_space_distance_steps"] = envelope["distance_after"]
         return res
+
+    def _check_envelope(self, motor: int, goal: int, cfg: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """None if no action space is recorded and none is required; else the check result."""
+        space = load_action_space()
+        if space is None or space.empty:
+            if envelope_required():
+                return {"ok": False, "error": "no action space recorded, so nudges are not allowed in this mode",
+                        "hint": "Ask the operator to record one: teleop on, ./cli.sh hw envelope record."}
+            return None
+        readings = self.hw().snapshot()
+        missing = [m for m in SPACE_MOTORS if m not in readings]
+        if missing:
+            return {"ok": False, "error": f"cannot read motors {missing}; cannot check the action space"}
+        current = {m: readings[m].present for m in SPACE_MOTORS}
+        r = readings[motor]
+        goal, _ = clamp_goal(goal, r.range_min, r.range_max)
+        check = space.check_move(current, {**current, motor: goal}, int(cfg["agent"]["envelope_margin_steps"]))
+        if not check["ok"]:
+            log.warning("nudge motor %d refused: %s", motor, check["reason"])
+            return {"ok": False, "error": check["reason"], "refused": "action_space",
+                    "distance_now_steps": check["distance_before"],
+                    "hint": "Try the other direction, a smaller nudge, or another joint. get_action_space() "
+                            "shows the recorded range and the anchors."}
+        return check
+
+    def get_action_space(self) -> Dict[str, Any]:
+        """What the human recorded with the leader arm: joint meanings, the range each joint was
+        driven through, named anchor poses, and how far the arm is from the space now."""
+        cfg = self._cfg()
+        space = load_action_space()
+        joint_map = {m: cfg["joint_map"][m] for m in sorted(cfg["joint_map"], key=int)}
+        if space is None or space.empty:
+            return {"ok": True, "recorded": False, "joint_map": joint_map, "required": envelope_required(),
+                    "hint": "No action space recorded. The operator records one with teleop on: "
+                            "./cli.sh hw envelope record."}
+        readings = self.hw().snapshot()
+
+        def pct(m: int, raw: int) -> Optional[float]:
+            r = readings.get(m)
+            if r is None or not r.calibrated:
+                return None
+            return round((raw - r.range_min) * 100.0 / (r.range_max - r.range_min), 1)
+
+        now = {m: readings[m].present for m in SPACE_MOTORS if m in readings}
+        joints = {}
+        for m, (lo, hi) in space.seen_range().items():
+            joints[str(m)] = {"recorded_min_percent": pct(m, lo), "recorded_max_percent": pct(m, hi),
+                              "now_percent": pct(m, now[m]) if m in now else None}
+        anchors = {}
+        for name, pose in space.anchors.items():
+            to_go = {}
+            for m in SPACE_MOTORS:
+                a, n = pct(m, int(pose[str(m)])), pct(m, now[m]) if m in now else None
+                if a is not None and n is not None:
+                    to_go[str(m)] = round(a - n, 1)
+            anchors[name] = {"distance_steps": max(abs(int(pose[str(m)]) - now[m]) for m in now) if now else None,
+                             "nudge_percent_to_reach": to_go}
+        distance = space.distance(now) if len(now) == len(SPACE_MOTORS) else None
+        margin = int(cfg["agent"]["envelope_margin_steps"])
+        return {"ok": True, "recorded": True, "updated": space.meta.get("updated"), "poses": len(space.poses),
+                "joint_map": joint_map, "joints": joints, "anchors": anchors,
+                "distance_now_steps": distance, "inside": distance is not None and distance <= margin,
+                "margin_steps": margin,
+                "note": "Nudges that would leave the recorded space are refused. nudge_percent_to_reach is "
+                        "per motor, in % of range, from where the arm is now (5% max per nudge)."}
 
     def set_gripper(self, open_percent: float) -> Dict[str, Any]:
         cfg = self._cfg()

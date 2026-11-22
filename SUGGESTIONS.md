@@ -237,6 +237,348 @@
    How: Add an `ahead` count check and timestamp warning in `cli.sh` under `sync` command output.
    Status: ⏳ Unimplemented
    Reason Deferred: Non-blocking polish item for hackathon workflow tooling.
+1. Show "REAL MOTION ON" on the console page — Priority 85% (High value) [Security]
+   What: A red banner at the top of the console page whenever `.mcp.json` has `ELROBOT_ALLOW_MOTION` set to "1".
+   Why: The switch is committed as "1" on the handover branch, so a teammate opening the console may not know that a chat message moves the real arm near a person.
+   How: In `src/web_console.py`, read the switch with `load_mcp_server_config()` from `src/console_agent.py` and add it to the `/api/messages` reply; in `src/web/console.html`, show a red bar when it is on. Add one test in `tests/test_web_console.py`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 handover check; documenting came first.
+
+2. Load the Claude API key from a local `.env` file — Priority 60% (Nice to have) [Security]
+   What: `./cli.sh console` reads `ANTHROPIC_API_KEY` from a gitignored `.env` file, with a committed `.env.example` that shows the name but no value.
+   Why: Today the key must be typed with `export` in each terminal, which tempts people to paste it into scripts or docs that end up in git.
+   How: `.gitignore` already ignores `.env` and allows `.env.example`. Add `.env.example` with `ANTHROPIC_API_KEY=`, and in the `console)` branch of `cli.sh` run `set -a; [ -f .env ] && . ./.env; set +a` before starting Python. Mention it in `docs/team_setup.md` step 8.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 handover check; no key is on this laptop yet to test with.
+
+3. Save each console chat with its tool calls to `logs/` — Priority 45% (Nice to have) [Professionalism]
+   What: Write every console conversation (what the person said, Claude's replies and each tool call with its result) to `logs/chat-<timestamp>.jsonl`.
+   Why: When a run goes wrong in front of the judges or a teammate asks "what did Claude do?", there is no record after the page is closed; a log makes failures reproducible.
+   How: In `ChatLog.add` in `src/web_console.py`, also append the message as one JSON line to a file opened at startup via the existing `src/elrobot_log.py` folder. `logs/` is already gitignored; note that logs can contain names (AGENTS.md privacy).
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 handover check.
+
+1. Add a test that catches docs naming the wrong arm or camera port — Priority 72% (High value) [Best practices]
+   What: A small offline test that reads `config/elrobot.json` and fails if a doc names a different follower bus serial or camera USB port as the current one.
+   Why: The team plan still named the arm that is out for repair and old camera ports a day after they changed, and agents read that plan first; a wrong serial means commands go to the wrong arm or no arm.
+   How: In `tests/`, load the config, take `station.bus` and the `port:` values, grep `docs/FEEDING_ASSISTANT_PLAN.md` and `docs/mcp_server.md` for lines marked as current state, and assert they match. Keep history sections out of the check.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 handover; fixing the stale text came first.
+
+2. Protect `main` on GitHub: review and passing tests before merge — Priority 66% (Nice to have) [Security]
+   What: Turn on GitHub branch protection so nobody can push straight to `main` or merge a PR without one review.
+   Why: Four people and their agents push to the same repo; one accidental push to `main` (or a force-push) can wipe teammates' work right before the demo.
+   How: GitHub → repository Settings → Branches → Add rule for `main`: require a pull request with 1 approval, block force pushes. If CI exists later, also require its check.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the repository owner's account; not something an agent should change.
+
+3. A short handover checklist at the top of HANDOFF.md — Priority 50% (Nice to have) [Professionalism]
+   What: Five tick boxes every person fills in before leaving: commits pushed, PR link, hardware owner updated, arm left in a safe pose, open blockers listed.
+   Why: At this handover HANDOFF said "pushed to origin" while the last two commits were still only on the laptop; a checklist makes such gaps visible before the person walks away.
+   How: Add the checklist block under the front matter of `.ai-sync/HANDOFF.md`, and one line in AGENTS.md "On Stop" asking to tick it; `git status -sb` shows "ahead N" when commits are unpushed.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Process change for the whole team; propose it at the next checkpoint.
+
+1. Confirm a grasp by lifting a little and watching the jaws — Priority 82% (High value) [Security]
+   What: After closing, lift 1 cm and re-read the gripper; if the jaws kept closing, call it a miss instead of "holding".
+   Why: A stall on the bowl or the table looks exactly like a grasp today, so the robot can carry "nothing" to a person and believe it is feeding them.
+   How: In `scripts/calib.py` `_gripper_after`, after the squeeze, move the arm up 10 mm, read motor 8 again, and print "closed empty" if it moved more than ~30 steps past the stall value. Add an offline test with the fake gripper.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found at the end of the 2026-11-22 session (bowl grips); handover came first.
+
+2. Refuse gripper commands when the MCP server's reading is old — Priority 74% (High value) [Security]
+   What: Have `set_gripper` and `get_robot_state` check how old the motor reading is and refuse (with a "reconnect /mcp" hint) when it is frozen.
+   Why: A frozen reading made the gripper squeeze 11x harder than set and split a grape; the same could hurt a fingertip during a handover.
+   How: In `src/robot_tools.py`, compare the reading's timestamp (or two reads a moment apart while a motor is moving) and return ok=false with a clear message when it is stale. Test it with a fake reader that never changes.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Workaround exists (`calib goto --close-after` reads fresh); needs a look at how the Station frames carry time.
+
+3. Store the bowl (and other fixed places) as named table points — Priority 48% (Nice to have) [Best practices]
+   What: Keep `places: {"bowl": [365, 28, 130]}` in `config/elrobot.json` and let `calib goto bowl` use it.
+   Why: The drop then needs no camera step and no pixel guessing, which makes it faster and the same every time; the camera is only needed when the bowl was moved.
+   How: Add the `places` block, accept a place name instead of X Y Z in `calib goto`, and update `drop-in-bowl` to try the stored place first and re-measure with `calib pixel` only if the look shows the bowl elsewhere.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The bowl was moved during the session; wait until its position on the table is fixed.
+
+1. Hardware-owner check inside the motion commands — Priority 80% (High value) [Security]
+   What: `calib goto`, `calib line` and `hw jog/goto` read `hardware_owner` from `.ai-sync/HANDOFF.md` and refuse to move unless `git config user.name` (or an `ELROBOT_OPERATOR` variable) matches it.
+   Why: With several teammates and their agents on the same repo, the single-writer rule is only written down; a second agent could move the arm while the owner is working on it.
+   How: Add a small `check_owner()` helper in `src/elrobot_config.py`, call it before the MOVE prompt, add an `--i-am-owner` override that is logged, and add an offline test for match/mismatch.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Raised at the 2026-11-22 team handover; motion code needs the hardware owner's review.
+
+2. One-command status report for a new teammate — Priority 62% (Nice to have) [Professionalism]
+   What: `./cli.sh status` prints the branch and PR, hardware owner, follower bus in use, calibration date and fit error, and whether the Station and console are running.
+   Why: A teammate's agent can see in five seconds which arm and calibration are live, instead of reading a long HANDOFF.md.
+   How: Add a `status` case to `cli.sh` that calls a short Python script reading `config/elrobot.json`, `config/calibration.json` and the HANDOFF front matter, plus `gh pr list --head <branch>`; test the parsing offline.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Raised at the 2026-11-22 team handover; docs-only session.
+
+3. Short demo-day runbook — Priority 55% (Nice to have) [Professionalism]
+   What: One page, `docs/demo_runbook.md`, with the exact commands in order from power-on to "grape in the bowl", and what to do when each step fails.
+   Why: During the demo, whoever stands at the arm needs a checklist, not the history of every session.
+   How: Copy the working commands from the three skills, add the start-up steps (Station, cameras, MCP reconnect) and the stop rule (12 V switch); rehearse it once and fix what was missing.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Waits until the fingers-down grip works, so the runbook describes the final procedure.
+
+1. Dry-run flag for `calib goto` — Priority 78% (High value) [Security]
+   What: A `--check` flag that runs every path check and prints the plan, then exits without asking or moving.
+   Why: Today the only way to test a path is to answer "no" at the MOVE prompt; one wrong keystroke or a `--yes` left in a command moves the arm.
+   How: In `scripts/calib.py`, add `--check`; after planning, print the segments and `return 0` before the torque check and the prompt. Add a test that it never calls the motion code.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 grape hover; this session only added `--travel-z`.
+
+2. Tag waypoints with the arm they were taught on — Priority 72% (High value) [Security]
+   What: Store the follower bus serial with each waypoint and sequence, and refuse to play them on a different arm.
+   Why: With the temporary arm, `clear` and the feeding waypoints would send raw step values from another arm to unchecked poses.
+   How: In `config/waypoints.json` add a `"bus"` field per waypoint; in the waypoint and sequence code compare it with `station.bus` from `config/elrobot.json` and refuse on mismatch with a clear message.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the waypoint format change agreed with the team.
+
+3. Per-motor overload thresholds measured per arm — Priority 55% (Nice to have) [Best practices]
+   What: Record the normal current of each motor while moving, and set overload thresholds from it for the arm in use.
+   Why: Motor 4 stopped a free move at 167 against a limit of 100; a limit that is too low stops good moves, one too high misses real collisions.
+   How: Run a slow `calib goto` in free air, log the peak current per motor (`./cli.sh logs`), and set each threshold to about 1.5x that peak in a calibration commit.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs a bench session with the hardware owner.
+
+1. Show the grasp target on the camera picture before going down — Priority 74% (High value) [Security]
+   What: Before `grab` descends, save the gripper-camera frame with the planned grasp point drawn on it and let the agent check it.
+   Why: The descent is the riskiest table move; a wrong target (wrong grape, edge of the bowl) is caught before the fingers hit anything.
+   How: In the grab procedure, after centring, call `look("gripper")`, draw a cross at the finger-centre pixel, and stop if the object is not under it.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The finger-centre pixel is not measured yet.
+
+2. Time each step of `grab` and `feed` — Priority 62% (Nice to have) [Best practices]
+   What: Log how long each step takes (find, hover, centre, grasp, carry, approach, handover).
+   Why: "Smooth" means no long pauses; the timings show which step to speed up instead of guessing.
+   How: Print a timestamp at the start and end of each step in the skill run and add a one-line summary to the handoff after rehearsals.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Skills not written yet.
+
+3. Wait in a "ready" pose above the table middle between requests — Priority 45% (Nice to have) [Best practices]
+   What: After `feed` returns, park the fingertip above the middle of the table instead of at `clear`.
+   Why: Every next move starts closer to the food, so requests feel faster and paths are shorter.
+   How: Pick a table point (e.g. x 250, y 120, z 150), check it with `calib reach`, and use it as the end of `feed` once the owner agrees.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the owner's OK on a new resting pose.
+
+1. Give each skill a written "done when" test and run it before trusting the skill — Priority 84% (High value) [Best practices]
+   What: For `grab` and `feed` in docs/feeding_skills.md, a short pass rule (e.g. "grab grape: 5 in a row, none crushed") recorded in FINDINGS.md with the run date.
+   Why: A skill that worked once at 4 a.m. is not a demo skill. A clear pass rule tells the team which skills `feed-me` may rely on and which must fall back to the recorded plan.
+   How: Copy the "Done when" column from the plan's task tables into each skill file; after each bench run, add one FINDINGS.md line with the result and the log path.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Skills other than hover are not written yet.
+
+2. Keep a one-page "autonomy register" of what the agent may do without asking — Priority 78% (High value) [Security]
+   What: One table (for example in GUIDELINES.md) listing each skill, whether it may run without confirmation, who allowed it and when.
+   Why: Standing permissions are spread over skill files and chat. One register makes it obvious when a skill near the person's face is running without a human OK, and makes it easy to revoke.
+   How: Add a table with columns skill / auto or ask / given by / date / limits; link it from every SKILL.md; change it only in its own commit by the hardware owner.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Only one skill has a standing OK today.
+
+3. Record a short video of every skill's first good bench run — Priority 45% (Nice to have) [Professionalism]
+   What: A phone or screen recording of each skill working on the arm, kept outside git, listed by date in HANDOFF.md.
+   Why: If something breaks on Sunday, the team still has proof each piece worked for the pitch, and the video shows exactly how the arm moved if a skill later behaves differently.
+   How: Start a recording before each first live run, save it to the shared drive (not the repo; faces must be cropped or consented), and note the file name in the handoff entry.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Demo recording is owned by role D and starts once skills run end to end.
+
+1. Enforce the hover skill's limits in a hook, not only in text — Priority 86% (High value) [Security]
+   What: A Claude Code PreToolUse hook that blocks `calib goto ... --yes` unless the z is >= 66 mm and HANDOFF.md names the session's user as hardware owner.
+   Why: The skill lets the agent move the arm without asking. A hook makes that rule hard to break by accident, for example a typo in z or a session run by someone else.
+   How: Add a small script in `.claude/hooks/` that reads the Bash command from stdin, parses the z after `calib goto`, and exits 2 with a message if it is too low; register it in `.claude/settings.json` under `PreToolUse` for `Bash`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Skill just created; first wanted Jafer to see it in use.
+
+2. Centre the object with the gripper camera before any descent — Priority 72% (High value) [Best practices]
+   What: After hovering, look through the gripper camera and correct x/y by a few mm until the object is in the middle of the picture.
+   Why: The table-camera calibration is ~3 cm off (the hover above the grape ended visibly to its right). The gripper camera sees the object up close, so it can remove most of that error before grasping.
+   How: Note which pixel in the gripper camera is right between the fingers, then after each hover compare the grape's pixel with it and send a small `calib goto` correction (z unchanged), at most 3 times.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the hover step proven first and a gripper-camera pixel-to-mm scale.
+
+3. Offer the hover procedure as an MCP tool for the voice agent — Priority 55% (Nice to have) [Professionalism]
+   What: A `hover_above(u, v, camera)` tool in the elrobot MCP server that runs pixel -> reach -> goto with the same checks.
+   Why: The console's voice agent cannot run shell commands, so today only a Claude Code session can do this move; one tool keeps both on the same safe code path.
+   How: Wrap the functions behind `calib pixel` and `calib goto` from `scripts/calib.py` in `src/robot_tools.py`, keep the 66 mm floor and dry-run flag, and add an offline test with a fake Station.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Out of the current plan step (bench calibration first).
+
+1. Log every `calib goto` with its plan and result — Priority 80% (High value) [Security]
+   What: Write each goto's target, planned legs, motor goals and final status to `logs/` (as `hw` commands already do).
+   Why: If the arm hits something, the log shows exactly what was commanded and where it stopped, which is the first thing anyone needs after an incident.
+   How: Call `setup_logging("calib", ...)` from `src/elrobot_log.py` in `scripts/calib.py` and log the plan before the MOVE prompt and the status after each leg.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The first live goto had not run yet.
+
+2. Compare the fingertip with the camera after each goto — Priority 60% (Nice to have) [Best practices]
+   What: After arriving, take a table-camera frame and save it with the target drawn on it.
+   Why: The joint readings only say where the arm thinks it is; the camera shows where it really is, which is the honest check of the calibration.
+   How: Reuse `_grab_frame` and `TableCamera.table_to_pixel` to draw the target point into a picture in `data/calibration/`, and print its path.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the calibration below ~10 mm to be meaningful.
+
+3. Return to `clear` with one command after a test — Priority 45% (Nice to have) [Professionalism]
+   What: `calib goto ... --then clear` (or a short doc line) to lift and go back to the taught `clear` pose after the test.
+   Why: Leaving the arm stretched out over the table is where people bump into it; a standard retreat keeps tests tidy.
+   How: After the last leg, run the same lift leg, then call the existing waypoint goto for `clear`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: `clear` is outside motor 2's current range; recalibrate motor 2 first.
+
+1. Refuse a Cartesian move when the fit error is above 10 mm — Priority 92% (Critical) [Security]
+   What: The future move command reads `base_in_table.rms_mm` from `config/calibration.json` and refuses to move when it is above 10 mm.
+   Why: A fit of 19-21 mm (what we have now) means the fingertip can land 2 cm off, for example on the table or near a person's face. A hard check stops that before the arm moves.
+   How: In the command that will drive the arm to `calib reach` targets, load the calibration, compare `rms_mm` with a limit in `config/elrobot.json`, and exit with a clear message when it is too high. Add an offline test for both cases.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The move command does not exist yet; it needs the hardware owner's review.
+
+2. Warn when a `calib reach` goal is close to a motor's range end — Priority 70% (High value) [Best practices]
+   What: Mark any motor whose goal lies within about 50 steps of its range end (today motor 6 goes to 1199 with a limit of 1202).
+   Why: Driving a servo into its end stop strains the gear and can stall the motor; a warning lets the operator pick another target or approach angle.
+   How: In `cmd_reach` in `scripts/calib.py`, compute the distance to each range end with `step_delta` and print `NEAR LIMIT`. Add a test for a wrapping range.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Out of scope for the wraparound fix.
+
+3. Show the touch points and their errors on the camera overlay — Priority 50% (Nice to have) [Professionalism]
+   What: `calib show` draws where each touch landed according to the fit next to the tag it should have hit.
+   Why: Seeing which touches are off, and in which direction, makes a bad fit (wrong width, bad zero) much faster to diagnose than a list of numbers.
+   How: Map each touch's fitted fingertip to a pixel with `TableCamera.table_to_pixel` and draw a line from it to its tag centre in `draw_overlay`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Diagnosis aid only; the fit is still being measured.
+
+1. Test that `look()` never changes the picture — Priority 75% (High value) [Best practices]
+   What: Add a small offline test that feeds a known JPEG through `RobotTools.look()` and checks that the same bytes come back.
+   Why: The picture clean-up was added and then removed. A test makes sure no future change quietly starts altering what Claude sees, which would also change what the AprilTag calibration measures.
+   How: In `tests/test_robot_mcp.py`, reuse the `env` fixture and `_envelopes()` helper: put a JPEG made with OpenCV into the fake camera queue, call `tools.look()`, and assert the returned bytes equal the input.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Small; do it in the next vision change.
+
+2. Save one raw reference frame per camera after each exposure change — Priority 55% (Nice to have) [Professionalism]
+   What: After `./cli.sh cameras --write`, save one frame per camera into `data/camera_reference/` with the date and exposure in its name.
+   Why: With no software clean-up, picture quality depends only on the camera settings. A reference frame lets the team see later whether the light or the settings changed. `data/` is gitignored, so people in the frame stay out of git.
+   How: In `scripts/camera_settings.py`, after a `--tune --write`, keep the frame captured at the chosen exposure and write it with `cv2.imwrite`. Print the path.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs a live tuning session with the Station stopped.
+
+3. Show the camera exposure in the console page — Priority 35% (Optional) [Professionalism]
+   What: Show the configured exposure value for each camera under its tile on the console page.
+   Why: `look()` no longer reports exposure. A visible value helps someone at the bench notice when a camera is still on old or automatic settings.
+   How: In `src/web_console.py`, return `camera_settings` from the `/cameras` endpoint, and in `src/web/console.html` print `exposure` under each tile's name.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Cosmetic; wait until the exposure values are final.
+
+1. Add a hard table-height floor to every IK target — Priority 92% (Critical) [Security]
+   What: Before any Cartesian move, check that every point on the planned path stays a few millimetres above the table and inside the tag rectangle, and refuse the move otherwise.
+   Why: A wrong joint zero or a typo in a target can send the fingertips into the table or the bowl. The arm already hit the table once (motor 2, 2026-11-21). A check in code catches this before a motor moves, whatever Claude or a person asks for.
+   How: In `src/arm_kinematics.py`, add a function that samples FK along the straight line in joint space from the current pose to the IK goal (e.g. 20 steps) and returns the lowest fingertip z in the table frame. In the future Cartesian move command, refuse when it is below `workspace.z_table_floor_mm` or outside the tag rectangle plus a margin. Add a unit test with a target below the table.
+   Status: ⏳ Unimplemented
+   Reason Deferred: There is no Cartesian move command yet; add the check in the same change that adds it.
+
+2. Re-check the camera calibration automatically on every look — Priority 72% (High value) [Best practices]
+   What: Each time the table camera is used for coordinates, detect the four tags again and compare their pixel positions with the ones saved at calibration time.
+   Why: If someone bumps the camera or a tag, every coordinate silently shifts by centimetres. A quick check turns that into a clear warning ("camera moved 14 px, run calib camera") instead of a missed grape.
+   How: `config/calibration.json` already stores `camera.centers_px`. Write a small function in `src/tag_calibration.py` that runs `detect_tags`, scales to the saved image size, and returns the largest shift in pixels; call it before `pixel_to_table` in the vision code and warn above ~5 px.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the first real camera calibration to pick a sensible threshold.
+
+3. Save each bench calibration run as a small report — Priority 45% (Nice to have) [Professionalism]
+   What: When `calib fit --write` runs, also write a dated text report (points, per-point errors, joint zeros, overlay path) into `docs/calibration_runs/`.
+   Why: Judges and teammates can see how accurate the arm really is, and if accuracy gets worse later you can compare against the earlier run instead of guessing.
+   How: In `scripts/calib.py` `cmd_fit`, after saving, format the printed numbers into a Markdown file named by date. No camera images in it (people can appear in frames); link to `data/calibration/` only by file name.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Only useful once real touch points exist.
+
+1. Put a matte, darker cloth on the table — Priority 88% (High value) [Best practices]
+   What: Replace the bright white table cover with a matte mid-grey or dark-blue cloth or card.
+   Why: On white, 47-62% of the table and gripper pictures are pure white (measured 2026-11-21), and a pale green grape almost disappears. No software can recover pure-white pixels; a darker, non-shiny surface gives the grape and bowls clear edges for Claude and for the ACT policy.
+   How: Lay the cloth over the work area, tape the corners so it cannot move, run `./cli.sh cameras --tune` again (Station stopped), then check that the chosen exposure's verdict is `ok` in the `--tune` table.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs a physical material at the bench and the team's agreement before ACT demos are recorded.
+
+2. Freeze the camera setup before recording ACT demos, and store it with each episode — Priority 80% (High value) [Best practices]
+   What: Save the camera exposure, controls and `resize_target` into each demo episode's metadata, and warn when they differ from the first episode.
+   Why: A policy trained on one exposure or frame size can fail when the picture changes. Without the settings stored, nobody can tell later why a model stopped working.
+   How: In `src/demo_recorder.py`, add `camera_settings` (from `config/elrobot.json`) and `resize_target` (from `station.yaml`) to the episode's meta file; in `scripts/record_demos.py`, compare with episode 0 and print a warning if they differ.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Camera settings are still being tuned; do it once they are final.
+
+3. Crop the table camera to the table — Priority 55% (Nice to have) [Security]
+   What: Add an optional crop box per camera in `config/elrobot.json`, so `look()` only shows the table area.
+   Why: The table and gripper cameras also catch people and screens in the background. Cropping keeps them out of what is sent to Claude and of the logs, and gives the food more pixels.
+   How: Add `"crop": [x, y, w, h]` (fractions of the frame) under `camera_settings.table`, apply it in `RobotTools.look()` in `src/robot_tools.py`, and add a test with a synthetic frame. Note that this is image processing again; the software picture enhancement was removed on request on 2026-11-22.
+   Status: ⏳ Unimplemented
+   Reason Deferred: The crop box needs to be chosen on the real camera view once the camera position is final.
+
+1. Warn on start when a named camera is missing — Priority 60% (Nice to have) [Professionalism]
+   What: When the console starts, print which configured cameras (`table`, `gripper`, `face`) the Station is actually streaming, and name any that are missing.
+   Why: Today a missing camera only shows as an error tile on the page. The USB hub on bus 3 has dropped cameras several times, and a clear message at start saves time at the bench.
+   How: In `src/web_console.py` `main()`, call `tools.list_cameras()` once, compare the live names with `config/elrobot.json` → `cameras`, and log a warning that names each missing camera and its USB port.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Small; do it after the face camera is confirmed live.
+
+1. Check the start pose before each demo episode — Priority 75% (High value) [Best practices]
+   What: Before Enter starts an episode, show how far the follower is from the start anchor (for example `arm_rest`) and warn if it is far off.
+   Why: ACT learns much faster from 60-100 demos when every episode starts from the same pose; mixed starts waste demonstrations.
+   How: In `scripts/record_demos.py`, add `--start-anchor arm_rest`, read it from `config/envelope.json` anchors, print the largest motor difference before each episode, and warn above about 60 steps.
+   Status: ⏳ Unimplemented
+   Reason Deferred: First confirm the recorder works live and which start pose the team wants.
+
+2. Keep demo frames private and deletable — Priority 65% (Nice to have) [Security]
+   What: Write down who may copy `data/demos/`, and add `./cli.sh demos delete <episode>` for removing an episode where a person is visible.
+   Why: The table camera can show people sitting at the table. Training data tends to get copied to other laptops or uploaded, and frames of people should not leave the team.
+   How: Add a short "Privacy" paragraph to `docs/act_pick_skill.md` and a delete subcommand that removes one episode folder after a confirmation.
+   Status: ⏳ Unimplemented
+   Reason Deferred: No episodes are recorded yet.
+
+3. Preview an episode as a short video — Priority 50% (Nice to have) [Professionalism]
+   What: `./cli.sh demos preview <episode>` writes an MP4 of the camera frames with the joint values printed on them.
+   Why: Bad demos (shaky, a missed grasp, a camera frozen) are easy to spot in a 10-second clip and hard to spot in numbers; removing them improves the trained model.
+   How: Use PyAV (already in `.venv` for the console) to encode `frames/<camera>/*.jpg` at the recorded rate into `logs/preview-<episode>.mp4`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Useful once the first real episodes exist.
+
+1. Slow down and shrink nudges near the face anchor in code — Priority 85% (High value) [Security]
+   What: When the arm is close to the recorded `face_standoff` anchor, let `nudge_joint` allow only 1-2% nudges at low speed, whatever Claude asks for.
+   Why: The action space stops the arm going where the operator never went, but near the face the speed and step size are still Claude's choice. The plan requires code limits near a person (safety rule 4).
+   How: In `RobotTools.nudge_joint`, if the distance to the `face_standoff` anchor is under about 150 steps, cap `delta_percent` at 2 and `speed` at 150; add a fake-arm test.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs a recorded `face_standoff` anchor to tune the distance.
+
+2. Warn when the recorded action space no longer matches the table — Priority 60% (Nice to have) [Best practices]
+   What: At console start, warn if the table camera view differs a lot from the view at recording time.
+   Why: The space is only valid while the arm base and table stay put. If someone moves the table, the "safe" space may now go through it.
+   How: Keep a small table-camera thumbnail locally when recording (logs/, not git), compare it with a fresh frame when the console starts, and post a warning in the chat if they differ a lot.
+   Status: ⏳ Unimplemented
+   Reason Deferred: First see how stable the setup is during a session.
+
+3. Show the recorded space as a picture — Priority 45% (Nice to have) [Professionalism]
+   What: A small plot of the recorded poses per pair of joints (for example motor 2 vs motor 3), with anchors marked.
+   Why: It shows at a glance whether the operator covered the area over the food and toward the person, or left gaps that will make Claude's nudges get refused.
+   How: Add `./cli.sh hw envelope plot` that writes a PNG into `logs/` from `config/envelope.json`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Only useful once a real recording exists.
+
+1. Reconnect the arm command channel after a Station restart — Priority 95% (Critical) [Best practices]
+   What: Make the MCP server notice that the Station restarted and open a fresh connection for motor commands, not only for readings.
+   Why: On 2026-11-21 the Station was restarted while the MCP server kept running. Readings still worked, but every move and even the "hold" from stop() silently went nowhere (the motors' goal register kept its old value). A stop that does nothing is the worst failure near a person.
+   How: In `src/elrobot_hardware.py`, after each `_sync_write` read back the goal register; if it did not change, close `self.client`, call `connect()` again and retry once, then report an error. Add a fake-Station test for it.
+   Status: ⏳ Unimplemented
+   Reason Deferred: It changes motion code, which needs the owner's OK first (AGENTS.md).
+
+2. Enforce the face standoff in code for stepwise mode — Priority 88% (High value) [Security]
+   What: Have local code, not Claude's judgement, refuse nudges that bring the gripper closer once the face in the gripper camera is big enough.
+   Why: In stepwise mode the 5-10 cm standoff is only a prompt rule. A wrong guess by the model about which joint moves toward the face could push food into someone's face.
+   How: Add a `face_size` check (for example MediaPipe face detection on the gripper frame) inside `RobotTools.nudge_joint`; when the face is wider than half the frame, allow only nudges that make it smaller, and return a clear refusal otherwise.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the mouth tracker (plan task 2.1) and a teammate in front of the camera to tune the size.
+
+3. Save each stepwise run as a replayable log — Priority 55% (Nice to have) [Best practices]
+   What: Record every tick of a stepwise run (camera frame, Claude's reason, the nudge, the joint positions) to `logs/`.
+   Why: Runs take minutes and fail in ways that are hard to remember. A log lets the team see where Claude got confused, and a good run can be turned into a recorded plan for the demo.
+   How: In `ConsoleAgent._run_turn`, append each tool call, its result and the latest robot state as one JSON line to `logs/stepwise-<time>.jsonl`, with frames saved next to it (logs are gitignored and stay local because frames show people).
+   Status: ⏳ Unimplemented
+   Reason Deferred: First see whether stepwise steering works at all on the arm.
 
 1. Teach and lock the 6 assistive feeding waypoints on the follower arm (`zone_a_hover`, `zone_a`, `serve`, `spoon_holder`, `bowl_scoop`, `serve_spoon`) — Priority 94% (Critical) [Best practices]
    What: Pose the physical follower arm by hand (with torque off) at the grape bowl, spoon holder, and a 7 cm standoff in front of the diner's mouth, and save each pose with `./cli.sh hw teach <name>`.

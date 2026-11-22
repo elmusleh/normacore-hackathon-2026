@@ -54,6 +54,9 @@
 
   /* cameras */
   .cams { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 0; }
+  /* three cameras: table across the top, gripper and face side by side below */
+  .cams.three { grid-template-columns: 1fr 1fr; grid-template-rows: 1.3fr 1fr; }
+  .cams.three .cam:first-child { grid-column: 1 / -1; }
   .cam { position: relative; background: #000; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-height: 0; }
   .cam img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .cam .label { position: absolute; top: 10px; left: 10px; display: flex; gap: 8px; align-items: center;
@@ -135,7 +138,8 @@
 
   @media (max-width: 900px) {
     main { grid-template-columns: 1fr; height: auto; }
-    .cams { grid-template-rows: none; grid-auto-rows: 38vh; }
+    .cams, .cams.three { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: 38vh; }
+    .cams.three .cam:first-child { grid-column: auto; }
     .chat { height: 80vh; }
   }
 </style>
@@ -289,13 +293,14 @@ function addCamera(name) {
 }
 
 fetch("/api/cameras").then(r => r.json())
-  .then(d => (d.cameras && d.cameras.length ? d.cameras : ["table", "gripper"]))
-  .catch(() => ["table", "gripper"])
+  .then(d => (d.cameras && d.cameras.length ? d.cameras : ["table", "gripper", "face"]))
+  .catch(() => ["table", "gripper", "face"])
   .then(names => {
-    // Gripper first is not important; keep table on top as it is the main view.
-    const order = ["table", "gripper"];
+    // Table on top as it is the main view, then gripper, then face.
+    const order = ["table", "gripper", "face"];
     names.sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
-    $("cams").style.gridTemplateRows = `repeat(${names.length}, 1fr)`;
+    if (names.length === 3) $("cams").classList.add("three");
+    else $("cams").style.gridTemplateRows = `repeat(${names.length}, 1fr)`;
     names.forEach(addCamera);
   });
 

@@ -72,6 +72,31 @@ viewer again; [calibration/](../calibration/) holds the ranges measured on 2026-
 - Do not run Claude Code with the `elrobot` server and the console chat on the arm at the same time:
   two controllers would send moves independently.
 
+### Stepwise mode: Claude steers every move (no waypoints)
+
+`./cli.sh console 8890 --mode stepwise` (or `WEB_CONSOLE_MODE=stepwise`). The person says the food they want;
+Claude then works in ticks: look at the cameras, one or two small `nudge_joint` moves (max 5% each, 1-2% near
+the face), look again. It grasps with `set_gripper`, lifts, turns to the person, approaches the mouth from the
+gripper camera and stops when the face fills about half the gripper image; the person leans in.
+
+- Claude only gets `look`, `list_cameras`, `get_robot_state`, `get_action_space`, `nudge_joint`, `set_gripper`,
+  `stop`. Waypoints, recorded plans, teaching and torque are removed in code (`STEPWISE_TOOLS` in
+  `src/console_agent.py`).
+- **Action space (required in this mode).** Record it first, with teleop ON and the console closed:
+  `./cli.sh hw envelope record`. Drive the leader slowly through every place the arm may go (above the table,
+  over each food, lifted, toward the person up to a safe distance). Type a name + Enter to mark an anchor
+  (`above_grape`, `lifted`, `face_standoff`), `q` to finish. It only reads the follower. Saved to
+  `config/envelope.json`; `./cli.sh hw envelope` shows it, `--append` adds to it.
+  `nudge_joint` then refuses any nudge ending more than `agent.envelope_margin_steps` (80) from every recorded
+  pose, unless it moves back toward the space. Without a recording, stepwise nudges are refused
+  (`ELROBOT_REQUIRE_ENVELOPE=1`, set by the console). Claude reads the anchors with `get_action_space()` and
+  steers toward them. The space is only valid while the arm base and table stay where they were.
+- Up to 150 tool rounds per request (plans mode: 25). Each tick takes a few seconds, so a full feed is minutes.
+- Joint directions and the gripper direction are not verified; the prompt tells Claude to learn them with 2%
+  test nudges. The face standoff is a prompt rule judged from the image, **not enforced in code**: keep a hand
+  on the 12 V switch and test on a teammate who agrees to it.
+- Default mode is still `plans` (recorded plans first).
+
 ## Motion is off until you turn it on
 
 `.mcp.json` sets `ELROBOT_ALLOW_MOTION` to `"0"`. Claude can look, read the arm and plan, but every
@@ -122,8 +147,25 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
 2. **Exposure.** Under the Station the cameras' auto exposure gives near-white frames. Fixed exposure per camera is in
    `config/elrobot.json` → `camera_settings` (table 160, gripper 14, tuned 2026-11-21 in daylight). Apply with the Station
    stopped: `./cli.sh cameras`, then start the Station. Repeat after replugging a camera or rebooting, or if the light changes.
-3. **Frame size.** `station.yaml` stores frames at `resize_target: 224` px. Too small to spot
-   small objects; try `480` and restart the Station.
+   To find a good value, stop the Station, point the camera at the real scene and run `./cli.sh cameras --tune table`
+   (add `--write` to save it). It tries exposures from 5 to 250 and picks the one with the fewest pure-white and black
+   pixels. Other V4L2 controls go in `camera_settings.<name>.controls`, e.g.
+   `{"gain": 0, "white_balance_automatic": 0, "white_balance_temperature": 4600, "backlight_compensation": 0}`.
+3. **Frame size.** With an empty `formats` list the Station picks a small camera mode (320x240), and
+   `resize_target` (default 224) shrinks it further. At 320x240 the AprilTag detector finds only the 2 near
+   tags. Set the camera mode and size in `station.yaml` (local, so set it on each machine), then restart the Station:
+   ```yaml
+   usb-video:
+     enabled: true
+     resize_target: 1080
+     formats:
+       - format: "1920x1080@30fps,mjpeg"
+       - format: "1280x720@30fps,mjpeg"
+       - format: "640x480@30fps,mjpeg"
+       - format: "640x480@maxfps,yuyv"
+   ```
+   Each camera takes the first mode it can open. All cameras sit on one 480 Mbps USB 2.0 link (the hub's
+   USB 3 side does not help USB 2.0 cameras), so not every camera gets Full HD: see FINDINGS.md.
 4. **Gripper direction.** `config/elrobot.json` → `gripper.open_at` (`"max"` or `"min"`) says which
    end of motor 8's range is open. Check with `./cli.sh hw identify 8`, fix if needed, set `"verified": true`.
 5. **Waypoints.** Teach at least `clear` (above the table, gripper open), then the pick spots and bins

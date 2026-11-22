@@ -24,7 +24,7 @@ pip install -r requirements.txt
 ```bash
 python3 -m pytest tests/ -q
 ```
-Expect all tests to pass (44 at the last review). If not, stop and fix before going further.
+Expect all tests to pass (144 at the last review, about 1 min). If not, stop and fix before going further.
 
 ## 4. NormaCore SDK and Station binary (must match)
 Both must come from NormaCore release **0.1.0-beta.10 (build 5f4f805)**. A mismatch can cause protocol or protobuf errors that look like hardware faults.
@@ -72,7 +72,13 @@ Always pass `--bus` explicitly when two serial adapters are plugged in. `--bus a
 
 Record which serial number is which arm in `HANDOFF.md` once it is confirmed. Confirmed 2026-11-21: follower `5B61034962`, leader `5B61037051` (`config/elrobot.json` `station.bus` / `station.leader_bus`).
 
-## 8. Common problems
+## 8. Web console: cameras and voice chat (optional)
+1. With the Station running: `./cli.sh console`, then open http://localhost:8890 on the same laptop (the microphone only works on `localhost`).
+2. The chat goes to Claude, which needs a Claude API key: `export ANTHROPIC_API_KEY=sk-ant-...` in that terminal before step 1. Never put the key in the repo. Without it, the cameras and speech-to-text still work.
+3. The first start downloads the speech model (about 1.6 GB on an NVIDIA GPU, 500 MB on CPU), so do it once while online.
+4. The console starts its own copy of the `elrobot` MCP server from `.mcp.json`, so `ELROBOT_ALLOW_MOTION` there decides whether Claude's moves are real. Typing or saying only "stop", or the red STOP button, holds the arm without going through Claude. Details: `docs/mcp_server.md` → Web console.
+
+## 9. Common problems
 
 | Symptom | Cause and fix |
 |---|---|

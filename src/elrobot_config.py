@@ -45,13 +45,17 @@ DEFAULTS: Dict[str, Any] = {
     # Friendly camera names for the MCP server, e.g. {"table": "usbvideo/<hash>"} or "port:3-2.4".
     # A value may be a list, to name the same camera on several laptops (Linux and macOS ports).
     "cameras": {},
-    # Fixed exposure per named camera, applied by ./cli.sh cameras (auto exposure washes out under the Station).
+    # Fixed exposure and other V4L2 controls per named camera, applied by ./cli.sh cameras
+    # (auto exposure washes out under the Station). Find a good exposure with ./cli.sh cameras --tune.
     "camera_settings": {},
     # Limits for moves requested by Claude through the MCP server (src/robot_mcp_server.py).
     "agent": {
         "max_speed": 500,
         "max_waypoint_delta_steps": 1500,
         "max_nudge_percent": 5.0,
+        # A nudge may end at most this many steps (any one motor) from a pose recorded with
+        # ./cli.sh hw envelope record (config/envelope.json).
+        "envelope_margin_steps": 80,
         "clear_waypoint": "clear",
         # play_sequence (recorded plans, config/sequences.json): speed, pause at each waypoint (s),
         # and how far short of a waypoint a stopped motor may be (loaded joints sag 20-45 steps).

@@ -44,6 +44,7 @@ print_usage() {
     echo -e "  ${C_YELLOW}setup-serial${C_RESET}        Configure Linux USB permissions (dialout, udev rules) for ElRobot servos"
     echo -e "  ${C_YELLOW}mcp${C_RESET}                 Run Model Context Protocol (MCP) server for Claude / Codex"
     echo -e "  ${C_YELLOW}console [port]${C_RESET}      Web console: live cameras + voice chat (Default: http://localhost:8890)"
+    echo -e "  ${C_YELLOW}console [port] --mode stepwise${C_RESET}  Claude steers the arm tick by tick (look + small nudges, no waypoints)"
     echo -e "  ${C_YELLOW}urdf${C_RESET}                Open official NormaCore online 3D URDF interactive viewer"
     echo ""
     echo -e "${C_BOLD}Hardware Day (ElRobot):${C_RESET}"
@@ -59,6 +60,8 @@ print_usage() {
     echo -e "  ${C_GREEN}hw goto <name>${C_RESET}      Move all motors to a waypoint (shows plan; type MOVE)"
     echo -e "  ${C_GREEN}hw waypoints${C_RESET}        List taught waypoints"
     echo -e "  ${C_GREEN}hw record <seq>${C_RESET}     Record a sequence: pose the arm, Enter saves each step (moves nothing)"
+    echo -e "  ${C_GREEN}hw envelope record${C_RESET}  Record the action space: drive the follower with the leader, name anchors (moves nothing)"
+    echo -e "  ${C_GREEN}demos record --skill pick --food grape${C_RESET}  Record teleop demos for ACT (reads only); demos list"
     echo -e "  ${C_RED}hw play <seq|wp...>${C_RESET}  Go through all waypoints, ONE MOVE prompt, waits until stopped + --pause"
     echo -e "  ${C_GREEN}hw sequences${C_RESET}        List recorded sequences"
     echo -e "  ${C_RED}hw demo [motors]${C_RESET}     Follower: sweep each motor, then all together; per-motor report"
@@ -68,6 +71,7 @@ print_usage() {
     echo -e "  ${C_CYAN}hw bundle${C_RESET}            Pack logs, config and state for debugging or sharing"
     echo -e "  ${C_CYAN}logs [-f]${C_RESET}            Show the newest run log (-f follows it live)"
     echo -e "  ${C_CYAN}cameras${C_RESET}              Apply fixed camera exposure (Station must be stopped)"
+    echo -e "  ${C_GREEN}calib <cmd>${C_RESET}          AprilTag table frame + arm base + IK: layout, camera, zero, touch, fit, where, reach, pixel, show; goto MOVES the arm"
     echo -e "  ${C_CYAN}preflight${C_RESET}            Read-only ElRobot readiness check (writes logs/)"
     echo ""
     echo -e "${C_BOLD}Team Sync:${C_RESET}"
@@ -196,7 +200,9 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
         # Load secrets such as ANTHROPIC_API_KEY from .env (gitignored) if present.
         if [ -f .env ]; then set -a; . ./.env; set +a; fi
         echo -e "${C_GREEN}[+] Starting ElRobot web console (cameras + voice chat)...${C_RESET}"
-        exec "$PY" src/web_console.py --port "${1:-8890}"
+        # Extra arguments go to web_console.py, e.g. ./cli.sh console 8890 --mode stepwise
+        PORT="${1:-8890}"; [ $# -gt 0 ] && shift
+        exec "$PY" src/web_console.py --port "$PORT" "$@"
         ;;
 
     mcp)
@@ -234,6 +240,17 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
 
     cameras)
         python3 scripts/camera_settings.py "$@"
+        ;;
+
+    calib)
+        # Table frame from 4 corner AprilTags, arm base pose, joint zeros, IK lookups. Reads only.
+        python3 scripts/calib.py "$@"
+        ;;
+
+    demos)
+        # Teleop demonstrations for ACT training (reads only), e.g. demos record --skill pick --food grape
+        PY=".venv/bin/python"; [ -x "$PY" ] || PY="python3"
+        "$PY" scripts/record_demos.py "$@"
         ;;
 
     sync)

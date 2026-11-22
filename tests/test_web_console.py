@@ -71,7 +71,7 @@ def test_frame_errors_are_json(client):
 
 
 def test_cameras_from_config(client):
-    assert set(client.get("/api/cameras").json()["cameras"]) >= {"table", "gripper"}
+    assert set(client.get("/api/cameras").json()["cameras"]) >= {"table", "gripper", "face"}
 
 
 def test_transcribe(client):

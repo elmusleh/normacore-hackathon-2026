@@ -1,8 +1,8 @@
-"""Web console for the ElRobot MCP: live table and gripper cameras next to a voice chat box.
+"""Web console for the ElRobot MCP: live table, gripper and face cameras next to a voice chat box.
 
     ./cli.sh console            then open http://localhost:8890
 
-Left: the `table` and `gripper` cameras (names from config/elrobot.json -> cameras), read
+Left: the `table`, `gripper` and `face` cameras (names from config/elrobot.json -> cameras), read
 from the Station exactly like the MCP `look` tool. Right: a chat box with a big microphone
 button. Speech is transcribed with OpenAI gpt-transcribe, the same call as src/speech.py
 (languages de + en, a keyword list). Needs OPENAI_API_KEY (from .env); without it the page falls
@@ -594,6 +594,9 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--no-stt", action="store_true", help="skip OpenAI speech-to-text; use the browser's")
     parser.add_argument("--no-agent", action="store_true", help="chat only, no Claude")
+    parser.add_argument("--mode", choices=("plans", "stepwise"), default=os.environ.get("WEB_CONSOLE_MODE", "plans"),
+                        help="plans: recorded plans and waypoints (default); stepwise: Claude steers every "
+                             "move with look + small nudges, no waypoints (env WEB_CONSOLE_MODE)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -611,7 +614,9 @@ def main() -> None:
     agent_factory = None
     if not args.no_agent:
         from console_agent import ConsoleAgent  # noqa: WPS433
-        agent_factory = ConsoleAgent
+        mode = args.mode
+        agent_factory = lambda post: ConsoleAgent(post, mode=mode)  # noqa: E731
+        print(f"Agent mode: {mode}", flush=True)
         if not os.environ.get("ANTHROPIC_API_KEY"):
             print("Note: ANTHROPIC_API_KEY is not set; the chat cannot reach Claude.", flush=True)
     uvicorn.run(create_app(stt=stt, agent_factory=agent_factory), host=args.host, port=args.port,

@@ -1,43 +1,48 @@
 {
   "station": {
     "server": "localhost",
-    "bus": "5B61034962",
+    "bus": "5B61034679",
     "leader_bus": "5B61037051"
   },
   "joint_map": {},
-  "current_threshold": {},
+  "current_threshold": {
+    "8": 100
+  },
   "default_current_threshold": 100,
   "gripper": {
     "motor": 8,
     "open_at": "max",
-    "verified": false,
-    "squeeze_steps": 10
+    "verified": true,
+    "squeeze_steps": 57
   },
   "cameras": {
     "table": [
+      "port:3-5.1",
       "port:3-1.1",
       "port:3-5.2.2",
       "port:2-1.2.2"
     ],
     "gripper": [
-      "port:3-1.2.4",
       "port:3-5.2.4",
+      "port:3-1.2.4",
       "port:2-1.2.4"
     ],
+    "face": "port:3-5.3",
     "person": "v4l2:2"
   },
   "camera_settings": {
     "table": {
-      "exposure": 160
+      "exposure": 250
     },
     "gripper": {
-      "exposure": 14
+      "exposure": 250
     }
   },
   "agent": {
     "max_speed": 500,
     "max_waypoint_delta_steps": 1500,
     "max_nudge_percent": 5.0,
+    "envelope_margin_steps": 80,
     "clear_waypoint": "clear",
     "sequence_speed": 300,
     "sequence_pause_s": 1.5,
