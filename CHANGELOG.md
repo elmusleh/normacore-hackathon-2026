@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `./cli.sh start` and `./cli.sh digital-twin` now run the dashboard with `.venv/bin/python` (falling back to `python3`), like `console` and `mcp`. Under plain `python3` MediaPipe is missing, so the person camera fell back to the OpenCV Haar detector and drew a false "MOUTH closed" box on an empty scene.
 
 ### Changed
+- Polished repository structure for hackathon submission: organized `docs/` into `docs/pitch/`, `docs/diagrams/`, `docs/assets/`, active engineering guides, and `docs/archive/` with a `docs/README.md` index; upgraded `README.md` with embedded architecture/flow PNGs, use-case illustrations, badges, and AprilTag IK coverage; added `.env.example` and MIT `LICENSE`; untracked personal `archive/` exports and root `sample_calibrated_view.png` in `.gitignore`.
 - Updated `README.md` to reflect Team 6 (**CareArm — Assistive Feeding Robot**), its 4-layer architecture, 3-camera MediaPipe vision, 15 MCP tools, 3-layer guardrails, verified benchmarks (123/123 tests), `./cli.sh` reference, and Team 6 roster.
 - Added Team 6 (`CareArm`) and all 3 team member names (Jan Schulz, Jafer Sharfeddin, Mohammad El-Musleh) to Slides 1 and 10 of `scripts/generate_pitch_deck.py` and regenerated `docs/Assistive_Feeding_Robot_Pitch.pptx`.
 - Recorded 6 verified 2026-11-22 hardware, camera, MediaPipe MAR, gravity-settle, torque-readback, and test-suite findings at the top of `FINDINGS.md`.

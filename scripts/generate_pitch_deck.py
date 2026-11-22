@@ -1084,4 +1084,4 @@ Thank you—we would love to show you a live feeding run and answer any question
 
 if __name__ == "__main__":
     repo_root = Path(__file__).resolve().parent.parent
-    build_deck(repo_root / "docs" / "Assistive_Feeding_Robot_Pitch.pptx")
+    build_deck(repo_root / "docs" / "pitch" / "Assistive_Feeding_Robot_Pitch.pptx")

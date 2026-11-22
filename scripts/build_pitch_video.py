@@ -125,8 +125,8 @@ def main() -> None:
     parser.add_argument(
         "--pptx",
         type=Path,
-        default=Path("docs/CareArm_Use_Case_Pitch.pptx"),
-        help="Input .pptx file (default: docs/CareArm_Use_Case_Pitch.pptx)",
+        default=Path("docs/pitch/CareArm_Use_Case_Pitch.pptx"),
+        help="Input .pptx file (default: docs/pitch/CareArm_Use_Case_Pitch.pptx)",
     )
     parser.add_argument(
         "--output",

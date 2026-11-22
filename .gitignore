@@ -62,20 +62,21 @@ recordings/
 telemetry_dumps/
 captures/*.png
 captures/*.jpg
-!sample_calibrated_view.png
+sample_calibrated_view.png
 sample_feeding_view.jpg
 
 # IDEs & Text Editors
 .idea/
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
+.vscode/
 *.sublime-workspace
 *.sublime-project
 *.swp
 *.swo
 *~
+**/.~lock.*#
+
+# Personal hackathon inbox exports & unrelated track archive (local only)
+/archive/
 
 # Operating System Files
 .DS_Store

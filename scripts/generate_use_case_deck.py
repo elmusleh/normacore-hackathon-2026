@@ -926,4 +926,4 @@ Thank you—we’d love to show you CareArm in action and answer your questions!
 
 if __name__ == "__main__":
     repo_root = Path(__file__).resolve().parent.parent
-    build_deck(repo_root / "docs" / "CareArm_Use_Case_Pitch.pptx")
+    build_deck(repo_root / "docs" / "pitch" / "CareArm_Use_Case_Pitch.pptx")

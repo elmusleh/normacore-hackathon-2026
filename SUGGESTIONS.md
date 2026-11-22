@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Merge `feat/agent-commit-and-push-policy` into `main` so `github.com/elmusleh/normacore-hackathon-2026` shows the polished repo by default — Priority 96% (Critical) [Professionalism]
+   What: Merge the verified `feat/agent-commit-and-push-policy` branch into `main` and push `main` to `origin`.
+   Why: The Tally submission link opens `main` by default; merging ensures judges land directly on the visual `README.md`, organized `docs/pitch/`, and 169 passing tests.
+   How: Run `git checkout main && git merge feat/agent-commit-and-push-policy && git push origin main`, or create and merge a PR on GitHub.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Waiting for your confirmation on merging directly to `main` vs. opening a PR.
+
+2. Add a direct `Demo Video` link row to the top table in `README.md` once the final MP4 is uploaded to Google Drive — Priority 76% (High value) [Professionalism]
+   What: Add a `| **3-Minute Demo Video** | [Watch on Google Drive](...) |` row to the top Submission Asset table in `README.md`.
+   Why: Judges browsing GitHub can launch your 3-minute showcase video in one click right from the repository header.
+   How: Edit the top table in `README.md` once the final video file is in your shared Google Drive folder.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Final combined bench + story video is still being uploaded to Google Drive.
+
+3. Tag the final hackathon submission commit (`v1.0-hackathon-submission`) once `main` is updated — Priority 48% (Optional) [Best practices]
+   What: Create an annotated git tag `v1.0-hackathon-submission` on the final `main` commit before the 16:30 deadline.
+   Why: Gives judges a permanent, reproducible snapshot of the exact code submitted at the hackathon even if the team keeps iterating afterward.
+   How: Run `git tag -a v1.0-hackathon-submission -m "Team 6 CareArm — Berlin Robotics & AI Hackathon 2026 submission" && git push origin v1.0-hackathon-submission`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Best applied right after `main` is merged and finalized before 16:30.
+
 1. Find the person camera by name or USB port, not by `/dev/video` number — Priority 80% (High value) [Best practices]
    What: Let `cameras.person` in `config/elrobot.json` be a USB port (`port:3-1.3`) or a name match (`name:OBSBOT`) and resolve it to the right `/dev/videoN` at start.
    Why: Numbers change after every replug; today the dashboard grabbed the table camera as the "person" camera and blocked exposure tuning.

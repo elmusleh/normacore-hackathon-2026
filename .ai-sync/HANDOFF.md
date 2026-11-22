@@ -1,15 +1,26 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T07:34:00Z
-status: narrated-story-film-ready
+timestamp: 2026-11-22T11:05:00Z
+status: repo-cleanup-and-polish-complete
 current_phase: "Phase 5: Demo Polishing & Sunday Pitch"
-current_task: "Wrote CareArm production story script (docs/CAREARM_STORY_SCRIPT.md) and generated narrated 1080p story film (data/carearm_story_film_1080p.mp4)"
+current_task: "Executed repository cleanup plan: organized docs/pitch + docs/archive + docs/README.md, upgraded README.md with visuals, added .env.example & MIT LICENSE, untracked archive/ & root sample image"
 stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-22T07:28 — diagrams-png-pdf-and-illustrated-video-ready
+previous_session: Claude Code 2026-11-22 ~09:00 — Stage 1.1 camera check, Full HD, 5B61034962 recalibrated
 ---
 
-## Latest session (2026-11-22 ~09:00, Claude Code for steve): Stage 1.1 camera check, Full HD and person-mouth fix
+## Latest session (2026-11-22 11:05): Repository Cleanup, Structure Polish & Showpiece README
+
+- **What Changed:**
+  - **Root & Security Hygiene (`.gitignore`, `.env.example`, `LICENSE`):** Added `.env.example` (blank placeholders, zero secrets) and MIT `LICENSE`; added `.vscode/`, `**/.~lock.*#`, `archive/`, and `sample_calibrated_view.png` to `.gitignore` and removed personal inbox exports (`archive/`) and root `sample_calibrated_view.png` from git tracking (local copies preserved on disk).
+  - **Clean `docs/` Hierarchy (`docs/README.md`, `docs/pitch/`, `docs/archive/`):** Moved final pitch/submission assets into `docs/pitch/`, regenerated both PPTX decks there, moved 7 outdated Day-1 drafts into `docs/archive/`, kept all active engineering guides in `docs/` (zero broken code/CLI references), and updated generator scripts (`scripts/generate_pitch_deck.py`, `scripts/generate_use_case_deck.py`, `scripts/build_pitch_video.py`).
+  - **Showpiece `README.md`:** Embedded `docs/diagrams/carearm_overview.png`, `docs/diagrams/carearm_feeding_sequence.png`, and 2 editorial use-case illustrations (`scene_04_standoff.png`, `scene_05_family.png`), added status badges, top Submission Asset links, AprilTag IK & feeding skills coverage, and verified 0 broken links.
+- **Files Changed:** `.gitignore`, `.env.example`, `LICENSE`, `README.md`, `docs/README.md`, `docs/pitch/*`, `docs/archive/*`, `scripts/generate_pitch_deck.py`, `scripts/generate_use_case_deck.py`, `scripts/build_pitch_video.py`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
+- **Next Steps:**
+  1. Push `feat/agent-commit-and-push-policy` and merge into `main` so `https://github.com/elmusleh/normacore-hackathon-2026` shows the polished repo by default.
+  2. Upload final demo video + pitch deck to Google Drive / Slides and submit `https://tally.so/r/GexoxQ` before **16:30**.
+
+## Session (2026-11-22 ~09:00, Claude Code for steve): Stage 1.1 camera check, Full HD and person-mouth fix
 
 - **What Changed:**
   - `cli.sh`: `start` and `digital-twin` now use `.venv/bin/python` (fallback `python3`). Under plain `python3` MediaPipe is missing, so the person camera drew a false "MOUTH closed" box with nobody in view.
