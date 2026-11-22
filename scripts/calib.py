@@ -28,6 +28,7 @@ import argparse
 import math
 import os
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -454,11 +455,50 @@ def cmd_goto(args, cal):
         final = hw.snapshot()
         tip = base.base_to_table(model.tcp(jc.to_radians({m: final[m].present for m in ARM_MOTORS})))
         print(f"Arrived. Fingertip by the joint readings: {_fmt(tip)} mm (target {_fmt(end or target)}).")
+        opening, closing = getattr(args, "open_after", False), getattr(args, "close_after", False)
+        if opening or closing:
+            return _gripper_after(hw, cfg, "open" if opening else "close")
         return 0
     try:
         return hw_day._with_station(go)
     except hw_day.StationDown as exc:
         raise SystemExit(f"ERROR: {exc}")
+
+
+GRIP_MOTOR = 8
+GRIP_EDGE_STEPS = 20       # stay this far inside the gripper's calibrated range
+GRIP_HOLD_MIN_STEPS = 60   # stalled this far above the closed end = something is between the jaws
+
+
+def _gripper_after(hw, cfg, action: str) -> int:
+    """Open or close the gripper (motor 8) right after a goto, on this same Station connection
+    (fresh readings). Closing stops where it stalls and keeps gripper.squeeze_steps of squeeze."""
+    g = cfg.get("gripper", {})
+    r = hw.snapshot()[GRIP_MOTOR]
+    lo, hi = r.range_min + GRIP_EDGE_STEPS, r.range_max - GRIP_EDGE_STEPS
+    open_goal, closed_goal = (hi, lo) if g.get("open_at", "max") == "max" else (lo, hi)
+    if action == "open":
+        hw.move_motors({GRIP_MOTOR: open_goal}, enable_motion=True, max_speed=800)
+        time.sleep(0.6)
+        print(f"Gripper opened: {hw.snapshot()[GRIP_MOTOR].present} (goal {open_goal}).")
+        return 0
+    hw.move_motors({GRIP_MOTOR: closed_goal}, enable_motion=True, max_speed=400)
+    prev, still, t_end = r.present, 0, time.monotonic() + 3.0
+    while time.monotonic() < t_end:
+        time.sleep(0.05)
+        now = hw.snapshot()[GRIP_MOTOR].present
+        still = still + 1 if abs(now - prev) < 3 else 0
+        prev = now
+        if still >= 4 or abs(now - closed_goal) < 10:
+            break
+    if abs(prev - closed_goal) >= GRIP_HOLD_MIN_STEPS:
+        squeeze = int(g.get("squeeze_steps", 10))
+        hold = prev - squeeze if closed_goal < open_goal else prev + squeeze
+        hw.move_motors({GRIP_MOTOR: hold}, enable_motion=True, max_speed=200)
+        print(f"Gripper holding: stalled at {prev}, squeeze {squeeze} steps (goal {hold}).")
+    else:
+        print(f"Gripper closed empty at {prev}: nothing between the jaws.")
+    return 0
 
 
 def cmd_pixel(args, cal):
@@ -503,12 +543,14 @@ def main() -> int:
     p.add_argument("y", type=float)
     p.add_argument("z", type=float)
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
-    p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-70 mm/s)")
+    p.add_argument("--mm-per-s", type=float, default=60.0, help="fingertip speed (5-70 mm/s)")
     p.add_argument("--step-mm", type=float, default=3.0, help="distance between streamed points (2-20)")
     p.add_argument("--travel-z", type=float, default=GOTO_TRAVEL_Z_MM,
                    help="height (mm) to travel sideways at; never below the safety floor (default 150)")
     p.add_argument("--min-z", type=float, default=GOTO_MIN_Z_MM,
                    help="lower the safety floor for a grasp (0-50 mm, default 50); fit error is still added")
+    p.add_argument("--open-after", action="store_true", help="open the gripper after arriving (e.g. drop into a bowl)")
+    p.add_argument("--close-after", action="store_true", help="close the gripper after arriving and hold with gripper.squeeze_steps")
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
     p = sub.add_parser("line", help="MOVE: goto the start point, then along a straight line (asks MOVE first)")
     for a in ("x1", "y1", "z1", "x2", "y2", "z2"):
@@ -519,7 +561,7 @@ def main() -> int:
     p.add_argument("--min-z", type=float, default=GOTO_MIN_Z_MM,
                    help="lower the safety floor for a grasp (0-50 mm, default 50); fit error is still added")
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
-    p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-70 mm/s)")
+    p.add_argument("--mm-per-s", type=float, default=60.0, help="fingertip speed (5-70 mm/s)")
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
     p = sub.add_parser("zero")
     p.add_argument("--write", action="store_true")

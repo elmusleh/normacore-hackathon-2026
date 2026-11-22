@@ -331,3 +331,51 @@ def test_cartesian_line_refuses_low_lines():
     model, jc, base, present, ranges = _goto_setup()
     with pytest.raises(ValueError, match="below the allowed"):
         ak.plan_cartesian_line(model, jc, base, present, ranges, [150, 150, 100], [300, 150, 40])
+
+
+def _load_calib_script():
+    sys.path.insert(0, str(ROOT / "scripts"))
+    spec = importlib.util.spec_from_file_location("calib_script", ROOT / "scripts" / "calib.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class _FakeGripperHw:
+    """Motor 8 that moves toward its goal and stalls at `stall` (an object between the jaws)."""
+
+    def __init__(self, present, stall=None):
+        self.present, self.stall, self.goal, self.goals = present, stall, present, []
+
+    def snapshot(self):
+        step = max(-60, min(60, self.goal - self.present))
+        nxt = self.present + step
+        if self.stall is not None and self.goal < self.present and nxt <= self.stall:
+            nxt = max(self.stall, nxt) if self.present > self.stall else self.present
+        self.present = nxt
+        r = type("R", (), {})()
+        r.present, r.range_min, r.range_max = self.present, 1245, 2851
+        return {8: r}
+
+    def move_motors(self, goals, **kw):
+        self.goal = goals[8]
+        self.goals.append(goals[8])
+
+
+def test_gripper_after_close_holds_with_squeeze_on_a_fresh_reading(monkeypatch):
+    calib = _load_calib_script()
+    monkeypatch.setattr(calib.time, "sleep", lambda s: None)
+    hw = _FakeGripperHw(2800, stall=1490)
+    assert calib._gripper_after(hw, {"gripper": {"open_at": "max", "squeeze_steps": 57}}, "close") == 0
+    assert hw.goals[0] == 1265 and hw.goals[-1] == 1490 - 57
+
+
+def test_gripper_after_close_empty_and_open(monkeypatch):
+    calib = _load_calib_script()
+    monkeypatch.setattr(calib.time, "sleep", lambda s: None)
+    hw = _FakeGripperHw(2800)
+    calib._gripper_after(hw, {"gripper": {"open_at": "max", "squeeze_steps": 57}}, "close")
+    assert hw.goals == [1265]                       # reached the closed end: no squeeze added
+    hw = _FakeGripperHw(1300)
+    calib._gripper_after(hw, {"gripper": {"open_at": "max"}}, "open")
+    assert hw.goals == [2831]

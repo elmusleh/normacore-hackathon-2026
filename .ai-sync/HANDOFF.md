@@ -9,6 +9,13 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~08:20, claude for Jafer): drop-in-bowl skill, faster moves
+- Jafer: new skill "drop into the bowl" (pre-stage for the mouth), and make decisions and moves much faster.
+- `calib goto --open-after / --close-after` (gripper without MCP, fresh readings), default 60 mm/s. Skill `drop-in-bowl`: `calib goto 365 28 130 --travel-z 130 --mm-per-s 70 --open-after` dropped the left grape into the blue bowl (bowl centre ~ (365, 28) mm). The dropped grape looks split (from the earlier hard grip).
+- `grip-object` rewritten: hover+open, 40 mm check, down+close, lift; 70/40/20/50 mm/s. `--close-after` not yet run on the arm.
+- Arm now: above the bowl at ~ (358, 31, 97) mm by joints, gripper open, torque on.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~08:05, claude for Jafer): grip too hard, stale MCP readings
 - Jafer: grip is too hard, halve it. Found the elrobot MCP server reads a frozen frame (motor 8 raw 1381 while `hw motors` says 1487), so set_gripper's 10-step squeeze became ~115 steps. Set the held grape to zero extra squeeze (`hw jog 8 -57` ended with goal = present); still held.
 - `gripper.squeeze_steps` 10 -> 57 (half of 115). Needs the MCP server reconnected (`/mcp`) so the squeeze is counted from a fresh reading. MCP writes work, its reads are stale; that also explains the timeouts.
