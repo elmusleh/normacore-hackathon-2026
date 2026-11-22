@@ -44,16 +44,17 @@ Voice "stop" is not part of the skills: it is the always-on local process `scrip
 | :--- | :--- | :--- | :--- |
 | grab 3 | Hover procedure | - | Done (`hover-above-object`) |
 | grab 4 | Finger-centre pixel in the gripper camera | - | To measure |
-| grab 5 | Gripper direction verified, current probed, grasp width per food in `foods` config | 1.2-1.4, 4.1 | Open |
+| grab 5 | Gripper direction verified, current probed, grasp width per food in `foods` config | 1.2-1.4, 4.1 | Direction verified (temp arm); grasp works on the flat table with the angled wrist (`grip-object`); fingers-down required now and blocked by wrist zeros; motor 8 range and per-food width open |
+| feed pre-stage | Drop the held object into the bowl | - | Done (`drop-in-bowl`, 2026-11-22) |
 | feed 2 | `serve` pose (waypoint or table-frame point) | 2.3 | Open |
 | feed 3 | `find_mouth` tool + approach loop (local code, owner-reviewed) | 2.1, 2.2, 2.4 | Partly in `src/feeding_vision.py` |
 | feed 4 | Bite detection | 2.5 | Open |
 
 ## Autonomy
 
-`grab` steps 1-3 run without asking (standing OK for hover, Jafer, 2026-11-22). Grasping (step 5) and all of
-`feed` need the hardware owner's typed confirmation, once per request, until the owner writes a wider
-standing OK into the skill file.
+`grab` (skill `grip-object`) and `drop-in-bowl` run without asking: Jafer gave a standing OK on 2026-11-22,
+written into both skill files, retries allowed. `feed` toward a person still needs the hardware owner's typed
+confirmation per request. A new hardware owner must renew these OKs (see HANDOFF).
 
 ## Later (Could tier)
 

@@ -67,12 +67,26 @@ Origin = centre of tag 0, +x toward tag 1, +y toward tag 3, z up from the table 
 - Motor 1's zero cannot be told apart from the base yaw: the fit puts it in the yaw.
 - The URDF wrist and gripper geometry is assumed correct; the TCP offset (closed fingertip,
   103.5 mm past the Gripper_Base frame) comes from the jaw meshes, not a ruler.
-- `calib reach` only computes. `./cli.sh calib goto X Y Z [--down] [--mm-per-s 25]` and
-  `./cli.sh calib line X1 Y1 Z1 X2 Y2 Z2 [--down] [--mm-per-s 25]` MOVE the arm (hardware owner only,
-  `docs/bench_safety.md` first). Path: straight up to 150 mm, straight across, straight down to the
+- `calib reach` only computes. `./cli.sh calib goto X Y Z [--down] [--mm-per-s 60]` and
+  `./cli.sh calib line X1 Y1 Z1 X2 Y2 Z2 [--down] [--mm-per-s 60]` MOVE the arm (hardware owner only,
+  `docs/bench_safety.md` first). Path: straight up to the travel height (150 mm), straight across, straight down to the
   target (and for `line`, along the line). Points every `--step-mm` (3) are streamed at a steady
   pace without waiting, so the arm glides instead of stopping at each point. With `--down` the
   wrist turns down once, above the target. Every point is checked before the MOVE prompt (height
   >= 50 mm + fit error, reach, motor ranges never clamped, no motor jumping > 120 steps between
   neighbours). While moving it holds the arm at once on an overload, a motor fault, or a motor
-  more than 200 steps behind. Motor 7 and the gripper stay where they are.
+  more than 200 steps behind. Motor 7 stays where it is; the gripper too, unless asked (below).
+- Options added 2026-11-22 (goto and line unless noted):
+  - `--mm-per-s` 5-70, default 60.
+  - `--travel-z MM` (50-250, default 150): travel sideways lower, e.g. when the lift to 150 mm pushes a
+    motor past its range. Never below the safety floor or the target height.
+  - `--min-z MM` (0-50, default 50): lowers the 50 mm part of the floor for a grasp; the fit error is
+    still added (so `--min-z 0` allows about 16 mm with the current fit). Prints a warning.
+  - goto only: `--open-after` opens the gripper on arrival (drop into the bowl); `--close-after` closes it,
+    stops where the jaws stall and keeps `gripper.squeeze_steps` (57) of squeeze, read fresh on the same
+    connection. It reports "holding" on any stall, also on a bowl or the table: check with the gripper camera.
+  - No dry-run flag: `echo no | ./cli.sh calib goto ...` runs every check and moves nothing.
+- The arm sags 10-25 mm under gravity depending on reach (it ends LOWER than commanded; over the bowl
+  it ended a little higher). Read the "Arrived ... joint readings" height after each move.
+- Skills that use these: `.claude/skills/hover-above-object`, `grip-object` (fingers vertical down only),
+  `drop-in-bowl`.

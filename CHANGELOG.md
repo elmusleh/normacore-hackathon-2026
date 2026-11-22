@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Docs: `docs/tcp_calibration.md` lists the new `calib goto/line` options, defaults and the sag note; `docs/feeding_skills.md` status and autonomy updated for `grip-object` / `drop-in-bowl`; `calib` usage text updated.
 - FINDINGS: bowl grip failure, `--down` refusals (wrist zeros), stale MCP readings, reach-dependent sag. PREFERENCES: Jafer's fast arm pace. SUGGESTIONS: 3 new (2026-11-22 handover).
 - Team handover docs: HANDOFF "START HERE" summary (branch, temporary arm, calibration, what works/fails, ordered next steps), PROGRESS brought up to date, GUIDELINES §6 grasp rules and per-owner standing permissions, plan status line (2026-11-22).
 - `config/calibration.json`: joint zeros re-captured and the base-in-table fit redone from 8 AprilTag touches (rms 16.0 -> 15.55 mm, base z -36.9 -> -20.2 mm), measured 2026-11-22.

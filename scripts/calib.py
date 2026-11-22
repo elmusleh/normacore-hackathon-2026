@@ -10,8 +10,8 @@ Usage (via ./cli.sh calib):
   calib touch --list | --clear
   calib fit [--refine] [--write]       arm base pose in the table frame (+ joint zeros/directions)
   calib where                          current fingertip position in base and table frames
-  calib goto X Y Z [--down] [--mm-per-s 25] [--travel-z 150]  MOVES the arm smoothly: lift, across at 150 mm, descend (asks MOVE)
-  calib line X1 Y1 Z1 X2 Y2 Z2 [--down] [--mm-per-s 25]  MOVES: goto the start, then along a straight line
+  calib goto X Y Z [--down] [--mm-per-s 60] [--travel-z 150] [--min-z 50] [--open-after|--close-after]  MOVES: lift, across, descend (asks MOVE)
+  calib line X1 Y1 Z1 X2 Y2 Z2 [--down] [--mm-per-s 60]  MOVES: goto the start, then along a straight line
   calib reach X Y Z [--down]           IK: joint steps that put the fingertip at table point X Y Z
   calib pixel U V [--size WxH]         table point under a camera pixel
   calib show                           what is calibrated and how well
