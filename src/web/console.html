@@ -200,11 +200,31 @@ fetch("/api/cameras").then(r => r.json())
 // ---------------------------------------------------------------- text to speech (TTS)
 let currentAudio = null;
 let ttsPlaying = false;
-let followupUntil = 0;  // 12 s after TTS finishes, user can reply without repeating wake word
+let followupUntil = 0;
+let hfCancelCurrent = false;
+
+function setHfMicEnabled(enabled) {
+  if (hfStream) {
+    hfStream.getAudioTracks().forEach(t => { t.enabled = enabled; });
+  }
+}
+
+function abortHandsFreeRecording() {
+  hfSpeaking = false;
+  hfSpeechFrames = 0;
+  setRecording(false);
+  if (hfRecorder?.state === "recording") {
+    hfCancelCurrent = true;
+    try { hfRecorder.stop(); } catch (_) {}
+  }
+}
 
 async function speakText(text, force = false) {
   if ((!force && !$("tts")?.checked) || !text) return;
   ttsPlaying = true;
+  abortHandsFreeRecording();
+  setHfMicEnabled(false);
+  if (hfActive) setHfState("speaking", "Robot speaking… (mic muted)");
   try {
     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
     const r = await fetch("/api/tts", {
@@ -238,13 +258,14 @@ async function speakText(text, force = false) {
     }
     if (force) setStatus(`TTS error: ${e.message}`, true);
   } finally {
-    // Brief echo guard before resuming hands-free mic listening
+    // Keep mic muted for 700 ms after TTS finishes so speaker tail/echo is completely gone
     setTimeout(() => {
       ttsPlaying = false;
+      setHfMicEnabled(true);
       if ($("handsfree")?.checked && !recording && !busy) {
         setHfState("standby", 'Say "Robo, ..." to command (or "Stop" anytime)');
       }
-    }, 500);
+    }, 700);
   }
 }
 
@@ -609,6 +630,10 @@ async function startHandsFree() {
           hfRecorder = new MediaRecorder(hfStream, { audioBitsPerSecond: 128000 });
           hfRecorder.ondataavailable = (e) => e.data.size && hfChunks.push(e.data);
           hfRecorder.onstop = async () => {
+            if (hfCancelCurrent || ttsPlaying) {
+              hfCancelCurrent = false;
+              return;
+            }
             const durMs = performance.now() - hfStartedAt;
             const blob = new Blob(hfChunks, { type: hfRecorder.mimeType || "audio/webm" });
             if (durMs < HF_MIN_SPEECH_MS + HF_SILENCE_MS * 0.5 || blob.size < 2000) {
