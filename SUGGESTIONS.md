@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Enforce the hover skill's limits in a hook, not only in text — Priority 86% (High value) [Security]
+   What: A Claude Code PreToolUse hook that blocks `calib goto ... --yes` unless the z is >= 66 mm and HANDOFF.md names the session's user as hardware owner.
+   Why: The skill lets the agent move the arm without asking. A hook makes that rule hard to break by accident, for example a typo in z or a session run by someone else.
+   How: Add a small script in `.claude/hooks/` that reads the Bash command from stdin, parses the z after `calib goto`, and exits 2 with a message if it is too low; register it in `.claude/settings.json` under `PreToolUse` for `Bash`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Skill just created; first wanted Jafer to see it in use.
+
+2. Centre the object with the gripper camera before any descent — Priority 72% (High value) [Best practices]
+   What: After hovering, look through the gripper camera and correct x/y by a few mm until the object is in the middle of the picture.
+   Why: The table-camera calibration is ~3 cm off (the hover above the grape ended visibly to its right). The gripper camera sees the object up close, so it can remove most of that error before grasping.
+   How: Note which pixel in the gripper camera is right between the fingers, then after each hover compare the grape's pixel with it and send a small `calib goto` correction (z unchanged), at most 3 times.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the hover step proven first and a gripper-camera pixel-to-mm scale.
+
+3. Offer the hover procedure as an MCP tool for the voice agent — Priority 55% (Nice to have) [Professionalism]
+   What: A `hover_above(u, v, camera)` tool in the elrobot MCP server that runs pixel -> reach -> goto with the same checks.
+   Why: The console's voice agent cannot run shell commands, so today only a Claude Code session can do this move; one tool keeps both on the same safe code path.
+   How: Wrap the functions behind `calib pixel` and `calib goto` from `scripts/calib.py` in `src/robot_tools.py`, keep the 66 mm floor and dry-run flag, and add an offline test with a fake Station.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Out of the current plan step (bench calibration first).
+
 1. Log every `calib goto` with its plan and result — Priority 80% (High value) [Security]
    What: Write each goto's target, planned legs, motor goals and final status to `logs/` (as `hw` commands already do).
    Why: If the arm hits something, the log shows exactly what was commanded and where it stopped, which is the first thing anyone needs after an incident.

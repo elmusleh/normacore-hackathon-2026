@@ -9,6 +9,12 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~04:40, claude for Jafer): hover above the grape, skill
+- Jafer asked to move towards the grape with the IK interface and to execute automatically. Ran `./cli.sh calib goto 381 155 70 --yes` (grape at pixel (1265, 445) -> table (380.7, 154.6)). Arrived; joint readings (380.6, 155.1, 66.7). The camera shows the tip right of and behind the grape (see FINDINGS.md). Arm is holding there, torque on.
+- New project skill `.claude/skills/hover-above-object/SKILL.md`: the procedure for every "move above <object>" request. Standing authorization from Jafer covers only this hover move (z >= floor, no grasp, no gripper).
+- Next: 1) Ruler-measure the tip-to-grape offset at the hover pose. 2) More touches / ruler layout to bring the fit under 10 mm. 3) Then a separate, confirmed "descend and grasp" step.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~04:10, claude for Jafer): hardware owner -> Jafer, calib goto
 - Hardware owner changed from steve to jafer at Jafer's request ("please remove anything with steve"). Older entries below still name steve; they are history and were not rewritten.
 - Jafer recalibrated the Station motor ranges, then redid `calib zero` (03:53) and 8 touches; fit 16.0 mm RMS, base z -36.9 mm (implausible: expected >= 0). Committed as measured, but treat targets as +-3 cm until the ruler fit.

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Project skill `.claude/skills/hover-above-object/SKILL.md`: the fixed procedure for "move above <object>" (table camera look -> `calib pixel` -> `calib reach` -> `calib goto X Y 70 --yes` -> look again). Jafer (hardware owner) authorised it to run without asking each time on 2026-11-22, for hover moves only; grasping, lower moves and gripper commands still need typed confirmation.
+
 ### Changed
 - `calib goto` and `calib line` move smoothly: the whole move (lift, across, descend, line) is planned as straight segments with a point every 3 mm (`plan_cartesian_path`) and streamed at a steady fingertip speed (`--mm-per-s`, default 25, max 60) with `move_motors`, instead of stopping at each point (Jafer saw the line stutter). Watched on every point: overload, fault, motor > 200 steps behind -> hold. `--speed` replaced by `--mm-per-s`. With `--down` the wrist turns once above the target.
 
