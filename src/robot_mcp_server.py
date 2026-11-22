@@ -149,12 +149,19 @@ def list_sequences() -> dict:
 
 
 @server.tool(structured_output=False)
-def play_sequence(name: str) -> dict:
-    """Run a recorded plan (e.g. the one for grapes) from start to end, in one call: the arm
-    goes through every recorded pose, waits until it has stopped at each one, pauses briefly,
-    then goes on. Takes about 20-60 s. On any problem (obstacle, overload, not arriving) or a
-    stop() call it holds the arm where it is and returns ok=false with the step it stopped at."""
-    return tools.call(tools.play_sequence, name)
+def play_sequence(name: str, start_at: str = "", stop_after: str = "") -> dict:
+    """Run a recorded plan (e.g. the one for grapes) from start to end, or a slice using optional
+    start_at / stop_after waypoint names (for grasp alignment/verification). Holds the arm and
+    returns ok=false on any problem (obstacle, overload, not arriving) or stop()."""
+    return tools.call(tools.play_sequence, name, start_at or None, stop_after or None)
+
+
+@server.tool(structured_output=False)
+def align_base(delta_percent: float) -> dict:
+    """Bounded pre-grasp base alignment nudge at the approach pose. Moves only the configured
+    grasp_alignment.motor by at most ±max_step_percent (default 2%) per call and ±max_total_percent
+    (default 6%) cumulative since the last play_sequence(..., stop_after=approach)."""
+    return tools.call(tools.align_base, delta_percent)
 
 
 @server.tool(structured_output=False)

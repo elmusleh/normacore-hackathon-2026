@@ -133,6 +133,9 @@ class RobotTools:
         self._lock = threading.Lock()
         self._gripper_cmd_open: Optional[float] = None  # last commanded gripper opening, %
         self._abort = threading.Event()  # set by stop(); a running play_sequence halts on it
+        self._align_cumulative: float = 0.0
+        self._last_approach_pose: Optional[Dict[int, int]] = None
+        self._last_approach_name: Optional[str] = None
 
     # -- plumbing -------------------------------------------------------------
 
@@ -446,25 +449,55 @@ class RobotTools:
         plans = {name: {"steps": steps, "ready": all(w in points for w in steps),
                         "missing_waypoints": [w for w in steps if w not in points]}
                  for name, steps in seqs.items()}
-        foods = {food: {"sequence": spec.get("sequence"), "note": spec.get("note", ""),
-                        "ready": spec.get("sequence") in plans and plans[spec["sequence"]]["ready"]}
-                 for food, spec in cfg.get("foods", {}).items()}
+        foods: Dict[str, Any] = {}
+        for food, spec in cfg.get("foods", {}).items():
+            seq_name = spec.get("sequence")
+            ready = seq_name in plans and plans[seq_name]["ready"]
+            entry: Dict[str, Any] = {"sequence": seq_name, "note": spec.get("note", ""), "ready": ready}
+            grasp = spec.get("grasp")
+            if isinstance(grasp, dict):
+                entry["grasp"] = grasp
+                steps = seqs.get(seq_name, [])
+                approach = grasp.get("approach")
+                cont = grasp.get("continue_at")
+                if approach not in steps or cont not in steps or steps.index(approach) >= steps.index(cont):
+                    entry["ready"] = False
+                    entry["grasp_error"] = (
+                        f"grasp.approach ({approach!r}) must appear before grasp.continue_at ({cont!r}) in {seq_name!r}"
+                    )
+            foods[food] = entry
         return {"ok": True, "foods": foods, "sequences": plans,
                 "hint": "" if foods else "No foods configured: add 'foods' to config/elrobot.json."}
 
-    def play_sequence(self, name: str) -> Dict[str, Any]:
-        """Run a recorded plan from start to end. Holds the arm and stops on any problem or stop()."""
+    def play_sequence(self, name: str, start_at: Optional[str] = None,
+                      stop_after: Optional[str] = None) -> Dict[str, Any]:
+        """Run a recorded plan (or a start_at..stop_after slice). Holds the arm on any problem or stop()."""
         cfg = self._cfg()
         seqs = load_sequences()
         if name not in seqs:
             return {"ok": False, "error": f"no recorded plan {name!r}", "known": sorted(seqs)}
+        full_steps = list(seqs[name])
+        lo = 0
+        hi = len(full_steps) - 1
+        if start_at:
+            if start_at not in full_steps:
+                return {"ok": False, "error": f"plan {name!r}: unknown start_at step {start_at!r}", "steps": full_steps}
+            lo = full_steps.index(start_at)
+        if stop_after:
+            if stop_after not in full_steps:
+                return {"ok": False, "error": f"plan {name!r}: unknown stop_after step {stop_after!r}", "steps": full_steps}
+            hi = full_steps.index(stop_after)
+        if lo > hi:
+            return {"ok": False, "error": f"plan {name!r}: start_at {start_at!r} comes after stop_after {stop_after!r}"}
+        chosen_steps = full_steps[lo: hi + 1]
+
         agent = cfg["agent"]
         speed = min(int(agent.get("sequence_speed", 300)), int(agent["max_speed"]))
         pause = max(0.0, min(float(agent.get("sequence_pause_s", 1.5)), SEQ_MAX_PAUSE))
         tolerance = max(TRACK_TOLERANCE, min(int(agent.get("sequence_tolerance_steps", 60)), 100))
         points = load_waypoints()
         targets = []
-        for wp in seqs[name]:
+        for wp in chosen_steps:
             target, err = waypoint_target(points, wp)
             if err:
                 return {"ok": False, "error": f"plan {name!r}: {err}"}
@@ -494,6 +527,7 @@ class RobotTools:
             return {"ok": False, "error": f"goal registers of motors {drifting} change on their own: teleop "
                                           "(leader arm) is probably on. Ask the operator to turn it off."}
         self._abort.clear()
+        self._align_cumulative = 0.0
         fv_cfg = cfg.get("feeding_vision", {})
         mouth_gate_on = bool(fv_cfg.get("mouth_gate_enabled", False))
         gate_waypoints = set(fv_cfg.get("mouth_gate_waypoints") or ["serve", "feed_3", "feed_4", "choc_feed_7"])
@@ -508,9 +542,77 @@ class RobotTools:
                           tolerance=tolerance, pause=pause, stop_event=self._abort,
                           after_leg=after_leg_cb, title=name)
         result.update(sequence=name, steps=steps, mouth_gate_enabled=mouth_gate_on)
+        if result["ok"] and stop_after:
+            self._last_approach_name = stop_after
+            self._last_approach_pose = dict(targets[-1][1])
+        elif result["ok"]:
+            self._last_approach_name = None
+            self._last_approach_pose = None
         if not result["ok"]:
             result["hint"] = "The arm is holding where it stopped. Look at the camera and tell the person; do not rerun blindly."
         return result
+
+    def align_base(self, delta_percent: float) -> Dict[str, Any]:
+        """Bounded pre-grasp base alignment at the approach pose (Stage 2)."""
+        cfg = self._cfg()
+        align_cfg = cfg.get("grasp_alignment") or {}
+        motor = align_cfg.get("motor")
+        if motor is None:
+            return {"ok": False, "error": "grasp_alignment.motor is not configured; run ./cli.sh hw identify 1 first"}
+        motor = int(motor)
+        gm = self._gripper_motor(cfg)
+        if motor not in ELROBOT_MOTOR_IDS or motor == gm:
+            return {"ok": False, "error": f"invalid grasp_alignment.motor {motor}"}
+
+        max_step = float(align_cfg.get("max_step_percent", 2.0))
+        max_total = float(align_cfg.get("max_total_percent", 6.0))
+        camera_sign = align_cfg.get("camera_sign")
+        delta_percent = float(delta_percent)
+
+        if abs(delta_percent) > max_step:
+            return {"ok": False, "error": f"|delta_percent| must be <= {max_step:g}% per call"}
+        next_total = round(self._align_cumulative + delta_percent, 4)
+        if abs(next_total) > max_total:
+            return {
+                "ok": False,
+                "error": f"cumulative alignment {next_total:+.1f}% exceeds ±{max_total:g}% limit",
+                "cumulative_percent": round(self._align_cumulative, 2),
+            }
+        if self._last_approach_pose is None:
+            return {
+                "ok": False,
+                "error": "align_base is only allowed at an approach pose right after play_sequence(..., stop_after=approach)",
+            }
+
+        readings = self.hw().snapshot()
+        # Verify non-base, non-gripper joints are still at the approach pose
+        off_joints = {
+            m: abs(readings[m].present - self._last_approach_pose[m])
+            for m in ELROBOT_MOTOR_IDS
+            if m not in (motor, gm) and m in readings and m in self._last_approach_pose
+            and abs(readings[m].present - self._last_approach_pose[m]) > AT_WAYPOINT_TOLERANCE
+        }
+        if off_joints:
+            return {
+                "ok": False,
+                "error": f"arm is not at approach pose {self._last_approach_name!r} (joints off: {off_joints})",
+            }
+        r = readings.get(motor)
+        if r is None or not r.calibrated:
+            return {"ok": False, "error": f"base motor {motor} not visible or not calibrated"}
+
+        delta_steps = int(round(delta_percent / 100.0 * (r.range_max - r.range_min)))
+        res = self._move({motor: r.present + delta_steps}, cfg)
+        res["motor"] = motor
+        res["delta_percent"] = delta_percent
+        res["delta_steps"] = delta_steps
+        if camera_sign is not None:
+            res["camera_sign"] = camera_sign
+        if res.get("ok") and not res.get("dry_run"):
+            self._align_cumulative = next_total
+        res["cumulative_percent"] = round(self._align_cumulative, 2)
+        res["remaining_percent"] = round(max(0.0, max_total - abs(self._align_cumulative)), 2)
+        return res
 
     def set_mouth_gate(self, enabled: bool) -> Dict[str, Any]:
         """Enable or disable the OBSBOT MediaPipe mouth-open safety gate during play_sequence."""

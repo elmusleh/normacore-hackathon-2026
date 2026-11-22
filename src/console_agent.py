@@ -129,6 +129,15 @@ Recorded feeding plans (use these first):
   returns, all in one call. Do not add other moves around it and do not open or close the
   gripper yourself. If the plan is not ready, or the food has no plan, say which foods you can
   serve and do not move. If the request could mean two foods, ask which one.
+- If a food in list_sequences() defines a "grasp" block (approach, close_percent, continue_at):
+  1. Call play_sequence(plan, stop_after=approach).
+  2. Call look("gripper"). If the food is off-center between the jaws, use align_base(delta_percent)
+     in small steps (max 3 corrections, re-checking look("gripper") after each).
+  3. Close with set_gripper(close_percent), then call look("gripper").
+  4. Continue with play_sequence(plan, start_at=continue_at) ONLY if set_gripper returned
+     holding_object AND look("gripper") confirms food in the jaws. Otherwise open with
+     set_gripper(100), move to clear, tell the person, and retry at most once. Never bring an
+     empty gripper to the person's mouth.
 - If play_sequence returns ok=false, the arm is holding where it stopped. Tell the person at
   which step it stopped and why, in plain words, and do not run it again unless they ask.
 

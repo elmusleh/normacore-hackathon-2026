@@ -1,18 +1,25 @@
 ### Post-Implementation Suggestions
 
-1. Implement Stage 0 (`gripper` center crosshair + jaw-zone ROI overlay in `src/web_console.py`) — Priority 86% (High value) [Professionalism]
-   What: Draw a subtle vertical center guide line and jaw-zone box on the `gripper` camera feed in `http://localhost:8890`, matching the overlays on `person` and `table`.
-   Why: Zero-risk 10-minute upgrade that gives both Claude (`look("gripper")`) and judges an immediate visual alignment reference without touching arm motion code.
-   How: Add a `role == "gripper"` branch in `_annotate_bgr()` in `src/web_console.py` and include `"gripper"` in the `_annotate_jpeg()` check.
+1. Complete Stage 1B + 2B bench calibration on the real arm (`gripper.verified`, `grape_open`, `grasp_alignment`) — Priority 92% (Critical) [Best practices]
+   What: Run `./cli.sh hw identify 8` and `./cli.sh hw identify 1`, re-teach an open-jaw `grape_open` waypoint, and record `grasp_alignment.camera_sign` in `config/elrobot.json`.
+   Why: Activates Stage 1–2 closed-loop alignment and empty-grasp rejection on the physical follower arm without guessing motor IDs or directions.
+   How: Follow Steps 1B and 2B in `docs/GRIPPER_CAMERA_ROADMAP.md` with the hardware owner present and hand on the 12 V switch.
    Status: ⏳ Unimplemented
-   Reason Deferred: This turn documented the full Stage 0–4 roadmap and Stage 0–2 plan first before implementing code changes.
+   Reason Deferred: Requires the physical arm powered on at the bench with the hardware owner confirming each step.
 
-2. Implement Stage 1A + 2A offline code (`play_sequence` `start_at`/`stop_after` + bounded `align_base` + `FakeArm` unit tests) — Priority 82% (High value) [Best practices]
-   What: Build the deterministic partial-sequence runner and bounded `align_base(delta_percent)` MCP tool offline with full `FakeArm` unit tests before the bench session.
-   Why: Separates software verification from hardware calibration so bench time with the powered arm is short, calm, and focused solely on measuring the 4 physical facts.
-   How: Follow Steps 1A and 2A in `docs/GRIPPER_CAMERA_ROADMAP.md` (`src/robot_tools.py`, `src/robot_mcp_server.py`, `tests/test_robot_mcp.py`).
+2. Add a `check_gripper_roi()` MCP tool so Claude gets exact `offset_x_pct` numbers alongside `look("gripper")` — Priority 76% (High value) [Professionalism]
+   What: Expose `FeedingVisionDetector.analyze_gripper_roi()` as a read-only MCP tool returning `{in_jaws, offset_x_pct, coverage}` from the latest gripper frame.
+   Why: Gives Claude deterministic numerical alignment feedback (e.g. `offset_x_pct: +0.32`) and logs exact before/after offsets in the `Developer Trace` tab.
+   How: Add `check_gripper_roi()` to `src/robot_tools.py` reusing `look("gripper")` + `FeedingVisionDetector.analyze_gripper_roi()`, register it in `src/robot_mcp_server.py`, and add a unit test.
    Status: ⏳ Unimplemented
-   Reason Deferred: Awaiting user go-ahead on whether to build Stage 0 only for the demo or proceed straight into Stage 1A/2A offline code.
+   Reason Deferred: Stage 0–2A already draws the live jaw-zone overlay on the gripper stream and gives Claude multimodal `look("gripper")` inspection.
+
+3. Add a `FakeClaude` end-to-end empty-grasp abort test in `tests/test_console_agent.py` — Priority 62% (Nice to have) [Best practices]
+   What: Add a test simulating `play_sequence(stop_after="grape")` -> `align_base` -> `set_gripper` returning `closed_empty` and verifying Claude does not call `play_sequence(start_at="feed_1")`.
+   Why: Regression-tests the full Stage 1–2 agent loop offline so prompt edits never weaken the "never bring an empty gripper to the mouth" rule.
+   How: Add a `FakeClaude` test in `tests/test_console_agent.py` asserting the `tool_use` sequence stops cleanly on `closed_empty`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Core `RobotTools` slicing, `align_base` bounds, and `analyze_gripper_roi` unit tests are already passing in `tests/test_robot_mcp.py`.
 
 3. Add a hardware-bench calibration script (`./cli.sh hw calibrate-grasp`) for Stage 1B/2B — Priority 64% (Nice to have) [Security]
    What: Add a guided read-only/single-step CLI wizard that walks the hardware owner through identifying motor 8 (gripper), motor 1 (base), and verifying camera-to-motor sign safely.

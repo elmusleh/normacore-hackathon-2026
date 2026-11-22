@@ -455,3 +455,85 @@ def test_mouth_gate_state_file_roundtrip(tmp_path, monkeypatch):
     assert robot_tools.read_mouth_gate_state(max_age_s=2.0) is None
 
 
+def test_play_sequence_partial_slice_and_grasp_validation(plans):
+    tools, arm, tmp = plans
+    # Run only start -> grape
+    r1 = tools.play_sequence("grapes", stop_after="grape")
+    assert r1["ok"] and r1["done"] == ["start", "grape"]
+    assert len(arm.moves) == 2
+
+    # Run only mouth -> start (note: index() picks first 'start', so start_at='mouth' runs ['mouth', 'start'])
+    r2 = tools.play_sequence("grapes", start_at="mouth")
+    assert r2["ok"] and r2["done"] == ["mouth", "start"]
+
+    # Invalid step names & reversed order are refused
+    assert not tools.play_sequence("grapes", start_at="nope")["ok"]
+    assert not tools.play_sequence("grapes", stop_after="nope")["ok"]
+    assert not tools.play_sequence("grapes", start_at="mouth", stop_after="grape")["ok"]
+
+    # list_sequences validates grasp.approach < grasp.continue_at
+    cfg = json.loads((tmp / "elrobot.json").read_text())
+    cfg["foods"]["grapes"]["grasp"] = {"approach": "mouth", "close_percent": 30, "continue_at": "grape"}
+    (tmp / "elrobot.json").write_text(json.dumps(cfg))
+    listed = tools.list_sequences()
+    assert listed["foods"]["grapes"]["ready"] is False
+    assert "grasp_error" in listed["foods"]["grapes"]
+
+
+def test_align_base_bounds_approach_check_and_dry_run(plans, monkeypatch):
+    tools, arm, tmp = plans
+    # Unconfigured motor is refused
+    assert "not configured" in tools.align_base(1.0)["error"]
+
+    # Configure motor 1 with ±2% step, ±5% total
+    cfg = json.loads((tmp / "elrobot.json").read_text())
+    cfg["grasp_alignment"] = {"motor": 1, "max_step_percent": 2.0, "max_total_percent": 5.0, "camera_sign": 1}
+    (tmp / "elrobot.json").write_text(json.dumps(cfg))
+
+    # Refused before reaching an approach pose
+    assert "only allowed at an approach pose" in tools.align_base(1.0)["error"]
+
+    # Move to approach pose 'grape'
+    assert tools.play_sequence("grapes", stop_after="grape")["ok"]
+
+    # Exceeding single step cap refused
+    assert "<= 2%" in tools.align_base(2.5)["error"]
+
+    # Two valid +2% nudges succeed (cumulative +4%)
+    a1 = tools.align_base(2.0)
+    assert a1["ok"] and a1["cumulative_percent"] == 2.0 and a1["camera_sign"] == 1
+    a2 = tools.align_base(2.0)
+    assert a2["ok"] and a2["cumulative_percent"] == 4.0
+
+    # Third +2% nudge would exceed ±5% cumulative cap
+    assert "exceeds" in tools.align_base(2.0)["error"]
+
+    # Dry run does not move or increment cumulative
+    monkeypatch.setenv("ELROBOT_ALLOW_MOTION", "0")
+    dry = tools.align_base(-1.0)
+    assert dry["ok"] and dry["dry_run"] and dry["cumulative_percent"] == 4.0
+
+
+def test_gripper_roi_detector_empty_vs_centered_vs_offcenter():
+    import numpy as np
+    from feeding_vision import FeedingVisionDetector
+
+    # Uniform beige background -> empty
+    blank = np.full((240, 320, 3), (200, 210, 220), dtype=np.uint8)
+    r_empty = FeedingVisionDetector.analyze_gripper_roi(blank)
+    assert r_empty["in_jaws"] is False and r_empty["centroid_px"] is None
+
+    # Purple grape centered in jaw ROI
+    centered = blank.copy()
+    centered[140:180, 145:175] = (140, 40, 120)
+    r_mid = FeedingVisionDetector.analyze_gripper_roi(centered)
+    assert r_mid["in_jaws"] is True and abs(r_mid["offset_x_pct"]) < 0.15
+
+    # Purple grape shifted right inside jaw ROI
+    right = blank.copy()
+    right[140:180, 185:210] = (140, 40, 120)
+    r_right = FeedingVisionDetector.analyze_gripper_roi(right)
+    assert r_right["in_jaws"] is True and r_right["offset_x_pct"] > 0.35
+
+
+

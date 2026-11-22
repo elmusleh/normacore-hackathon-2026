@@ -232,6 +232,54 @@ class DetectedTarget:
 class FeedingVisionDetector:
     """Detects grape bowl, spoon, and human face/mouth in overhead or camera frames."""
 
+    @staticmethod
+    def analyze_gripper_roi(bgr: np.ndarray) -> Dict[str, Any]:
+        """Fast (<5 ms) jaw-zone ROI check on the eye-in-hand gripper camera.
+
+        Computes a centered lower-middle jaw-zone ROI and compares interior pixels
+        against the ROI border median in LAB space to estimate whether food is
+        between the jaws (`in_jaws`) and its horizontal offset (`offset_x_pct` in [-1, 1]).
+        """
+        h, w = bgr.shape[:2]
+        x1, x2 = int(w * 0.32), int(w * 0.68)
+        y1, y2 = int(h * 0.45), int(h * 0.88)
+        roi_px = [x1, y1, x2, y2]
+        roi = bgr[y1:y2, x1:x2]
+        if roi.size == 0 or roi.shape[0] < 12 or roi.shape[1] < 12:
+            return {"in_jaws": False, "coverage": 0.0, "offset_x_pct": 0.0,
+                    "roi_px": roi_px, "centroid_px": None}
+
+        lab = cv2.cvtColor(roi, cv2.COLOR_BGR2LAB).astype(np.float32)
+        rh, rw = lab.shape[:2]
+        border = np.concatenate([
+            lab[:3, :, :].reshape(-1, 3),
+            lab[-3:, :, :].reshape(-1, 3),
+            lab[:, :3, :].reshape(-1, 3),
+            lab[:, -3:, :].reshape(-1, 3),
+        ], axis=0)
+        bg_med = np.median(border, axis=0)
+        dist = np.linalg.norm(lab - bg_med, axis=2)
+        mask = (dist > 22.0).astype(np.uint8) * 255
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+
+        fg_pixels = int(np.count_nonzero(mask))
+        coverage = round(fg_pixels / float(rh * rw), 3)
+        if coverage < 0.03:
+            return {"in_jaws": False, "coverage": coverage, "offset_x_pct": 0.0,
+                    "roi_px": roi_px, "centroid_px": None}
+
+        ys, xs = np.nonzero(mask)
+        cx_local = float(np.mean(xs))
+        cy_local = float(np.mean(ys))
+        offset_x_pct = round(max(-1.0, min(1.0, (cx_local - rw * 0.5) / (rw * 0.5))), 3)
+        return {
+            "in_jaws": True,
+            "coverage": coverage,
+            "offset_x_pct": offset_x_pct,
+            "roi_px": roi_px,
+            "centroid_px": [int(round(x1 + cx_local)), int(round(y1 + cy_local))],
+        }
+
     def __init__(self, calibrator: Optional[TabletopCalibrator] = None):
         self.calibrator = calibrator or self._default_calibrator()
         self._face_cascade = self._load_cascade("haarcascade_frontalface_default.xml")

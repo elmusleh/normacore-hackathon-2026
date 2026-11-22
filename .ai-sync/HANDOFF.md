@@ -18,10 +18,13 @@ previous_session: antigravity 2026-11-22T03:38 — mouth-status-badge-cue-and-ti
   - **Live Developer Action Trace & 3-Tab UI (`src/console_agent.py`, `src/web_console.py`, `src/web/console.html`):**
     - Added `ConsoleAgent.trace_after()` / `clear_trace()` and `GET /api/trace` + `POST /api/trace/clear` recording `guardrail`, `thinking`, `tool_call` (exact arm MCP arguments), `tool_result` (arm response), and `stop` events.
     - Upgraded `http://localhost:8890` into 3 tabs (`Demo Console`, `Developer Trace` with filter pills + Copy JSON + Clear, and `Commands & Guardrails`) plus a header `Dev Log in Chat: OFF/ON` toggle button.
-  - **Gripper Camera Roadmap (`docs/GRIPPER_CAMERA_ROADMAP.md`):** Documented the 5-stage eye-in-hand roadmap (Stage 0–4) and step-by-step execution plan for Stages 0–2 (crosshair overlay, split sequences + dual-signal grasp check, bounded `align_base` + jaw-ROI telemetry).
+  - **Gripper Camera Stages 0, 1A & 2A (`src/feeding_vision.py`, `src/web_console.py`, `src/robot_tools.py`, `src/robot_mcp_server.py`, `src/console_agent.py`, `tests/test_robot_mcp.py`):**
+    - Stage 0: Added `FeedingVisionDetector.analyze_gripper_roi()` (<5 ms LAB contrast check) and live `gripper` center crosshair + jaw-zone ROI overlay in `GET /api/frame/gripper`.
+    - Stage 1A: Extended `play_sequence(name, start_at, stop_after)` for partial playback and added `grasp` config validation in `list_sequences()` + dual-signal grasp verification rules in `CONSOLE_PROMPT`.
+    - Stage 2A: Added bounded `align_base(delta_percent)` MCP tool (`±2%`/step, `±6%` cumulative, approach-pose guard, dry-run support) and full `FakeArm` unit tests. Not yet tested on physical arm motion.
 - **Next Steps:**
-  1. Execute **Stage 0** (add `gripper` crosshair + jaw-zone overlay in `src/web_console.py` — safe offline, 15 min) and optionally **Stage 1A / 2A** offline code + unit tests from `docs/GRIPPER_CAMERA_ROADMAP.md`.
-  2. When at the bench with hardware owner Steve: run Step 1B / 2B calibration (`hw identify 8`, `hw identify 1`, open-jaw `grape_open` pose, camera-to-motor sign).
+  1. When at the bench with hardware owner Steve (hand on 12 V switch): run Stage 1B / 2B calibration (`./cli.sh hw identify 8`, `./cli.sh hw identify 1`, re-teach open-jaw `grape_open` pose, record `grasp_alignment.camera_sign` in `config/elrobot.json`).
+  2. Start `./cli.sh station` + `./cli.sh console 8890` to view all 3 annotated feeds (`table`, `gripper`, `person`) live.
 
 ## Session (2026-11-22 03:38): Live OBSBOT Mouth Badge, Waiting Cue & Configurable Timeout
 

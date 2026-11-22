@@ -198,13 +198,31 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         return det
 
     def _annotate_bgr(bgr, role: str):
-        """Draw the same MediaPipe person/table overlays as Mission Control (./cli.sh start)."""
-        if role not in ("person", "table") or bgr is None:
+        """Draw the same MediaPipe person/table overlays as Mission Control plus Stage 0 gripper crosshair."""
+        if role not in ("person", "table", "gripper") or bgr is None:
             return bgr
         import cv2
         with vision_lock:
             det = _get_vision_detector()
             out = bgr.copy()
+            if role == "gripper":
+                h, w = out.shape[:2]
+                info = det.analyze_gripper_roi(bgr)
+                x1, y1, x2, y2 = info["roi_px"]
+                cx = w // 2
+                # Vertical center alignment guide
+                cv2.line(out, (cx, 0), (cx, h), (90, 170, 255), 1, cv2.LINE_AA)
+                box_color = (60, 220, 120) if info["in_jaws"] else (140, 155, 175)
+                cv2.rectangle(out, (x1, y1), (x2, y2), box_color, 2)
+                if info["centroid_px"] is not None:
+                    px, py = info["centroid_px"]
+                    cv2.circle(out, (px, py), 6, (0, 255, 255), -1)
+                    tag = f"IN JAWS (dx={info['offset_x_pct']:+.2f})"
+                else:
+                    tag = "JAW ZONE (empty)"
+                cv2.putText(out, tag, (max(8, x1), max(22, y1 - 8)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
+                return out
             if role == "person":
                 mouth = det.detect_mouth(bgr)
                 if mouth and not (mouth.extra or {}).get("fallback", False):
@@ -248,7 +266,7 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
 
     def _annotate_jpeg(jpeg: bytes, role: str) -> bytes:
         """Decode JPEG, apply role overlay, re-encode; returns original bytes on any decode error."""
-        if role not in ("person", "table"):
+        if role not in ("person", "table", "gripper"):
             return jpeg
         try:
             import cv2
@@ -342,7 +360,7 @@ def create_app(tools=None, stt: Optional[SpeechToText] = None, station_up=None,
         meta, jpeg = result
         if jpeg is None:
             return JSONResponse(meta, status_code=503)
-        if name in ("person", "table"):
+        if name in ("person", "table", "gripper"):
             jpeg = await run_in_threadpool(_annotate_jpeg, jpeg, name)
         age = meta.get("age_seconds")
         return Response(jpeg, media_type="image/jpeg", headers={
