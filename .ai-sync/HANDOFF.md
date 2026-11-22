@@ -9,6 +9,12 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~06:50, claude for Jafer): right grape hover arrived
+- Jafer: move towards food on your own, no permission needed. Retried from the stopped pose: `calib goto 380.5 146.1 70 --travel-z 90 --mm-per-s 15 --yes` arrived, no overload. Fingertip by joints (375.0, 150.2, 56.6) mm vs target (380.5, 146.1, 70): 7 mm sideways, 13 mm low (elbow sag). Camera: tip just behind the grape (expected parallax at ~6 cm height). Grape untouched.
+- Arm now: torque on, hovering above the right grape. Gripper untouched.
+- Next: measure motor currents for a proper motor 4 threshold; then `grab` (descend + grasp) once the gripper probe is done.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~06:45, claude for Jafer): grape hover, `--travel-z`, motor 4 overload
 - Jafer refitted the arm on the temporary arm (uncommitted `config/calibration.json`: RMS 15.55 mm, motor 2 zero 1945 instead of 1000). Not committed by me: Jafer commits it as a calibration commit.
 - Hover refusals seen: motor 6 near its low end during "across" when starting with fingers flat; motor 2 at its low end (996 < 998) when lifting to 150 mm. `clear` and the feeding waypoints were taught on the old arm: do not use them on this arm.
