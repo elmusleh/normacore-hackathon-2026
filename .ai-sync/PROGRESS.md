@@ -17,7 +17,7 @@
 - [x] Connect ElRobot USB serial cable and execute `./scripts/setup_usb_serial.sh`
 - [x] Launch NormaCore Station Web console and verify joint zero positions
 - [x] First physical hardware move to safe clearance height / live teleoperation
-- [ ] Place 4 AprilTag markers at workspace corners and calibrate camera (code ready: `./cli.sh calib`, docs/tcp_calibration.md; the old printed 45 mm sheet works as family printed-v1 with 480 px frames)
+- [x] Place 4 AprilTag markers at workspace corners and calibrate camera (2026-11-22: printed-v1 45 mm tags, camera fit 2.38 mm RMS, `config/calibration.json`)
 
 ## Phase 3: Agent Integration & Tabletop Primitives — IN PROGRESS
 - [x] Joint-level hardware bridge to the Station SDK written (`src/elrobot_hardware.py`), unit-tested offline (44 tests pass in total).
@@ -59,11 +59,17 @@
 - [x] Table frame + URDF FK/IK + base/joint-zero fit, read-only CLI `./cli.sh calib` (tested offline only)
 - [x] First camera-located hover: `calib goto` above the grape (2026-11-22, on the arm); skill `.claude/skills/hover-above-object/` for repeat requests
 - [x] Skill design to feeding a person: `docs/feeding_skills.md` (two skills: `grab <object>`, `feed <object>`)
-- [ ] Write `.claude/skills/grab/` (needs finger-centre pixel, gripper 1.2-1.4) and `.claude/skills/feed/` (needs serve pose, find_mouth, approach loop)
-- [ ] Bench calibration per docs/tcp_calibration.md: layout, camera, zero, touches, fit --refine; commit config/calibration.json
+- [x] Grip skill written as `.claude/skills/grip-object/` (grape on the flat table gripped 2026-11-22, wrist as-is) and `.claude/skills/drop-in-bowl/` (grape dropped in the bowl)
+- [ ] Grip with the fingers vertical down (`--down`, Jafer's rule): refused on the temporary arm (motor 6 range end; wrist zeros 5-7 suspect). Redo `calib zero` + touches + `fit --refine`
+- [ ] Grip a grape from the bowl (3 failed tries 2026-11-22: jaw tips drag on the curved bowl; false "holding")
+- [ ] Recalibrate gripper motor 8 range on the temporary arm (jaws stall ~1372, range low end 1245) so `holding_object` is reliable
+- [ ] Write `.claude/skills/feed/` (needs serve pose taught on the arm in use, find_mouth, approach loop)
+- [ ] When the usual follower `5B61034962` returns: switch `config/elrobot.json` `station.bus` and `.mcp.json` `ELROBOT_BUS` back and redo the full calibration
+- [ ] Merge `feat/vision-apriltag-ik` into `main` (PR open, needs one human review)
+- [x] Bench calibration per docs/tcp_calibration.md on the temporary arm, committed 3c0a1d8 (fit 15.55 mm RMS, above the 10 mm target; wrist zeros suspect)
 - [ ] Check `calib where` against the tape measure at 3+ spots (target: within ~1 cm)
-- [ ] Cartesian move command (table x,y,z -> IK -> clamped joint goals via move_and_watch), reviewed by the hardware owner
-- [ ] Vision: food pixel from the table camera -> table mm -> reach above it, fingers down
+- [x] Cartesian move command `./cli.sh calib goto|line` (IK -> clamped joint goals, `--travel-z`, `--min-z`, `--open-after/--close-after`), run on the arm by the hardware owner 2026-11-22. Gravity sag 10-25 mm not compensated
+- [x] Vision: food pixel from the table camera -> table mm -> hover above it (`calib pixel` + `calib goto`, skill `hover-above-object`). Fingers-down part: see the `--down` item above
 - [ ] MCP command connection goes stale after a Station restart (reads work, writes do not land): reconnect it
 
 ## Phase 4: Closed-Loop Recovery & Stress Testing — PENDING

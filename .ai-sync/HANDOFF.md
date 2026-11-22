@@ -1,13 +1,52 @@
 ---
 last_agent: claude
-timestamp: 2026-11-22T10:00:00
-status: apriltag-ik-calibration-ready-untested-on-arm
+timestamp: 2026-11-22T09:30:00
+status: team-handover-grip-from-bowl-and-fingers-down-blocked
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (Assistive Feeding)"
-current_task: "AprilTag table frame + URDF IK (ACT dropped); bench calibration next"
-stop_reason: ready-for-hardware-session
+current_task: "Grip a grape fingers-down (blocked: wrist zeros on the temporary arm), then feed stage (mouth)"
+stop_reason: handover-to-team
 hardware_owner: "jafer"
-previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
+previous_session: claude 2026-11-22T08:45 — grip rule fingers vertical down; blocked by motor 6 zero
 ---
+
+## START HERE: team handover (2026-11-22, ~09:30, claude for Jafer)
+Jafer is handing the project to teammates. This entry is the summary; the dated entries below have the details.
+
+**Where the code is**
+- All current work is on branch `feat/vision-apriltag-ik` (pushed to origin; a PR into `main` is open, see the PR list). `main` does NOT have the AprilTag/IK code, the `calib` commands or the skills. Until the PR is merged: `git fetch && git checkout feat/vision-apriltag-ik && ./cli.sh sync`.
+- Tests: `python3 -m pytest tests/` (144 pass, offline, about 1 min). Tree clean at handover.
+
+**Hardware state**
+- Hardware owner is still `jafer`. Only the owner runs motion. To take over: change `hardware_owner` above, commit it, and get the new owner's typed OK in your session (AGENTS.md rule 7).
+- The skills `hover-above-object`, `grip-object` and `drop-in-bowl` run without asking only because Jafer allowed it, and they check `hardware_owner: "jafer"`. When a new owner takes over, that permission ends: ask the new owner, then edit the name in the three `SKILL.md` files.
+- The usual follower `5B61034962` is out for a motor repair. A TEMPORARY follower on bus `5B61034679` is in use (`config/elrobot.json` `station.bus`, `.mcp.json` `ELROBOT_BUS`). When the old arm comes back, switch both back AND redo the whole calibration (`calib zero`, touches, `calib fit`), because the zeros are per arm.
+- `config/waypoints.json`, `config/sequences.json` (`grapes`, `chocolate`) and `clear` were taught on the OLD arm. Do NOT play them on the temporary arm.
+- Station + console: `./cli.sh station`, `./cli.sh console` (port 8890). Cameras: table `3-5.1`, gripper `3-5.2.4`, face `3-5.3` (hub in laptop port 5). After a Station restart the elrobot MCP server may read stale frames (writes land, reads are old): reconnect with `/mcp`.
+
+**Calibration (committed 3c0a1d8, `config/calibration.json`)**
+- Table frame: 4 AprilTags (`printed-v1` family, 45 mm), camera fit 2.38 mm RMS. Arm fit: joint zeros 05:59, 8 touches, base fit 06:28: 15.55 mm RMS (target < 10 mm). Expect 1-2 cm errors plus 10-25 mm gravity sag (the arm ends LOWER than commanded; check the joint-reading height after each move).
+- Wrist motors 5-7: the zeros look wrong (see the 08:45 entry). This blocks fingers-down grips.
+
+**What works on the arm (temporary arm, 2026-11-22)**
+- Hover above an object seen on the table camera: skill `hover-above-object` (`./cli.sh calib pixel` -> `calib goto X Y 70 --travel-z 90`).
+- Grip a grape lying on the flat table with the wrist as-is (not fingers-down): skill `grip-object`, worked first try with the gripper-camera correction.
+- Drop the held object into the blue bowl: skill `drop-in-bowl` (`calib goto 365 28 130 --travel-z 130 --mm-per-s 70 --open-after`).
+
+**What does not work yet**
+1. RULE from Jafer: every grip has the fingers pointing straight down (`--down`). No angled fallback; if `--down` is refused, report it. On the temporary arm `--down` is refused (motor 6 reaches its range end). Likely cause: wrong wrist zeros.
+2. Gripping a grape from the bowl failed 3 times (jaw tips drag on the curved bowl). `--close-after` and `set_gripper` can report "holding" falsely; check that the jaws do not keep closing after the lift, and look with the gripper camera.
+3. Gripper motor 8 range on the temporary arm is not fully calibrated (closed end 1245 is never reached; the jaws stall near 1372).
+4. Motor 4 overloaded once (167 > 100) on a free move; thresholds are not measured per motor.
+
+**Next steps, in order (owner = hardware owner unless noted)**
+1. Review and merge the PR for `feat/vision-apriltag-ik` (anyone; needs one human review).
+2. Hold the arm in the URDF zero pose (torque off; pose in `docs/tcp_calibration.md`) -> `./cli.sh calib zero --write` -> `calib touch --clear` + 8 touches (each tag twice, two poses) -> `calib fit --refine --write`. Commit as `chore(calib): ... measured <date>`. Target: fit < 10 mm and `--down` no longer refused. `calib fit --refine` only corrects the zeros of motors 2-4, so the wrist zeros (5-7) come from how carefully the wrist is held in step `calib zero`: gripper level, not rolled, pointing straight ahead (runbook step 5).
+3. Retry the grape grip with `--down` (skill `grip-object`), first on the flat table, then from the bowl (aim at the flat bowl centre).
+4. Recalibrate motor 8 through its full travel in the Station console, then check `holding_object` on an empty close and on a grape.
+5. Feed stage: teach a serve pose in front of the face, then write `.claude/skills/feed/` (plan in `docs/feeding_skills.md`; mouth detection is local code, see `docs/FEEDING_ASSISTANT_PLAN.md`).
+6. Voice: console chat (`./cli.sh console`) with `ANTHROPIC_API_KEY`, motion off first.
+
+**Where to read more:** `docs/tcp_calibration.md` (calib commands), `docs/feeding_skills.md` (skill roadmap), `.claude/skills/*/SKILL.md` (exact procedures with speeds), `FINDINGS.md` (measured facts), `SUGGESTIONS.md` (open ideas), `docs/bench_safety.md` (before any motion).
 
 ## Latest session (2026-11-22, ~08:45, claude for Jafer): grip rule = fingers vertical down; blocked by motor 6 zero
 - Jafer: gripping must always be done with the gripper looking vertically down. Skill `grip-object` now requires `--down`.

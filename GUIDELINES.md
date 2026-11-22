@@ -44,3 +44,11 @@ Standards, conventions, and safety rules for all code and AI agents working in t
 ## 5. Linux Permissions & Hardware Communication
 - Never run robot scripts with `sudo`.
 - Configure Linux serial permissions via group membership (`dialout`) and udev rules using `scripts/setup_usb_serial.sh`.
+
+---
+
+## 6. Grasping and Standing Permissions (Jafer, 2026-11-22)
+- **Fingers vertical down:** every grasp is done with the gripper fingers pointing straight down (`calib goto ... --down`). If `--down` is refused, report the refusal and stop; do not fall back to an angled grasp.
+- **Check a grasp twice:** `holding_object` / "holding" can be false (jaws stalling on each other or on a bowl). After the lift, confirm with the gripper camera and check the jaws did not keep closing.
+- **Standing permissions belong to one person:** a skill that moves without asking (`hover-above-object`, `grip-object`, `drop-in-bowl`) does so only for the hardware owner who allowed it, named in the skill and in `.ai-sync/HANDOFF.md`. A new hardware owner must allow it again, and the name in the skill is updated in a commit.
+- **Waypoints are per arm:** waypoints, sequences and calibration taught on one follower are not played on another.

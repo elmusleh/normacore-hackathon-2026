@@ -11,6 +11,9 @@ Cartesian pick_at/place_at plan. **Diagrams:** [FEEDING_ASSISTANT_DIAGRAMS.md](F
 > once the calibration is measured (`config/calibration.json`, all `measured` flags true) and a
 > Cartesian move command has been reviewed by the hardware owner. Waypoints and recorded plans stay
 > as the fallback.
+>
+> **Status 2026-11-22:** calibration measured and `calib goto` runs on a temporary arm; hover, grip from the
+> flat table and drop in the bowl work. Current state and next steps: `.ai-sync/HANDOFF.md`, section "START HERE".
 
 ## 1. The goal
 

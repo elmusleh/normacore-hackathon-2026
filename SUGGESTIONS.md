@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Hardware-owner check inside the motion commands — Priority 80% (High value) [Security]
+   What: `calib goto`, `calib line` and `hw jog/goto` read `hardware_owner` from `.ai-sync/HANDOFF.md` and refuse to move unless `git config user.name` (or an `ELROBOT_OPERATOR` variable) matches it.
+   Why: With several teammates and their agents on the same repo, the single-writer rule is only written down; a second agent could move the arm while the owner is working on it.
+   How: Add a small `check_owner()` helper in `src/elrobot_config.py`, call it before the MOVE prompt, add an `--i-am-owner` override that is logged, and add an offline test for match/mismatch.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Raised at the 2026-11-22 team handover; motion code needs the hardware owner's review.
+
+2. One-command status report for a new teammate — Priority 62% (Nice to have) [Professionalism]
+   What: `./cli.sh status` prints the branch and PR, hardware owner, follower bus in use, calibration date and fit error, and whether the Station and console are running.
+   Why: A teammate's agent can see in five seconds which arm and calibration are live, instead of reading a long HANDOFF.md.
+   How: Add a `status` case to `cli.sh` that calls a short Python script reading `config/elrobot.json`, `config/calibration.json` and the HANDOFF front matter, plus `gh pr list --head <branch>`; test the parsing offline.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Raised at the 2026-11-22 team handover; docs-only session.
+
+3. Short demo-day runbook — Priority 55% (Nice to have) [Professionalism]
+   What: One page, `docs/demo_runbook.md`, with the exact commands in order from power-on to "grape in the bowl", and what to do when each step fails.
+   Why: During the demo, whoever stands at the arm needs a checklist, not the history of every session.
+   How: Copy the working commands from the three skills, add the start-up steps (Station, cameras, MCP reconnect) and the stop rule (12 V switch); rehearse it once and fix what was missing.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Waits until the fingers-down grip works, so the runbook describes the final procedure.
+
 1. Dry-run flag for `calib goto` — Priority 78% (High value) [Security]
    What: A `--check` flag that runs every path check and prints the plan, then exits without asking or moving.
    Why: Today the only way to test a path is to answer "no" at the MOVE prompt; one wrong keystroke or a `--yes` left in a command moves the arm.
