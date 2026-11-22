@@ -9,6 +9,12 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~07:15, claude for Jafer): speed cap 70, gripper direction verified
+- `calib goto/line` speed cap 60 -> 70 mm/s; right->left grape at 70 mm/s arrived, same accuracy. Arm hovering above the left grape.
+- Gripper direction verified on the temp arm (low = closed, high = open): `config/elrobot.json` gripper `verified: true`. Removed a junk `joint_map` entry written by `hw identify`.
+- Next: plan 1.3 `./cli.sh hw probe-current 8` (empty, then on a grape), 1.4 grasp width for grapes.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~07:00, claude for Jafer): left grape hover, sag below the floor
 - `calib goto 102.2 89.2 70 --travel-z 100 --mm-per-s 15 --yes` arrived. Joint-reading fingertip (108.7, 97.0, 45.4) mm: 10 mm sideways, but 25 mm LOW, i.e. below the 66 mm floor. The planner checks only commanded points, not the sagged pose. Camera: tip just behind-right of the grape, grape untouched.
 - Next: account for sag (check the joint-reading height after arriving, or a gravity term in IK) before any lower move. Arm holding above the left grape, torque on.

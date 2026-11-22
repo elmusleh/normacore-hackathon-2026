@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Gripper direction verified on the temporary arm (`config/elrobot.json` gripper `verified: true`); FINDINGS entry added (2026-11-22).
 - `calib goto` / `calib line` speed cap raised from 60 to 70 mm/s (Jafer asked for 70 mm/s, 2026-11-22). Grape hovers ran at 45 and 70 mm/s on the temporary arm with no overload; overload stop unchanged.
 - HANDOFF: right grape hover reached on the temporary arm with `--travel-z 90 --mm-per-s 15` (2026-11-22).
 - `calib goto` / `calib line` take `--travel-z MM` (default 150, 50-250) to travel sideways lower. The planner never travels below the safety floor (50 mm + fit error) or the target height. Added because the 150 mm lift pushed motor 2 past its range on the temporary arm. Test added.

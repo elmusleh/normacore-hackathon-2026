@@ -37,3 +37,9 @@ This file holds facts that stay true, with the evidence behind them.
 | 2026-11-21 | The Station's serial-bus serial numbers are `5B61034962` (`ttyACM0`) and `5B61037051` (`ttyACM1`). Which one is the leader is not confirmed by any measurement. | `udevadm` and dmesg serial strings. The teleop CHANGELOG entry names the leader; `docs/team_setup.md` says it is unconfirmed. | Open. Confirm on the bench before anything else uses the labels. |
 | 2026-11-21 | `GUIDELINES.md` §2 says agents must never command raw joint angles. The hardware bridge is joint-level by design. | Compare `GUIDELINES.md` §2 with `.ai-sync/HANDOFF.md` "Key Decisions" | Open decision. The rule and the design cannot both stand. The owner must choose one. |
 | 2026-11-21 | Offline suite: 44 tests pass. | `python3 -m pytest tests/ -q` | Resolved. |
+
+## Gripper direction, temporary arm 5B61034679 (2026-11-22)
+- Observation: motor 8 closes toward lower steps and opens toward higher steps (range 1245..2851). `+30` steps is ~2% of travel and barely visible; use `hw jog 8 200`.
+- Evidence: Jafer jogged motor 8 at the bench and reported it in the session; Station console showed 1285 (2.5%).
+- Status: verified; `config/elrobot.json` gripper `open_at: "max"`, `verified: true`.
+- Note: `hw identify` saved a Ctrl-X keypress as motor 8's direction in `joint_map`; it was removed. Answer its prompts with plain text.
