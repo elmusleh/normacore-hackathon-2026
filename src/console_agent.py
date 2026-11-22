@@ -248,19 +248,29 @@ class ConsoleAgent:
         messages = list(self._history) + [{"role": "user", "content": text}]
         for _ in range(MAX_TOOL_ROUNDS):
             try:
-                response = await self._client.beta.messages.create(
-                    model=MODEL,
-                    max_tokens=16000,
-                    system=self._system,
-                    tools=self._tools,
-                    messages=messages,
-                    output_config={"effort": "medium"},
-                    cache_control={"type": "ephemeral"},
-                    # Drop old camera images/tool results once the conversation gets long.
-                    context_management={"edits": [{"type": "clear_tool_uses_20250919"}]},
-                    fallbacks="default",
-                    betas=["server-side-fallback-2026-07-01", "context-management-2025-06-27"],
-                )
+                try:
+                    response = await self._client.beta.messages.create(
+                        model=MODEL,
+                        max_tokens=16000,
+                        system=self._system,
+                        tools=self._tools,
+                        messages=messages,
+                        output_config={"effort": "medium"},
+                        cache_control={"type": "ephemeral"},
+                        # Drop old camera images/tool results once the conversation gets long.
+                        context_management={"edits": [{"type": "clear_tool_uses_20250919"}]},
+                        fallbacks="default",
+                        betas=["server-side-fallback-2026-07-01", "context-management-2025-06-27"],
+                    )
+                except TypeError:
+                    # Standard anthropic SDK versions do not accept beta kwargs like `fallbacks`/`output_config`.
+                    response = await self._client.messages.create(
+                        model=MODEL,
+                        max_tokens=4096,
+                        system=self._system,
+                        tools=self._tools,
+                        messages=messages,
+                    )
             except anthropic.AuthenticationError:
                 self._post("error", "Claude API key missing or invalid. Start the console with "
                                     "ANTHROPIC_API_KEY set (see docs/mcp_server.md).")

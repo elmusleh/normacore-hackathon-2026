@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Leader/follower serial roles were swapped in `scripts/teleop_sync.py` (it drove the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` and `docs/team_setup.md`. Confirmed on the arm 2026-11-21: follower `5B61034962`, leader `5B61037051`.
 
 ### Added
+- Fixed `src/console_agent.py` compatibility with standard `anthropic` SDK versions (falls back from `beta.messages.create(..., fallbacks=...)` to `messages.create(...)` on `TypeError`).
 - Fixed `src/speech.py` compatibility with OpenAI Python SDK 2.x (automatically falls back from `languages`/`keywords` to `gpt-4o-mini-transcribe` with `prompt` when `TypeError` is raised).
 - Added browser Text-to-Speech (`Speak replies (TTS)` toggle + `Test Voice` button) in `src/web/console.html` and refined `CONSOLE_PROMPT` in `src/console_agent.py` for natural spoken feeding guidance (including `grapes` and `chocolate`).
 - Improved tabletop bowl & food-piece stability (`src/feeding_vision.py`): added specular-glare rejection, thin-sliver circularity/aspect filtering, distance-transform peak splitting for touching grapes, and EMA temporal smoothing on the bowl bounding box.
