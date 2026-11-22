@@ -1,15 +1,25 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T05:18:00Z
-status: final-pitch-deck-ready
+timestamp: 2026-11-22T06:45:00Z
+status: submission-form-prepared
 current_phase: "Phase 5: Demo Polishing & Sunday Pitch"
-current_task: "Generated 10-slide final pitch deck (docs/Assistive_Feeding_Robot_Pitch.pptx) with embedded speaker notes and reproducible generator script"
+current_task: "Prepared complete copy-paste Tally submission inputs and pre-deadline checklist in docs/Hackathon_submission_requirements.md"
 stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-22T04:03 — guardrails-dev-trace-and-multitab-console-live
+previous_session: antigravity 2026-11-22T05:18 — final-pitch-deck-ready
 ---
 
-## Latest session (2026-11-22 05:18): Final Presentation Pitch Deck (`docs/Assistive_Feeding_Robot_Pitch.pptx`)
+## Latest session (2026-11-22 06:45): Hackathon Tally Submission Prep (`docs/Hackathon_submission_requirements.md`)
+
+- **What Changed:**
+  - Added a complete, copy-paste-ready **Ready-to-Submit Form Inputs** section to `docs/Hackathon_submission_requirements.md` mapping 1-to-1 to every required field of `https://tally.so/r/GexoxQ`: submitter email (`elmusleh.mohammad@gmail.com`), Team 6 (+ name placeholder & suggestions), all 3 team members, judge-ready "What are you building?" description, Google Drive video folder link, Google Slides presentation link, GitHub repository link, **Normacore** track selection, Terms & Conditions agreement, and a pre-16:30 submission checklist.
+- **Files Changed:** `docs/Hackathon_submission_requirements.md`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`, `.ai-sync/PROGRESS.md`.
+- **Next Steps:**
+  1. Finalize Team 6's team name, upload the 3-minute demo video to Google Drive, and sync `docs/Assistive_Feeding_Robot_Pitch.pptx` to Google Slides.
+  2. Verify all 3 links (Drive, Slides, GitHub) are publicly accessible in an incognito window.
+  3. Submit `https://tally.so/r/GexoxQ` before **Sunday, November 22 at 16:30**.
+
+## Session (2026-11-22 05:18): Final Presentation Pitch Deck (`docs/Assistive_Feeding_Robot_Pitch.pptx`)
 
 - **What Changed:**
   - Created `scripts/generate_pitch_deck.py` and generated the 10-slide 16:9 widescreen final presentation deck at `docs/Assistive_Feeding_Robot_Pitch.pptx`, complete with embedded speaker notes on every slide.

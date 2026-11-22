@@ -59,5 +59,6 @@
 
 ## Phase 5: Demo Polishing & Sunday Pitch — IN PROGRESS
 - [x] Generate final 10-slide presentation pitch deck with speaker notes (`docs/Assistive_Feeding_Robot_Pitch.pptx`, `scripts/generate_pitch_deck.py`)
+- [x] Prepare copy-paste Tally submission form inputs & pre-16:30 checklist (`docs/Hackathon_submission_requirements.md`)
 - [ ] Build split-screen display
 - [ ] Rehearse 3-minute winning stage demo
