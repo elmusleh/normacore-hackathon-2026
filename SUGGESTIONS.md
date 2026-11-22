@@ -1,5 +1,12 @@
 ### Post-Implementation Suggestions
 
+1. Find the person camera by name or USB port, not by `/dev/video` number — Priority 80% (High value) [Best practices]
+   What: Let `cameras.person` in `config/elrobot.json` be a USB port (`port:3-1.3`) or a name match (`name:OBSBOT`) and resolve it to the right `/dev/videoN` at start.
+   Why: Numbers change after every replug; today the dashboard grabbed the table camera as the "person" camera and blocked exposure tuning.
+   How: In `src/digital_twin_server.py` and `src/web_console.py`, resolve `port:`/`name:` via `/sys/class/video4linux/video*/name` and `/dev/v4l/by-path`, keep `v4l2:N` working, set `person` to the OBSBOT's port, add a test with a fake sysfs tree.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Touches the dashboard and console camera code; found mid-bench session, so left for a focused change.
+
 1. Apply camera exposure automatically before the Station starts — Priority 75% (High value) [Best practices]
    What: Have `./cli.sh station` and `./cli.sh start` run the `./cli.sh cameras` exposure step right before launching the Station.
    Why: Exposure only works while the Station is stopped, so teammates keep getting nearly white table/gripper frames and have to stop, fix and restart by hand.

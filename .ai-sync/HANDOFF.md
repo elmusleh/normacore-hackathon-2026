@@ -23,10 +23,11 @@ previous_session: antigravity 2026-11-22T07:28 — diagrams-png-pdf-and-illustra
 - **Build Status:** `.venv/bin/python -m pytest tests/` 163 passed; `bash -n cli.sh` OK.
 - **Follow-up (same session): made the fixes permanent for the team.** Every `./cli.sh` command uses `.venv/bin/python` (hardware owner steve approved this for `hw`/`calib`/`feed`); OpenCV mouth guesses are marked `fallback` in `src/feeding_vision.py`; new `./cli.sh setup-vision`, `scripts/vision_check.py`, `scripts/station_config.py` (HD formats auto-added to `station.yaml`); `requirements.txt` gains `mediapipe`, `pyyaml`; `docs/team_setup.md` and `docs/mcp_server.md` updated. Tests: 169 passed. Teammates: pull, then run `.venv/bin/pip install -r requirements.txt` and `./cli.sh setup-vision` once.
 - **Follow-up (same session): follower back and recalibrated.** `config/elrobot.json` bus back to `5B61034962` (55e1840, steve confirmed; arm self-controlled, torque off, 8/8 motors OK). Station auto-calibrate set the motor ranges; joint zeros + base fit re-measured on this arm (f6a5d8e): L-pose zero, 8 tag touches, 16.4 mm RMS, base yaw 177.7°. Gripper direction verified on this arm (open = higher steps, `open_at: "max"` unchanged). Position check: fingertips on tag 1 read (443, -4, 8) mm vs (456, 0, 0).
+- **Follow-up: exposure fixed and first hover done.** Table/gripper exposure 250 -> 20/50 (5bc5781; tuner multi-port bug fixed in ed423de). Hover over the grape at (75.5, 219.5) mm, z 70: arrived at (77.1, 219.4, 66.9), grape centred between the open jaws on the gripper camera. Arm left holding the hover with torque ON (steve at the bench). Person camera is set by number (`v4l2:2`) and is now `/dev/video6` after a replug; the dashboard picks it up by discovery, but fix the config (SUGGESTIONS.md #1).
 - **Next Steps:**
   1. Done: follower is (Self-controlled) and `station.bus` is `5B61034962`.
   2. Done: `calib where` on tag 1 within 1.5 cm; gripper direction verified.
-  3. Continue Stage 1 with the `hover-above-object` and `grip-object` skills (motion: hardware owner's MOVE each time).
+  3. Done: hover. Next: `grip-object` on the grape (open, descend with lowered floor, close, check, lift); hardware owner's MOVE each time.
 
 ## Latest session (2026-11-22 07:34): Narrated 1080p Story Film ("Marta's Dinner")
 

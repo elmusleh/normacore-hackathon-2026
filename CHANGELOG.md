@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- `FINDINGS.md`/`HANDOFF.md`: first hover on `5B61034962` (within 3 mm by joint readings, grape centred in the gripper camera) and the person-camera numbering problem.
 - `config/elrobot.json`: camera exposure table 250 -> 20, gripper 250 -> 50 (`./cli.sh cameras --tune`, daylight 2026-11-22). At 250 the table camera was 71% pure white and the grape was invisible.
 - `FINDINGS.md`/`HANDOFF.md`: gripper direction (`open_at: "max"`) verified on follower `5B61034962`; calibration position check on tag 1 within 1.5 cm.
 - `config/calibration.json`: joint zeros and arm base re-measured on follower `5B61034962` (upright L zero pose + 8 AprilTag touches; fit 16.4 mm RMS, base yaw 177.7°). Replaces the values taken on the temporary arm.
