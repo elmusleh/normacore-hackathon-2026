@@ -5,9 +5,16 @@ status: apriltag-ik-calibration-ready-untested-on-arm
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (Assistive Feeding)"
 current_task: "AprilTag table frame + URDF IK (ACT dropped); bench calibration next"
 stop_reason: ready-for-hardware-session
-hardware_owner: "steve"
+hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
+
+## Latest session (2026-11-22, ~04:10, claude for Jafer): hardware owner -> Jafer, calib goto
+- Hardware owner changed from steve to jafer at Jafer's request ("please remove anything with steve"). Older entries below still name steve; they are history and were not rewritten.
+- Jafer recalibrated the Station motor ranges, then redid `calib zero` (03:53) and 8 touches; fit 16.0 mm RMS, base z -36.9 mm (implausible: expected >= 0). Committed as measured, but treat targets as +-3 cm until the ruler fit.
+- New `./cli.sh calib goto X Y Z [--down]` (MOVES the arm; see docs/tcp_calibration.md). NOT run on the arm yet. Dry plan from live readings: targets at the table middle plan fine without `--down`; with `--down` the wrist cannot point straight down there (motor 6 range, motor 2 range 1532..2564 is narrow).
+- Next: 1) Jafer runs the bench checklist (docs/bench_safety.md), `./cli.sh hw torque on` while holding the arm, then `./cli.sh calib goto 228 114 120 --speed 200`, type MOVE, hand on the 12 V switch. 2) Recalibrate motor 2 through its full travel (waypoints use down to 1016). 3) Ruler layout, zero, touches, fit < 10 mm.
+- Hardware owner: jafer.
 
 ## Latest session (2026-11-22, ~02:20, claude for Jafer): camera resolution, console sees all cameras
 - Jafer asked for Full HD. Local `station.yaml` (gitignored) now has `resize_target: 1080` and a `formats` list (1920x1080 MJPEG, then 1280x720, then 640x480); backup of the old file was in the session scratchpad. Result: face 1920x1080; table and gripper fall back to 1280x720 (USB 2.0 bandwidth, libuvc -51) and are upscaled to 1920x1080. All 4 AprilTags found on the live table frame (only 2 at the old 320x240). Details in FINDINGS.md, setup in docs/mcp_server.md item 3.

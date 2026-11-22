@@ -148,7 +148,7 @@ To maximize velocity and avoid duplicate work during the 48-hour sprint:
    ```bash
    ./scripts/setup_usb_serial.sh
    ```
-3. Read the complete troubleshooting guide in [docs/hardware_setup_and_usb_serial.md](file:///home/steve/Notebooks/Projects/AI%20%26%20Robotics%20Hackathon/docs/hardware_setup_and_usb_serial.md).
+3. Read the complete troubleshooting guide in [docs/hardware_setup_and_usb_serial.md](docs/hardware_setup_and_usb_serial.md).
 
 ---
 
@@ -158,4 +158,4 @@ Our stage pitch is designed around **real-world robustness**:
 1. We give Claude a natural-language sorting command.
 2. While the arm is in motion, we invite a judge to physically slide a target object across the table.
 3. The robot senses that the target is missing (`verify_grasp() == EMPTY_GRIP`), triggers its visual recovery loop, recalculates the new coordinates from the overhead camera, and successfully completes the pick-and-place.
-4. Full demo script and choreography: [docs/NormaCore_Winning_Plan.md](file:///home/steve/Notebooks/Projects/AI%20%26%20Robotics%20Hackathon/docs/NormaCore_Winning_Plan.md).
+4. Full demo script and choreography: [docs/NormaCore_Winning_Plan.md](docs/NormaCore_Winning_Plan.md).
