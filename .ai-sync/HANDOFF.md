@@ -9,6 +9,18 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, claude for Jafer): feeding skills roadmap
+- Jafer asked for the list of skills needed to get from "move above <object>" to feeding a person. Wrote `docs/feeding_skills.md`: 17 skills (check-ready, scan-table, hover-above-object [done], center-on-object, grasp-food, carry-to-serve, find-mouth, approach-mouth, handover, return-to-clear, feed-me, safe-recover, place-object, say-and-listen, pick/return-tool, scoop, meal-session), each with tier, dependencies, autonomy and status, plus a build order. Docs only; no code, no motion.
+- Next: 1) Jafer reviews the list and the autonomy column (which moves may run without asking). 2) Write `check-ready`, `return-to-clear`, `safe-recover` skills. 3) Measure the gripper camera's finger-centre pixel for `center-on-object`. 4) Gripper direction + current probe (plan 1.2-1.3) to unblock `grasp-food`.
+- Hardware owner: jafer.
+
+## Latest session (2026-11-22, ~05:20, claude for Jafer): hovers with the skill, motor 2 limits
+- Hovers run on the arm (all arrived, nothing touched): chocolate (169,138,70), grape (279,53,70), chocolate (61,189,70), grape bowl (373,92,110) via (279,53,110). Camera offset 1-5 cm, mostly to the right.
+- Repeated refusals from motor 2's narrow range (1532..2564): straight paths that pass near the base need motor 2 < 1552. Workaround used with Jafer's OK: go through (279,53,110) first. Motor 2 low end reached by jog (1564); high end not done (needs the elbow folded to ~2333 first, else the tip goes 75 mm into the table).
+- Arm now: hovering above the grape bowl, torque on, gripper untouched.
+- Next: recalibrate motor 2 through its full travel in the Station console (fixes most refusals). The skill's fallback rules (jog off limit, via point) were NOT added: blocked by the permission check; Jafer to decide.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~04:40, claude for Jafer): hover above the grape, skill
 - Jafer asked to move towards the grape with the IK interface and to execute automatically. Ran `./cli.sh calib goto 381 155 70 --yes` (grape at pixel (1265, 445) -> table (380.7, 154.6)). Arrived; joint readings (380.6, 155.1, 66.7). The camera shows the tip right of and behind the grape (see FINDINGS.md). Arm is holding there, torque on.
 - New project skill `.claude/skills/hover-above-object/SKILL.md`: the procedure for every "move above <object>" request. Standing authorization from Jafer covers only this hover move (z >= floor, no grasp, no gripper).
