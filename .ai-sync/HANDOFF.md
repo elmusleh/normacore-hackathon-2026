@@ -1,15 +1,27 @@
 ---
 last_agent: antigravity
-timestamp: 2026-11-22T07:14:00Z
-status: use-case-pitch-deck-ready
+timestamp: 2026-11-22T07:21:00Z
+status: plantuml-diagrams-and-video-builder-ready
 current_phase: "Phase 5: Demo Polishing & Sunday Pitch"
-current_task: "Created 9-slide use-case & human-impact presentation (docs/CareArm_Use_Case_Pitch.pptx) with embedded speaker notes"
+current_task: "Added PlantUML system overview + feeding sequence diagrams and 1080p MP4 pitch video builder (scripts/build_pitch_video.py)"
 stop_reason: complete
 hardware_owner: "steve"
-previous_session: antigravity 2026-11-22T06:51 — docs-readme-findings-and-deck-synced
+previous_session: antigravity 2026-11-22T07:14 — use-case-pitch-deck-ready
 ---
 
-## Latest session (2026-11-22 07:14): Use-Case & Human-Impact Pitch Deck (`docs/CareArm_Use_Case_Pitch.pptx`)
+## Latest session (2026-11-22 07:21): PlantUML Overview Diagrams & 1080p Pitch Video Builder
+
+- **What Changed:**
+  - Created two PlantUML diagrams:
+    - `docs/diagrams/carearm_overview.puml`: 4-layer System Overview (Human Interface, Semantic Brain + 3-Layer Guardrails + 15 MCP Tools, 3-Camera Local Vision, Deterministic Safety + NormaCore Station + ElRobot 7+1 DOF).
+    - `docs/diagrams/carearm_feeding_sequence.puml`: End-to-end runtime sequence diagram showing voice request, `<1 ms` guardrail, table check, wrist grasp verification, 5–10 cm standoff, MediaPipe mouth-open gate, and `<0.5 s` bypass-LLM E-stop.
+  - Created `scripts/build_pitch_video.py` (LibreOffice + `pdftoppm` + `ffmpeg` H.264 1080p 30 FPS MP4 builder with optional `--audio` voiceover muxing) and rendered a local 1080p slide video to gitignored `data/carearm_pitch_1080p.mp4`.
+- **Files Changed:** `docs/diagrams/carearm_overview.puml`, `docs/diagrams/carearm_feeding_sequence.puml`, `scripts/build_pitch_video.py`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
+- **Next Steps:**
+  1. Combine `data/carearm_pitch_1080p.mp4` with live bench footage of the ElRobot feeding cycle (plus a team member on camera) in CapCut or OBS/DaVinci Resolve, and upload to the shared Google Drive folder before `16:30`.
+  2. Export SVGs of the PlantUML diagrams via `plantuml.com` or VS Code if you want them embedded in slides or `README.md`.
+
+## Session (2026-11-22 07:14): Use-Case & Human-Impact Pitch Deck (`docs/CareArm_Use_Case_Pitch.pptx`)
 
 - **What Changed:**
   - Created `scripts/generate_use_case_deck.py` and generated a new 9-slide, warm human-centered presentation at `docs/CareArm_Use_Case_Pitch.pptx` with presenter speaker notes on every slide.

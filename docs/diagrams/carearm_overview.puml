@@ -1,0 +1,67 @@
+@startuml CareArm_System_Overview
+!theme plain
+skinparam backgroundColor #FAF9F6
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam defaultFontName Inter
+skinparam defaultFontSize 12
+skinparam ArrowColor #334155
+skinparam ArrowThickness 1.4
+
+title <b>CareArm (Team 6) — Assistive Feeding Robot System Overview</b>\n<size:11>Decoupled Physical AI: "Claude Decides, Local Code Acts Fast"</size>
+
+actor "Diner / User\n(Hands-Free Voice)" as User #E0F2FE
+
+package "Layer 1 · Human Interface (http://localhost:8890)" as L1 #EEF2FF {
+    component "3-Tab Web Console\n(src/web/console.html)\n• Demo Console\n• Developer Trace\n• Commands & Guardrails" as UI #FFFFFF
+    component "Bilingual Voice I/O\n• OpenAI gpt-transcribe (EN/DE)\n• TTS Voice + Web Audio Chimes" as Voice #FFFFFF
+    component "Direct E-Stop\n(Voice 'Stop!' / Red Button)" as Estop #FEE2E2
+}
+
+package "Layer 2 · Semantic Brain & 3-Layer Guardrails" as L2 #F0FDFA {
+    component "Layer 1 Guardrail (<1 ms)\nclassify_intent()\nBlocks prompt injection & off-topic" as G1 #FFFFFF
+    component "Claude Agent Loop\n(src/console_agent.py)\nLayer 2: <user_voice_transcript> XML" as Claude #FFFFFF
+    component "Live Developer Trace\n(GET /api/trace)\nGuardrails · Thinking · Tool Calls" as Trace #FFFFFF
+    component "Layer 3 · 15-Tool MCP Server\n(src/robot_mcp_server.py)\nplay_sequence · look · align_base\ncheck_person_mouth · set_mouth_gate · stop" as MCP #FFFFFF
+}
+
+package "Layer 3 · Real-Time Local Vision (~30 FPS)" as L3 #ECFEFF {
+    component "Table Camera (Overhead)\nBowl & Food Zone Detection\n(KD-USB, fixed exposure)" as CamTable #FFFFFF
+    component "Gripper Camera (Wrist)\n<5 ms LAB Jaw-Zone ROI\nGrasp check + ±2% align_base" as CamGrip #FFFFFF
+    component "OBSBOT Person Camera\nMediaPipe Face Landmarker\nMAR Mouth-Open Gate + 0.6 s Watchdog" as CamPerson #FFFFFF
+}
+
+package "Layer 4 · Deterministic Safety & Hardware" as L4 #FFFBEB {
+    component "RobotTools & Sequence Player\n(src/robot_tools.py · sequence_player.py)\nCalibrated clamps · Speed/step caps\n5–10 cm standoff pause" as Tools #FFFFFF
+    component "ElRobot Hardware Bridge\n(src/elrobot_hardware.py)\nST3215 Overload Current Guard\n4x Torque-Off Readback Retry" as Bridge #FFFFFF
+    component "NormaCore Station (v0.1.0-beta.10)\nTCP 8888 · Web Viewer 8889" as Station #FFFFFF
+    node "ElRobot 7+1 DOF Arm\nFollower: 5B61034962 (12 V)\nLeader: 5B61037051 (5 V)\n+ Physical 12 V Cutoff Switch" as Arm #FEF3C7
+}
+
+User --> Voice : Speaks naturally\n("Give me a grape")
+Voice --> UI
+UI --> G1 : User transcript
+G1 --> Claude : Allowed intent only
+G1 ..> Trace : Log ALLOWED / BLOCKED
+Claude <--> MCP : Validated tool calls
+Claude ..> Trace : Log thinking & tool JSON
+Trace --> UI : Live audit stream
+
+' Direct E-stop bypasses Claude completely
+User -[#DC2626,bold]-> Estop : "Stop!" (<0.5 s)
+Estop -[#DC2626,bold]-> Tools : stop_now() [Bypass LLM]
+
+MCP --> Tools : Safe motion & vision API
+Tools --> Bridge : Clamped joint targets
+Bridge --> Station : Protobuf DriverCommand
+Station --> Arm : ST3215 Bus (8 servos)
+
+' Vision feeds
+CamTable --> Tools : look("table") + boxes
+CamGrip --> Tools : look("gripper") + jaw ROI
+CamPerson --> Tools : mouth_open_confirmed\n(30 FPS MediaPipe MAR)
+CamTable ..> UI : Live annotated feed
+CamGrip ..> UI : Live crosshair + ROI
+CamPerson ..> UI : Live MAR + Mouth OPEN badge
+
+@enduml

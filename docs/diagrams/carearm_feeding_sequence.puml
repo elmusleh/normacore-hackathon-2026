@@ -1,0 +1,66 @@
+@startuml CareArm_Feeding_Sequence
+!theme plain
+skinparam backgroundColor #FAF9F6
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam defaultFontName Inter
+skinparam defaultFontSize 12
+skinparam SequenceMessageAlign center
+
+title <b>CareArm (Team 6) — End-to-End Feeding & Safety Flow</b>
+
+actor "Diner" as Diner
+participant "Web Console\n(Voice + UI)" as UI
+participant "Guardrail\n(<1 ms)" as Guard
+participant "Claude Agent\n(MCP Client)" as Claude
+participant "RobotTools +\nSafety Layer" as Tools
+participant "3-Camera Vision\n(Table/Gripper/OBSBOT)" as Vision
+participant "ElRobot Arm\n(NormaCore Station)" as Arm
+
+== 1. Voice Request & Scope Guardrail ==
+Diner -> UI : Speaks: "Give me a grape"
+UI -> UI : gpt-transcribe (EN/DE) + chime
+UI -> Guard : classify_intent(transcript)
+
+alt Off-topic or Prompt Injection
+    Guard --> UI : BLOCKED (<1 ms, 0 LLM calls)
+    UI --> Diner : Spoken scope reminder
+else Valid Feeding Request
+    Guard -> Claude : <user_voice_transcript>Give me a grape</user_voice_transcript>
+
+    == 2. Scene Check & Verified Pick ==
+    Claude -> Tools : look("table")
+    Tools -> Vision : Capture Table Cam + food boxes
+    Vision --> Claude : Grape bowl confirmed
+    Claude --> UI : "Picking a grape now." (TTS)
+    Claude -> Tools : play_sequence("grapes")
+    Tools -> Arm : Approach & grasp grape (clamped speed & load guard)
+    Tools -> Vision : analyze_gripper_roi() (<5 ms LAB contrast)
+    Vision --> Tools : Grasp confirmed (or bounded ±2% align_base retry)
+
+    == 3. Safe Standoff & MediaPipe Mouth-Open Gate ==
+    Tools -> Arm : Move to 5–10 cm standoff pose (feed_3)
+    UI --> Diner : Amber banner + TTS:\n"Ready. Open your mouth when you want the bite."
+
+    loop Every frame (~30 FPS) up to timeout (12 s)
+        Tools -> Vision : Check OBSBOT MediaPipe MAR
+        alt Face lost > 0.6 s
+            Vision --> Tools : FACE_LOST watchdog
+            Tools -> Arm : Hold pose & abort cleanly
+        else Mouth OPEN confirmed (MAR >= 0.26, 3 frames)
+            Vision --> Tools : mouth_open_confirmed = true
+            Tools -> Arm : Deliver bite gently & open gripper
+            Tools -> Arm : Retract to safe reset pose
+            Tools --> Claude : Sequence complete (ok=true)
+            Claude --> UI : "Enjoy! Let me know when you want another."
+        end
+    end
+end
+
+== Emergency Override (Active at Any Millisecond) ==
+Diner -[#DC2626]> UI : Speaks "Stop!" or presses Red E-Stop
+UI -[#DC2626]> Tools : POST /api/stop -> stop_now() [Bypasses Claude]
+Tools -[#DC2626]> Arm : hold() all 8 ST3215 servos (<0.5 s, arm never drops)
+UI -[#DC2626]-> Diner : Descending chime + "Stopped safely."
+
+@enduml

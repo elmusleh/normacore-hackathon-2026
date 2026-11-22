@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Splice live ElRobot bench footage into `data/carearm_pitch_1080p.mp4` using CapCut or DaVinci Resolve for the 3-minute submission video — Priority 93% (Critical) [Professionalism]
+   What: Combine the first 45 seconds of `data/carearm_pitch_1080p.mp4` (the human story slides) with 90–120 seconds of real bench video (a teammate speaking to camera + live grape pick + OBSBOT Mouth-Open delivery + voice `"Stop!"`) and auto-captions.
+   Why: The Robotics Track rules explicitly require showing the physical robot in action and recommend a team member speaking to camera — slides alone will score lower than a real hardware + story cut.
+   How: Import `data/carearm_pitch_1080p.mp4` and your bench phone/OBS clip into CapCut (web/desktop), add auto-captions, export 1080p MP4, and upload to your shared Google Drive folder before `16:30`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Requires capturing the live physical robot feeding clip on the bench.
+
+2. Export SVG/PNG renders of both PlantUML diagrams and embed `carearm_overview.svg` in `README.md` and Slide 4 of the technical deck — Priority 74% (High value) [Professionalism]
+   What: Render `docs/diagrams/carearm_overview.puml` and `docs/diagrams/carearm_feeding_sequence.puml` to high-DPI SVG/PNG via `plantuml.com` or the VS Code PlantUML extension and reference them in `README.md`.
+   Why: GitHub does not natively render raw `.puml` files inline, so embedding an exported `.svg` lets judges see the full 4-layer architecture immediately on your GitHub page.
+   How: Paste each `.puml` file into `https://www.plantuml.com/plantuml/uml` (or VS Code PlantUML -> Export Current Diagram), save as `docs/diagrams/carearm_overview.svg`, and embed with `![System Overview](docs/diagrams/carearm_overview.svg)`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: `plantuml` CLI is not installed in the local sandbox environment.
+
+3. Generate an optional narrated MP3 voiceover for `scripts/build_pitch_video.py --audio` using OpenAI TTS or a live mic recording — Priority 60% (Nice to have) [Best practices]
+   What: Record a crisp 3-minute human voiceover (or generate a clean narration track) and pass `--audio narration.mp3` to `scripts/build_pitch_video.py` to mux studio-clean audio automatically.
+   Why: Clear audio makes a bigger impression on hackathon judges than any visual effect, especially in a noisy Berlin venue.
+   How: Record voiceover in a quiet corner (or via Audacity/OBS), then run `python3 scripts/build_pitch_video.py --audio data/narration.mp3`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Human narration synced to the live robot clip is best recorded once the bench clip is captured.
+
 1. Choose one primary stage deck (or combine Slides 2–4 of `CareArm_Use_Case_Pitch.pptx` with Slides 4–8 of `Assistive_Feeding_Robot_Pitch.pptx`) before uploading to Google Slides — Priority 89% (High value) [Professionalism]
    What: Decide whether to present the human-centered `docs/CareArm_Use_Case_Pitch.pptx` (9 slides) for the main-stage 5-minute pitch, the technical `docs/Assistive_Feeding_Robot_Pitch.pptx` (10 slides) for track judges, or a merged 10-slide hybrid.
    Why: Keeping a single cohesive narrative ensures you stay comfortably inside the 3-minute video / 5-minute main-stage time cap without rushing slides.
