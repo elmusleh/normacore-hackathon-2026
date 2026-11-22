@@ -9,6 +9,11 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~07:00, claude for Jafer): left grape hover, sag below the floor
+- `calib goto 102.2 89.2 70 --travel-z 100 --mm-per-s 15 --yes` arrived. Joint-reading fingertip (108.7, 97.0, 45.4) mm: 10 mm sideways, but 25 mm LOW, i.e. below the 66 mm floor. The planner checks only commanded points, not the sagged pose. Camera: tip just behind-right of the grape, grape untouched.
+- Next: account for sag (check the joint-reading height after arriving, or a gravity term in IK) before any lower move. Arm holding above the left grape, torque on.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~06:50, claude for Jafer): right grape hover arrived
 - Jafer: move towards food on your own, no permission needed. Retried from the stopped pose: `calib goto 380.5 146.1 70 --travel-z 90 --mm-per-s 15 --yes` arrived, no overload. Fingertip by joints (375.0, 150.2, 56.6) mm vs target (380.5, 146.1, 70): 7 mm sideways, 13 mm low (elbow sag). Camera: tip just behind the grape (expected parallax at ~6 cm height). Grape untouched.
 - Arm now: torque on, hovering above the right grape. Gripper untouched.
