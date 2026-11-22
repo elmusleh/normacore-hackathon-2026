@@ -348,6 +348,20 @@ poll();
 async function send(text) {
   text = text.trim();
   if (!text) return;
+  // Emergency stop always goes through immediately
+  if (STOP_RE.test(text)) {
+    await fetch("/api/stop", { method: "POST" });
+    return;
+  }
+  // Enforce starting with "Robo" when wakeword gate is enabled
+  if ($("wakeword")?.checked) {
+    const m = text.match(WAKE_RE);
+    if (!m || !(m[2] || "").trim()) {
+      setStatus('Ignored — start with "Robo" (e.g. "Robo, I want grapes")', true);
+      return;
+    }
+    text = m[2].trim();
+  }
   agentBusy = true;
   if (hfActive) setHfState("busy", "Waiting for robot reply…");
   const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -515,7 +529,7 @@ const HF_SILENCE_MS = 1350;         // natural pause before sending
 const HF_MIN_SPEECH_MS = 400;       // ignores short clicks / coughs
 const HF_MAX_UTTERANCE_MS = 7500;
 const STOP_RE = /\b(stop|stopp|halt|freeze|wait)\b/i;
-const WAKE_RE = /^(?:hey\s+|ok\s+|okay\s+|hi\s+)?(robo|robot|robbo|roboh)\b[\s,.:;!?-]*(.*)$/i;
+const WAKE_RE = /^\W*(robo|robbo|roboh)\b[\s,.:;!?-]*(.*)$/i;
 
 let hfActive = false;
 let hfStream = null, hfCtx = null, hfAnalyser = null, hfTimer = null;
@@ -552,34 +566,26 @@ async function handleHandsFreeTranscript(rawText) {
   }
 
   const requireWake = $("wakeword")?.checked;
-  const inFollowup = performance.now() < followupUntil;
   const m = text.match(WAKE_RE);
 
-  if (requireWake && !inFollowup) {
+  if (requireWake) {
     if (!m) {
-      setHfState("standby", `Ignored background: "${text}" (say "Robo ..." to command)`);
+      setHfState("standby", `Ignored: "${text}" — start with "Robo"`);
       return;
     }
     const cmd = (m[2] || "").trim();
     if (!cmd) {
-      // Bare "Robo" opens a short 7s window for the user to state their command
-      followupUntil = performance.now() + 7000;
-      setHfState("speaking", 'Awake! Listening for your command…');
-      await speakText("Yes? What would you like?");
+      setHfState("standby", 'Heard "Robo" — say your full command (e.g. "Robo, I want grapes")');
       return;
     }
-    followupUntil = 0;
     setHfState("busy", `Sending: "${cmd}"`);
-    await send(cmd);
+    await send(text);
     return;
   }
 
-  // Wake word disabled, OR user just said bare "Robo" and is now giving the command
-  followupUntil = 0;
-  const cleanCmd = m ? (m[2] || "").trim() : text;
-  if (!cleanCmd) return;
-  setHfState("busy", `Sending: "${cleanCmd}"`);
-  await send(cleanCmd);
+  // Wake word unchecked: send directly
+  setHfState("busy", `Sending: "${text}"`);
+  await send(text);
 }
 
 async function startHandsFree() {
