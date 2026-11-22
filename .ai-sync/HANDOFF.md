@@ -19,6 +19,12 @@ previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP serve
 - Next: 1) Jafer reviews the list and the autonomy column (which moves may run without asking). 2) Write `check-ready`, `return-to-clear`, `safe-recover` skills. 3) Measure the gripper camera's finger-centre pixel for `center-on-object`. 4) Gripper direction + current probe (plan 1.2-1.3) to unblock `grasp-food`.
 - Hardware owner: jafer.
 
+## Latest session (2026-11-22, ~05:40, claude for Jafer): temporary follower arm
+- The usual follower (`5B61034962`) is out for a motor repair. A temporary arm on bus `5B61034679` is in use; `config/elrobot.json` `station.bus` and `.mcp.json` `ELROBOT_BUS` now point at it (restart the MCP server / Claude session to pick up `.mcp.json`). Switch both back when the old arm returns.
+- New arm's ranges (FINDINGS.md): motor 2 is fine (1002..3094), but motor 1 has only 302 steps, motor 4's reading is outside its range, and the gripper range is 2 steps: recalibrate those in the Station console first.
+- `config/calibration.json` still holds the OLD arm's joint zeros and touches: redo `calib zero --write`, `calib touch --clear`, 8 touches, `calib fit --refine --write` on this arm before any `calib goto`.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~05:20, claude for Jafer): hovers with the skill, motor 2 limits
 - Hovers run on the arm (all arrived, nothing touched): chocolate (169,138,70), grape (279,53,70), chocolate (61,189,70), grape bowl (373,92,110) via (279,53,110). Camera offset 1-5 cm, mostly to the right.
 - Repeated refusals from motor 2's narrow range (1532..2564): straight paths that pass near the base need motor 2 < 1552. Workaround used with Jafer's OK: go through (279,53,110) first. Motor 2 low end reached by jog (1564); high end not done (needs the elbow folded to ~2333 first, else the tip goes 75 mm into the table).

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Follower bus switched to the temporary arm `5B61034679` in `config/elrobot.json` and `.mcp.json` (2026-11-22, Jafer): the usual follower `5B61034962` is out for a motor repair. Switch both back when it returns. `config/calibration.json` must be redone for each arm (joint zeros and touches are per arm).
+
 ### Added
 - `docs/feeding_skills.md`: two skills to feed a person, `grab <object>` and `feed <object>` (feed grabs first if needed), with their steps, the missing pieces per step and the autonomy rule. Replaces the 17-skill list written earlier the same day. Docs only.
 - Project skill `.claude/skills/hover-above-object/SKILL.md`: the fixed procedure for "move above <object>" (table camera look -> `calib pixel` -> `calib reach` -> `calib goto X Y 70 --yes` -> look again). Jafer (hardware owner) authorised it to run without asking each time on 2026-11-22, for hover moves only; grasping, lower moves and gripper commands still need typed confirmation.
