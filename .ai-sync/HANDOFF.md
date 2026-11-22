@@ -264,6 +264,7 @@ None in code. Nothing has run on the physical arm.
 - Untracked, not committed: `src/digital_twin.html` (predates this work). `station.yaml`/`station_data/` now gitignored; they still exist from a Station test run.
 
 ## Blockers
+- 2026-11-22 03:07 (Jafer): Station motor ranges wrap past 0 on motors 1-7 and the gripper range is 3288..3292; every motion command refuses (`calibration invalid`). Evidence: `./cli.sh hw motors`. Fix: recalibrate in the Station console (hardware owner). See FINDINGS.md.
 
 - No physical arm in this session. Tested offline: 44 tests pass, including flow tests for identify, jog, probe, teach, goto, torque and stop against a fake bridge. Live Station frames have not been exercised.
 
