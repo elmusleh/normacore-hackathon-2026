@@ -9,6 +9,13 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~06:45, claude for Jafer): grape hover, `--travel-z`, motor 4 overload
+- Jafer refitted the arm on the temporary arm (uncommitted `config/calibration.json`: RMS 15.55 mm, motor 2 zero 1945 instead of 1000). Not committed by me: Jafer commits it as a calibration commit.
+- Hover refusals seen: motor 6 near its low end during "across" when starting with fingers flat; motor 2 at its low end (996 < 998) when lifting to 150 mm. `clear` and the feeding waypoints were taught on the old arm: do not use them on this arm.
+- Added `calib goto/line --travel-z` (Jafer chose it, told me to skip confirmations this session). Right grape hover `calib goto 380.5 146.1 70 --travel-z 90` STOPPED at across 29/46: motor 4 overload (167 > 100). Arm holding at table (320, 174, 56) mm, both grapes untouched, no motor fault.
+- Next: 1) Jafer checks the elbow for binding / cable snag. 2) Decide whether motor 4's overload threshold (100) is too low for this arm (config/elrobot.json, calibration commit). 3) Retry the hover from the current pose (shorter path) only after that.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, claude for Jafer): feeding skills cut to two
 - Jafer found the 17-skill list too much ("as smooth as possible"). `docs/feeding_skills.md` now has two skills: `grab <object>` (find, hover, centre, grasp, lift) and `feed <object>` (grab if needed, carry to serve, approach to standoff, handover, return). The old skills are steps inside them. Docs only.
 - Next: 1) Measure the gripper camera's finger-centre pixel. 2) Gripper direction + current probe (plan 1.2-1.3), grasp width for grapes. 3) Write `.claude/skills/grab/SKILL.md`. 4) Teach `serve`, build `find_mouth` + approach, then `.claude/skills/feed/SKILL.md`.

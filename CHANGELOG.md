@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- `calib goto` / `calib line` take `--travel-z MM` (default 150, 50-250) to travel sideways lower. The planner never travels below the safety floor (50 mm + fit error) or the target height. Added because the 150 mm lift pushed motor 2 past its range on the temporary arm. Test added.
 - Follower bus switched to the temporary arm `5B61034679` in `config/elrobot.json` and `.mcp.json` (2026-11-22, Jafer): the usual follower `5B61034962` is out for a motor repair. Switch both back when it returns. `config/calibration.json` must be redone for each arm (joint zeros and touches are per arm).
 
 ### Added

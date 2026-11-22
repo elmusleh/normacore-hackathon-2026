@@ -274,6 +274,20 @@ def test_cartesian_goto_lifts_moves_across_and_descends_in_small_steps():
 
 
 @pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
+def test_cartesian_goto_travel_height_is_settable_but_never_below_the_floor():
+    model, jc, base, present, ranges = _goto_setup()
+
+    def across_z(plan):
+        return {round(p[2], 3) for label, p, _, mode in plan if label.startswith("across")}
+
+    assert across_z(ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, 150, 80],
+                                           fit_rms_mm=16, travel_z_mm=110)) == {110.0}
+    # Asked below the floor (50 + 16 mm) and below the target: travels at the target height.
+    assert across_z(ak.plan_cartesian_goto(model, jc, base, present, ranges, [228, 150, 80],
+                                           fit_rms_mm=16, travel_z_mm=40)) == {80.0}
+
+
+@pytest.mark.skipif(not ak.URDF_PATH.exists(), reason="needs the norma-core submodule URDF")
 def test_cartesian_goto_refuses_unsafe_targets():
     model, jc, base, present, ranges = _goto_setup()
     with pytest.raises(ValueError, match="below the allowed"):

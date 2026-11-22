@@ -454,7 +454,8 @@ def plan_cartesian_path(model: ArmModel, calib: JointCalibration, base: BaseInTa
             steps.append((label, [float(v) for v in p], goals, "stream"))
             prev = goals
 
-    travel = max(travel_z_mm, max(c[2] for _, c in corners))
+    # Never travel sideways below the safety floor, whatever travel_z_mm was asked for.
+    travel = max(travel_z_mm, floor, max(c[2] for _, c in corners))
     top = np.array([here[0], here[1], travel])
     segment("lift", here, top, False)
     first = np.asarray(corners[0][1], dtype=float)

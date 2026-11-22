@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Dry-run flag for `calib goto` — Priority 78% (High value) [Security]
+   What: A `--check` flag that runs every path check and prints the plan, then exits without asking or moving.
+   Why: Today the only way to test a path is to answer "no" at the MOVE prompt; one wrong keystroke or a `--yes` left in a command moves the arm.
+   How: In `scripts/calib.py`, add `--check`; after planning, print the segments and `return 0` before the torque check and the prompt. Add a test that it never calls the motion code.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 grape hover; this session only added `--travel-z`.
+
+2. Tag waypoints with the arm they were taught on — Priority 72% (High value) [Security]
+   What: Store the follower bus serial with each waypoint and sequence, and refuse to play them on a different arm.
+   Why: With the temporary arm, `clear` and the feeding waypoints would send raw step values from another arm to unchecked poses.
+   How: In `config/waypoints.json` add a `"bus"` field per waypoint; in the waypoint and sequence code compare it with `station.bus` from `config/elrobot.json` and refuse on mismatch with a clear message.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs the waypoint format change agreed with the team.
+
+3. Per-motor overload thresholds measured per arm — Priority 55% (Nice to have) [Best practices]
+   What: Record the normal current of each motor while moving, and set overload thresholds from it for the arm in use.
+   Why: Motor 4 stopped a free move at 167 against a limit of 100; a limit that is too low stops good moves, one too high misses real collisions.
+   How: Run a slow `calib goto` in free air, log the peak current per motor (`./cli.sh logs`), and set each threshold to about 1.5x that peak in a calibration commit.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Needs a bench session with the hardware owner.
+
 1. Show the grasp target on the camera picture before going down — Priority 74% (High value) [Security]
    What: Before `grab` descends, save the gripper-camera frame with the planned grasp point drawn on it and let the agent check it.
    Why: The descent is the riskiest table move; a wrong target (wrong grape, edge of the bowl) is caught before the fingers hit anything.

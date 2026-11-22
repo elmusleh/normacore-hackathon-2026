@@ -10,7 +10,7 @@ Usage (via ./cli.sh calib):
   calib touch --list | --clear
   calib fit [--refine] [--write]       arm base pose in the table frame (+ joint zeros/directions)
   calib where                          current fingertip position in base and table frames
-  calib goto X Y Z [--down] [--mm-per-s 25]  MOVES the arm smoothly: lift, across at 150 mm, descend (asks MOVE)
+  calib goto X Y Z [--down] [--mm-per-s 25] [--travel-z 150]  MOVES the arm smoothly: lift, across at 150 mm, descend (asks MOVE)
   calib line X1 Y1 Z1 X2 Y2 Z2 [--down] [--mm-per-s 25]  MOVES: goto the start, then along a straight line
   calib reach X Y Z [--down]           IK: joint steps that put the fingertip at table point X Y Z
   calib pixel U V [--size WxH]         table point under a camera pixel
@@ -37,6 +37,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from arm_kinematics import (  # noqa: E402
     ARM_MOTORS,
+    GOTO_TRAVEL_Z_MM,
     ArmModel,
     BaseInTable,
     JointCalibration,
@@ -361,6 +362,8 @@ def cmd_goto(args, cal):
             raise SystemExit(f"Refused: {what} not measured yet. Nothing moved.")
     if not 5 <= args.mm_per_s <= STREAM_MAX_MM_S:
         raise SystemExit(f"Refused: --mm-per-s must be 5-{STREAM_MAX_MM_S}. Nothing moved.")
+    if not 50 <= args.travel_z <= 250:
+        raise SystemExit("Refused: --travel-z must be 50-250 mm. Nothing moved.")
     rms = float(cal["base_in_table"].get("rms_mm") or 0.0)
     model, jc, base = _model(cal), JointCalibration.from_config(cal["joints"]), _base(cal)
     if args.cmd == "line":
@@ -377,7 +380,7 @@ def cmd_goto(args, cal):
             return 1
         present = {m: readings[m].present for m in ARM_MOTORS}
         ranges = {m: (readings[m].range_min, readings[m].range_max) for m in ARM_MOTORS}
-        kw = dict(point_down=args.down, fit_rms_mm=rms, step_mm=args.step_mm)
+        kw = dict(point_down=args.down, fit_rms_mm=rms, step_mm=args.step_mm, travel_z_mm=args.travel_z)
         try:
             if end:
                 plan = plan_cartesian_line(model, jc, base, present, ranges, target, end, **kw)
@@ -496,11 +499,15 @@ def main() -> int:
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
     p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-60 mm/s)")
     p.add_argument("--step-mm", type=float, default=3.0, help="distance between streamed points (2-20)")
+    p.add_argument("--travel-z", type=float, default=GOTO_TRAVEL_Z_MM,
+                   help="height (mm) to travel sideways at; never below the safety floor (default 150)")
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
     p = sub.add_parser("line", help="MOVE: goto the start point, then along a straight line (asks MOVE first)")
     for a in ("x1", "y1", "z1", "x2", "y2", "z2"):
         p.add_argument(a, type=float)
     p.add_argument("--step-mm", type=float, default=3.0, help="distance between streamed points (2-20)")
+    p.add_argument("--travel-z", type=float, default=GOTO_TRAVEL_Z_MM,
+                   help="height (mm) to travel sideways at; never below the safety floor (default 150)")
     p.add_argument("--down", action="store_true", help="fingers pointing straight down")
     p.add_argument("--mm-per-s", type=float, default=25.0, help="fingertip speed (5-60 mm/s)")
     p.add_argument("--yes", action="store_true", help="skip the MOVE prompt")
