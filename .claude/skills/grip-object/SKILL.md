@@ -37,6 +37,10 @@ Worked first on 2026-11-22 (right grape, temporary arm `5B61034679`). See the HA
      command about 25 instead of 18 so the jaws end near grape height (~15-25 mm by joints) and do not hit the table.
    Never go below what `--min-z 0` allows (the fit error stays on top).
 7. **Close.** `set_gripper(0)`.
+   Grip strength = `gripper.squeeze_steps` in `config/elrobot.json` (57 since 2026-11-22: Jafer found 115 too hard).
+   It is counted from the MCP server's reading. If `get_robot_state` motor 8 `raw` differs from `./cli.sh hw motors`,
+   the MCP reading is stale and the squeeze will be wrong: ask the human to reconnect the elrobot MCP server (`/mcp`).
+   After closing, check `hw motors`: goal should be about present - 57.
 8. **Check with the gripper camera, not the result field.** `holding_object` is unreliable until motor 8's range is
    recalibrated (the jaws stall on each other near 1372). `look("gripper")`: the object must be pinched between the jaw tips.
 9. **Lift.** `./cli.sh calib goto X Y 90 --travel-z 90 --mm-per-s 15 --yes`, then `look("gripper")` and `look("table")`:

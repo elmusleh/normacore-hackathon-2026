@@ -45,6 +45,6 @@
     "motor": 8,
     "open_at": "max",
     "verified": true,
-    "squeeze_steps": 10
+    "squeeze_steps": 57
   }
 }

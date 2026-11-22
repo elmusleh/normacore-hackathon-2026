@@ -9,6 +9,11 @@ hardware_owner: "jafer"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
+## Latest session (2026-11-22, ~08:05, claude for Jafer): grip too hard, stale MCP readings
+- Jafer: grip is too hard, halve it. Found the elrobot MCP server reads a frozen frame (motor 8 raw 1381 while `hw motors` says 1487), so set_gripper's 10-step squeeze became ~115 steps. Set the held grape to zero extra squeeze (`hw jog 8 -57` ended with goal = present); still held.
+- `gripper.squeeze_steps` 10 -> 57 (half of 115). Needs the MCP server reconnected (`/mcp`) so the squeeze is counted from a fresh reading. MCP writes work, its reads are stale; that also explains the timeouts.
+- Hardware owner: jafer.
+
 ## Latest session (2026-11-22, ~07:55, claude for Jafer): left grape gripped with the grip-object skill
 - Put the right grape down at (407, 138) (lowered to 31 mm, opened: MCP set_gripper(100) timed out twice, `hw jog 8 200` x7 worked). After the left grip the right grape is NOT visible on the table near where it was released; there is a stain there. Check it.
 - Left grape (table cam (112, 45)): hover 70, 40-mm stage (joints 28 mm: big sag), gripper cam showed it ~3 cm beyond the tips; target (100.6, 19.9, 25) -> joints (103.3, 19.9, 24.7); closed; lifted to 50 mm by joints. First try, held.
