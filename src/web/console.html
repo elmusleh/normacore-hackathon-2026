@@ -111,7 +111,11 @@
       <button type="submit">Send</button>
     </form>
     <div class="opts">
-      <label><input type="checkbox" id="autosend"> Send right after speaking</label>
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <label><input type="checkbox" id="autosend"> Send right after speaking</label>
+        <label><input type="checkbox" id="tts" checked> Speak replies (TTS)</label>
+        <button type="button" id="tts-test" style="padding:2px 8px; border-radius:5px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:11px; cursor:pointer;">Test Voice</button>
+      </div>
       <span id="engine"></span>
     </div>
   </section>
@@ -179,11 +183,28 @@ fetch("/api/cameras").then(r => r.json())
     names.forEach(addCamera);
   });
 
+// ---------------------------------------------------------------- text to speech (TTS)
+function speakText(text) {
+  if (!$("tts")?.checked || !("speechSynthesis" in window) || !text) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    window.speechSynthesis.speak(u);
+  } catch (_) { /* ignore browser TTS errors */ }
+}
+
+$("tts-test")?.addEventListener("click", () => {
+  speakText("Hello! I am your feeding assistant. Tell me if you would like grapes or chocolate, or say stop anytime.");
+});
+
 // ---------------------------------------------------------------- chat
 let lastId = 0;
+let initialLoaded = false;
 const log = $("log");
 
-function render(m) {
+function render(m, announce = true) {
   log.querySelector(".empty")?.remove();
   const b = document.createElement("div");
   b.className = "bubble " + (["robot", "tool", "error"].includes(m.role) ? m.role : "user");
@@ -194,6 +215,7 @@ function render(m) {
   b.appendChild(t);
   log.insertBefore(b, typing.isConnected ? typing : null);
   log.scrollTop = log.scrollHeight;
+  if (announce && m.role === "robot") speakText(m.text);
 }
 
 const typing = document.createElement("div");
@@ -215,7 +237,8 @@ async function poll() {
   try {
     const r = await fetch(`/api/messages?after=${lastId}`, { cache: "no-store" });
     const d = await r.json();
-    for (const m of d.messages) { if (m.id > lastId) { render(m); lastId = m.id; } }
+    for (const m of d.messages) { if (m.id > lastId) { render(m, initialLoaded); lastId = m.id; } }
+    initialLoaded = true;
     showAgent(d);
   } catch (_) { /* server restarting; try again */ }
   setTimeout(poll, 700);

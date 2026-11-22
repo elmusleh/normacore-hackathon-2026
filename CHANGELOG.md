@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Leader/follower serial roles were swapped in `scripts/teleop_sync.py` (it drove the leader arm by default), `src/digital_twin_server.py`, `src/digital_twin.html`, `scripts/camera_feed_arm.py` and `docs/team_setup.md`. Confirmed on the arm 2026-11-21: follower `5B61034962`, leader `5B61037051`.
 
 ### Added
+- Added browser Text-to-Speech (`Speak replies (TTS)` toggle + `Test Voice` button) in `src/web/console.html` and refined `CONSOLE_PROMPT` in `src/console_agent.py` for natural spoken feeding guidance (including `grapes` and `chocolate`).
 - Improved tabletop bowl & food-piece stability (`src/feeding_vision.py`): added specular-glare rejection, thin-sliver circularity/aspect filtering, distance-transform peak splitting for touching grapes, and EMA temporal smoothing on the bowl bounding box.
 - Upgraded Table Cam detection (`src/feeding_vision.py`, `src/digital_twin_server.py`) with a tabletop colored-bowl + LAB chroma-contrast food-piece detector combined with MediaPipe `ObjectDetector`: locks reliably onto overhead colored bowls and highlights every grape/chocolate piece inside while ignoring ceramic glare.
 - Fixed V4L2 camera opening in `src/digital_twin_server.py` to use explicit `/dev/video{idx}` device paths with `cv2.CAP_V4L2`, fixing OpenCV 5.x index-gap failures and unlocking full 1280×720 HD MJPG capture on the NormaCore KD-USB and OBSBOT cameras.
