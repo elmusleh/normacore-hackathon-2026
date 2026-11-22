@@ -54,13 +54,24 @@ def transcribe(path: str, model: str = MODEL, keywords: list[str] | None = None)
         from openai import OpenAI
 
         _client = OpenAI(timeout=15.0, max_retries=1)
+    kw = KEYWORDS if keywords is None else keywords
     with open(path, "rb") as f:
-        result = _client.audio.transcriptions.create(
-            model=model,
-            file=f,
-            languages=LANGUAGES,
-            keywords=KEYWORDS if keywords is None else keywords,
-        )
+        try:
+            result = _client.audio.transcriptions.create(
+                model=model,
+                file=f,
+                languages=LANGUAGES,
+                keywords=kw,
+            )
+        except TypeError:
+            # openai SDK <3.57 (e.g. 2.x) uses `prompt` instead of `languages`/`keywords`
+            f.seek(0)
+            compat_model = "gpt-4o-mini-transcribe" if model == "gpt-transcribe" else model
+            result = _client.audio.transcriptions.create(
+                model=compat_model,
+                file=f,
+                prompt=", ".join(kw),
+            )
     return result.text.strip()
 
 
