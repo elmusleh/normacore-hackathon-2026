@@ -112,6 +112,8 @@
     </form>
     <div class="opts">
       <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <label><input type="checkbox" id="handsfree"> Hands-Free (Auto-Listen)</label>
+        <label><input type="checkbox" id="wakeword" checked> Wake word ("Robo")</label>
         <label><input type="checkbox" id="autosend"> Send right after speaking</label>
         <label><input type="checkbox" id="tts" checked> Speak replies (TTS)</label>
         <button type="button" id="tts-test" style="padding:2px 8px; border-radius:5px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:11px; cursor:pointer;">Test Voice</button>
@@ -185,9 +187,12 @@ fetch("/api/cameras").then(r => r.json())
 
 // ---------------------------------------------------------------- text to speech (TTS)
 let currentAudio = null;
+let ttsPlaying = false;
+let followupUntil = 0;  // 12 s after TTS finishes, user can reply without repeating wake word
 
 async function speakText(text, force = false) {
   if ((!force && !$("tts")?.checked) || !text) return;
+  ttsPlaying = true;
   try {
     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
     const r = await fetch("/api/tts", {
@@ -200,9 +205,17 @@ async function speakText(text, force = false) {
       throw new Error(info.error || `HTTP ${r.status}`);
     }
     const url = URL.createObjectURL(await r.blob());
-    currentAudio = new Audio(url);
-    currentAudio.onended = () => URL.revokeObjectURL(url);
-    await currentAudio.play();
+    await new Promise((resolve) => {
+      currentAudio = new Audio(url);
+      const done = () => {
+        URL.revokeObjectURL(url);
+        currentAudio = null;
+        resolve();
+      };
+      currentAudio.onended = done;
+      currentAudio.onerror = done;
+      currentAudio.play().catch(done);
+    });
   } catch (e) {
     // Fallback to browser speechSynthesis if server TTS fails
     if ("speechSynthesis" in window) {
@@ -212,11 +225,20 @@ async function speakText(text, force = false) {
       } catch (_) {}
     }
     if (force) setStatus(`TTS error: ${e.message}`, true);
+  } finally {
+    // Brief echo guard before resuming hands-free mic listening
+    setTimeout(() => {
+      ttsPlaying = false;
+      followupUntil = performance.now() + 12000;
+      if ($("handsfree")?.checked && !recording && !busy) {
+        setStatus('Hands-Free: Listening… (reply now or say "Robo")');
+      }
+    }, 350);
   }
 }
 
 // Persist checkbox states across refreshes
-for (const id of ["autosend", "tts"]) {
+for (const id of ["autosend", "tts", "wakeword"]) {
   const el = $(id);
   if (!el) continue;
   const saved = localStorage.getItem(`console_${id}`);
@@ -436,6 +458,155 @@ document.addEventListener("keyup", (e) => {
   e.preventDefault();
   spaceDown = false;
   if (recording) toggle();
+});
+
+// ---------------------------------------------------------------- hands-free voice loop (VAD + wake word)
+const HF_RMS_THRESHOLD = 0.022;
+const HF_SILENCE_MS = 1100;
+const HF_MAX_UTTERANCE_MS = 7500;
+const STOP_RE = /\b(stop|stopp|halt|freeze|wait)\b/i;
+const WAKE_RE = /^(?:hey\s+|ok\s+|okay\s+|hi\s+)?(robo|robot|robbo|roboh)\b[\s,.:;!?-]*(.*)$/i;
+
+let hfActive = false;
+let hfStream = null, hfCtx = null, hfAnalyser = null, hfTimer = null;
+let hfRecorder = null, hfChunks = [], hfSpeaking = false;
+let hfSpeechFrames = 0, hfLastVoiceAt = 0, hfStartedAt = 0;
+
+async function handleHandsFreeTranscript(rawText) {
+  const text = (rawText || "").trim();
+  if (!text) return;
+
+  // 1. Emergency stop ALWAYS bypasses wake word immediately
+  if (STOP_RE.test(text)) {
+    setStatus("STOP heard — halting arm!", true);
+    await fetch("/api/stop", { method: "POST" });
+    speakText("Stopped, holding still.");
+    return;
+  }
+
+  const requireWake = $("wakeword")?.checked;
+  const inFollowup = performance.now() < followupUntil;
+  const m = text.match(WAKE_RE);
+
+  if (requireWake && !inFollowup) {
+    if (!m) {
+      setStatus(`Hands-Free: Heard "${text}" (say "Robo ..." to command)`);
+      return;
+    }
+    const cmd = (m[2] || "").trim();
+    if (!cmd) {
+      followupUntil = performance.now() + 12000;
+      setStatus('Hands-Free: Awake! Say your request now…');
+      await speakText("Yes? What would you like?");
+      return;
+    }
+    setStatus(`Hands-Free command: "${cmd}"`);
+    await send(cmd);
+    return;
+  }
+
+  // Either wake word not required, or inside 12 s follow-up window
+  const cleanCmd = m ? (m[2] || "").trim() : text;
+  if (!cleanCmd) return;
+  setStatus(`Hands-Free command: "${cleanCmd}"`);
+  await send(cleanCmd);
+}
+
+async function startHandsFree() {
+  if (hfActive) return;
+  if (engine !== "server") {
+    setStatus("Hands-Free requires server STT (OPENAI_API_KEY).", true);
+    $("handsfree").checked = false;
+    return;
+  }
+  try {
+    hfStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+  } catch (e) {
+    setStatus(`Microphone blocked: ${e.message}`, true);
+    $("handsfree").checked = false;
+    return;
+  }
+  hfCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const src = hfCtx.createMediaStreamSource(hfStream);
+  hfAnalyser = hfCtx.createAnalyser();
+  hfAnalyser.fftSize = 1024;
+  src.connect(hfAnalyser);
+  const buf = new Float32Array(hfAnalyser.fftSize);
+
+  hfActive = true;
+  hfSpeaking = false;
+  hfSpeechFrames = 0;
+  setStatus('Hands-Free ON: Say "Robo, I want grapes" (or "Stop" anytime)');
+
+  hfTimer = setInterval(() => {
+    if (!hfActive || ttsPlaying || busy) return;
+    hfAnalyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    const rms = Math.sqrt(sum / buf.length);
+    const now = performance.now();
+
+    if (!hfSpeaking) {
+      if (rms >= HF_RMS_THRESHOLD) {
+        hfSpeechFrames++;
+        if (hfSpeechFrames >= 2) {
+          hfSpeaking = true;
+          hfStartedAt = now;
+          hfLastVoiceAt = now;
+          hfChunks = [];
+          hfRecorder = new MediaRecorder(hfStream, { audioBitsPerSecond: 128000 });
+          hfRecorder.ondataavailable = (e) => e.data.size && hfChunks.push(e.data);
+          hfRecorder.onstop = async () => {
+            const blob = new Blob(hfChunks, { type: hfRecorder.mimeType || "audio/webm" });
+            if (blob.size < 1200) return;
+            busy = true; mic.classList.add("busy"); setStatus("Hands-Free: Transcribing…");
+            try {
+              const r = await fetch("/api/transcribe", { method: "POST", body: blob, headers: { "Content-Type": blob.type } });
+              const d = await r.json();
+              if (d.ok) await handleHandsFreeTranscript(d.text);
+              else setStatus(`Transcription failed: ${d.error}`, true);
+            } catch (err) {
+              setStatus(`Hands-Free error: ${err.message}`, true);
+            } finally {
+              busy = false; mic.classList.remove("busy");
+              if (hfActive && !ttsPlaying) setStatus('Hands-Free: Listening… (say "Robo ..." or "Stop")');
+            }
+          };
+          hfRecorder.start();
+          setRecording(true);
+          setStatus("Hands-Free: Hearing you… (pause to send)");
+        }
+      } else {
+        hfSpeechFrames = 0;
+      }
+    } else {
+      if (rms >= HF_RMS_THRESHOLD * 0.75) hfLastVoiceAt = now;
+      if ((now - hfLastVoiceAt) >= HF_SILENCE_MS || (now - hfStartedAt) >= HF_MAX_UTTERANCE_MS) {
+        hfSpeaking = false;
+        hfSpeechFrames = 0;
+        setRecording(false);
+        if (hfRecorder?.state === "recording") hfRecorder.stop();
+      }
+    }
+  }, 50);
+}
+
+function stopHandsFree() {
+  hfActive = false;
+  hfSpeaking = false;
+  setRecording(false);
+  if (hfTimer) { clearInterval(hfTimer); hfTimer = null; }
+  if (hfRecorder?.state === "recording") { try { hfRecorder.stop(); } catch (_) {} }
+  if (hfStream) { hfStream.getTracks().forEach(t => t.stop()); hfStream = null; }
+  if (hfCtx) { hfCtx.close().catch(() => {}); hfCtx = null; }
+  setStatus("Hands-Free OFF. Click the microphone to speak.");
+}
+
+$("handsfree")?.addEventListener("change", (e) => {
+  if (e.target.checked) startHandsFree();
+  else stopHandsFree();
 });
 
 chooseEngine();
