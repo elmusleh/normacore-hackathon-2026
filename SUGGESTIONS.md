@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Show "REAL MOTION ON" on the console page — Priority 85% (High value) [Security]
+   What: A red banner at the top of the console page whenever `.mcp.json` has `ELROBOT_ALLOW_MOTION` set to "1".
+   Why: The switch is committed as "1" on the handover branch, so a teammate opening the console may not know that a chat message moves the real arm near a person.
+   How: In `src/web_console.py`, read the switch with `load_mcp_server_config()` from `src/console_agent.py` and add it to the `/api/messages` reply; in `src/web/console.html`, show a red bar when it is on. Add one test in `tests/test_web_console.py`.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 handover check; documenting came first.
+
+2. Load the Claude API key from a local `.env` file — Priority 60% (Nice to have) [Security]
+   What: `./cli.sh console` reads `ANTHROPIC_API_KEY` from a gitignored `.env` file, with a committed `.env.example` that shows the name but no value.
+   Why: Today the key must be typed with `export` in each terminal, which tempts people to paste it into scripts or docs that end up in git.
+   How: `.gitignore` already ignores `.env` and allows `.env.example`. Add `.env.example` with `ANTHROPIC_API_KEY=`, and in the `console)` branch of `cli.sh` run `set -a; [ -f .env ] && . ./.env; set +a` before starting Python. Mention it in `docs/team_setup.md` step 8.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 handover check; no key is on this laptop yet to test with.
+
+3. Save each console chat with its tool calls to `logs/` — Priority 45% (Nice to have) [Professionalism]
+   What: Write every console conversation (what the person said, Claude's replies and each tool call with its result) to `logs/chat-<timestamp>.jsonl`.
+   Why: When a run goes wrong in front of the judges or a teammate asks "what did Claude do?", there is no record after the page is closed; a log makes failures reproducible.
+   How: In `ChatLog.add` in `src/web_console.py`, also append the message as one JSON line to a file opened at startup via the existing `src/elrobot_log.py` folder. `logs/` is already gitignored; note that logs can contain names (AGENTS.md privacy).
+   Status: ⏳ Unimplemented
+   Reason Deferred: Found during the 2026-11-22 handover check.
+
 1. Add a test that catches docs naming the wrong arm or camera port — Priority 72% (High value) [Best practices]
    What: A small offline test that reads `config/elrobot.json` and fails if a doc names a different follower bus serial or camera USB port as the current one.
    Why: The team plan still named the arm that is out for repair and old camera ports a day after they changed, and agents read that plan first; a wrong serial means commands go to the wrong arm or no arm.

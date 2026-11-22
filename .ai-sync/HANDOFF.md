@@ -1,6 +1,6 @@
 ---
 last_agent: claude
-timestamp: 2026-11-22T09:30:00
+timestamp: 2026-11-22T10:00:00
 status: team-handover-grip-from-bowl-and-fingers-down-blocked
 current_phase: "Phase 3: Agent Integration & Tabletop Primitives (Assistive Feeding)"
 current_task: "Grip a grape fingers-down (blocked: wrist zeros on the temporary arm), then feed stage (mouth)"
@@ -14,6 +14,15 @@ previous_session: claude 2026-11-22T08:45 — grip rule fingers vertical down; b
 - Fixed `docs/FEEDING_ASSISTANT_PLAN.md`: its current-state section still described 2026-11-21 (the arm now in repair, old camera ports, "no x/y/z moves"). It now matches the START HERE entry below and says HANDOFF wins on any disagreement.
 - Next: the START HERE steps below are unchanged. Whoever takes the arm: edit `hardware_owner` in the front matter and commit it first.
 - Hardware owner: jafer (until a teammate takes over).
+
+## Handover check (2026-11-22, ~10:00, claude for Jafer)
+> **WARNING: real motion is ON on this branch.** `.mcp.json` has `ELROBOT_ALLOW_MOTION: "1"` (Jafer, commit ee39ba5; he chose to keep it for the handover). On this branch, Claude Code's `elrobot` tools AND the web console chat move the real arm, with no dry run. Before you open either: be the hardware owner (`hardware_owner` above) with a hand on the 12 V switch, or set it to `"0"` on your laptop. Safety rule 9 in `docs/FEEDING_ASSISTANT_PLAN.md` says it should not be committed as "1": set it to `"0"` before PR #3 is merged into `main` (main still has "0").
+
+- Checked for handover: tree clean, everything pushed to `origin/feat/vision-apriltag-ik` (PR #3 open), `./cli.sh sync` exit 0, 144 tests pass, `bash -n cli.sh` OK.
+- Web console (`./cli.sh console`, http://localhost:8890): cameras, push-to-talk speech-to-text (local faster-whisper, `large-v3-turbo` on the GPU), chat answered by Claude through its own copy of the `elrobot` MCP server. Needs `export ANTHROPIC_API_KEY=...` (none on this laptop; never commit it). The chat with Claude has NEVER been tried with a real key. "stop" alone in the chat, or the red STOP button, holds the arm without Claude. Do not run Claude Code's `elrobot` tools and the console chat on the arm at the same time (two controllers).
+- Added: `docs/team_setup.md` step 8 (console setup).
+- Next: as in START HERE below; for voice, set the key, try `look at the table` first, then a small move with the owner at the arm.
+- Hardware owner: jafer.
 
 ## START HERE: team handover (2026-11-22, ~09:30, claude for Jafer)
 Jafer is handing the project to teammates. This entry is the summary; the dated entries below have the details.
