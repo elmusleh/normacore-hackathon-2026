@@ -90,6 +90,7 @@ class RobotTools:
         self._camera_queues = camera_queues or discover_camera_queues
         self._usb_ports = usb_ports_fn or usb_ports
         self._camera_info: Dict[str, Dict[str, Any]] = {}  # queue -> describe_camera(); fixed per queue
+        self._camera_retry_at: Dict[str, float] = {}  # queue -> when to try describing it again
         self._hw = None
         self._lock = threading.Lock()
         self._gripper_cmd_open: Optional[float] = None  # last commanded gripper opening, %
@@ -199,6 +200,20 @@ class RobotTools:
         return {"ok": True, "waypoints": sorted(points), "clear_waypoint": cfg["agent"]["clear_waypoint"],
                 "hint": "Teach new ones with teach_waypoint or ./cli.sh hw teach <name>." if not points else ""}
 
+    def _describe_queue(self, q: str) -> Dict[str, Any]:
+        """Product and unique_id of a camera queue. The first entry (the connect event) is not
+        always readable (the Station returned nothing for queues it reopened), but every entry
+        carries the camera, so fall back to the newest one."""
+        for read in (lambda: self.hw().read_first(q), lambda: self.hw().read_recent(q, back=1)):
+            try:
+                info = describe_camera(read())
+            except Exception:  # noqa: BLE001 - description is optional
+                log.debug("describe %s failed", q, exc_info=True)
+                continue
+            if info.get("unique_id"):
+                return info
+        return {}
+
     def _cameras(self, cfg) -> List[Dict[str, Any]]:
         """Every camera queue with its product, USB port (None if unplugged) and configured name.
 
@@ -208,13 +223,14 @@ class RobotTools:
         names = {v: k for k, v in cfg["cameras"].items()}
         cams = []
         for q in self._camera_queues():
-            if q not in self._camera_info:
-                try:
-                    self._camera_info[q] = describe_camera(self.hw().read_first(q))
-                except Exception:  # noqa: BLE001 - description is optional
-                    log.debug("describe %s failed", q, exc_info=True)
-                    self._camera_info[q] = {}
-            info = dict(self._camera_info[q])
+            info = self._camera_info.get(q)
+            if not info and time.monotonic() >= self._camera_retry_at.get(q, 0.0):
+                info = self._describe_queue(q)
+                if info.get("unique_id"):
+                    self._camera_info[q] = info
+                else:  # a queue the Station has not filled yet: ask again later, not every call
+                    self._camera_retry_at[q] = time.monotonic() + 10.0
+            info = dict(info or {})
             port = port_of(info.get("unique_id", ""), ports)
             cams.append({"queue": q, "port": port, "live": port is not None,
                          "name": names.get(f"port:{port}") or names.get(q), "product": info.get("product")})

@@ -145,8 +145,21 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
    (add `--write` to save it). It tries exposures from 5 to 250 and picks the one with the fewest pure-white and black
    pixels. Other V4L2 controls go in `camera_settings.<name>.controls`, e.g.
    `{"gain": 0, "white_balance_automatic": 0, "white_balance_temperature": 4600, "backlight_compensation": 0}`.
-3. **Frame size.** `station.yaml` stores frames at `resize_target: 224` px by default. Too small to spot
-   a grape; use `480` and restart the Station. `station.yaml` is local, so set it on each machine.
+3. **Frame size.** With an empty `formats` list the Station picks a small camera mode (320x240), and
+   `resize_target` (default 224) shrinks it further. At 320x240 the AprilTag detector finds only the 2 near
+   tags. Set the camera mode and size in `station.yaml` (local, so set it on each machine), then restart the Station:
+   ```yaml
+   usb-video:
+     enabled: true
+     resize_target: 1080
+     formats:
+       - format: "1920x1080@30fps,mjpeg"
+       - format: "1280x720@30fps,mjpeg"
+       - format: "640x480@30fps,mjpeg"
+       - format: "640x480@maxfps,yuyv"
+   ```
+   Each camera takes the first mode it can open. All cameras sit on one 480 Mbps USB 2.0 link (the hub's
+   USB 3 side does not help USB 2.0 cameras), so not every camera gets Full HD: see FINDINGS.md.
 4. **Gripper direction.** `config/elrobot.json` → `gripper.open_at` (`"max"` or `"min"`) says which
    end of motor 8's range is open. Check with `./cli.sh hw identify 8`, fix if needed, set `"verified": true`.
 5. **Waypoints.** Teach at least `clear` (above the table, gripper open), then the pick spots and bins

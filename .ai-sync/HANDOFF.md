@@ -9,7 +9,15 @@ hardware_owner: "steve"
 previous_session: claude 2026-11-21T15:00 — web console and real-arm MCP server
 ---
 
-## Latest session (2026-11-22, claude for Jafer): camera ports, dark gripper camera
+## Latest session (2026-11-22, ~02:20, claude for Jafer): camera resolution, console sees all cameras
+- Jafer asked for Full HD. Local `station.yaml` (gitignored) now has `resize_target: 1080` and a `formats` list (1920x1080 MJPEG, then 1280x720, then 640x480); backup of the old file was in the session scratchpad. Result: face 1920x1080; table and gripper fall back to 1280x720 (USB 2.0 bandwidth, libuvc -51) and are upscaled to 1920x1080. All 4 AprilTags found on the live table frame (only 2 at the old 320x240). Details in FINDINGS.md, setup in docs/mcp_server.md item 3.
+- Fixed: the console showed gripper and face as unplugged after a Station restart (`read_first` returned nothing). `src/robot_tools.py` now falls back to the newest entry and retries every 10 s. Test added; 135 tests pass. Verified live: all three tiles serve frames.
+- Running now: the Station and the console on 8890 were restarted by Claude in the background (logs `logs/station-20261122-fullhd.log`, `logs/console-20261122.log`). If they stop with the session, start them again with `./cli.sh station` and `./cli.sh console`.
+- Gotcha: when the Station stops, the camera driver often does not take the KD cameras back; reattach with `for p in 3-5.1 3-5.2.4; do echo $p:1.0 | sudo tee /sys/bus/usb/drivers/uvcvideo/bind; done` before `./cli.sh cameras`.
+- Next: `./cli.sh calib camera` on the table camera (all 4 tags now visible). Decide whether the table camera needs real 1080p (move the face camera off the shared hub).
+- Hardware owner: steve (unchanged). No motion.
+
+## Earlier session (2026-11-22, claude for Jafer): camera ports, dark gripper camera
 - Jafer saw the camera view too bright, then too dark after a Station restart. Cause of the dark view: the gripper camera (port 3-5.2.4) in manual exposure 14. The hub is back on laptop port 5, so the config names pointed at missing `3-1.x` ports and `cameras --tune` could not find them.
 - Changed (with Jafer's OK): `config/elrobot.json` cameras -> table `port:3-5.1`, gripper `port:3-5.2.4`, face `port:3-5.3`. Evidence in FINDINGS.md.
 - Exposure set to 250 for table and gripper (Jafer's choice after trying values live; committed). Applied with `./cli.sh cameras`; verified by `cameras --show` (both manual, 250). Face camera left on auto.
