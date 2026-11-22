@@ -40,5 +40,11 @@
       "sequence": "choc",
       "note": "picks one piece of chocolate and brings it to the person's mouth, then returns"
     }
+  },
+  "gripper": {
+    "motor": 8,
+    "open_at": "max",
+    "verified": true,
+    "squeeze_steps": 10
   }
 }
