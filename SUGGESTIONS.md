@@ -1,5 +1,26 @@
 ### Post-Implementation Suggestions
 
+1. Give each skill a written "done when" test and run it before trusting the skill — Priority 84% (High value) [Best practices]
+   What: For every skill in docs/feeding_skills.md, a short pass rule (e.g. "grasp-food: 5 grapes in a row, none crushed") recorded in FINDINGS.md with the run date.
+   Why: A skill that worked once at 4 a.m. is not a demo skill. A clear pass rule tells the team which skills `feed-me` may rely on and which must fall back to the recorded plan.
+   How: Copy the "Done when" column from the plan's task tables into each skill file; after each bench run, add one FINDINGS.md line with the result and the log path.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Skills other than hover are not written yet.
+
+2. Keep a one-page "autonomy register" of what the agent may do without asking — Priority 78% (High value) [Security]
+   What: One table (for example in GUIDELINES.md) listing each skill, whether it may run without confirmation, who allowed it and when.
+   Why: Standing permissions are spread over skill files and chat. One register makes it obvious when a skill near the person's face is running without a human OK, and makes it easy to revoke.
+   How: Add a table with columns skill / auto or ask / given by / date / limits; link it from every SKILL.md; change it only in its own commit by the hardware owner.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Only one skill has a standing OK today.
+
+3. Record a short video of every skill's first good bench run — Priority 45% (Nice to have) [Professionalism]
+   What: A phone or screen recording of each skill working on the arm, kept outside git, listed by date in HANDOFF.md.
+   Why: If something breaks on Sunday, the team still has proof each piece worked for the pitch, and the video shows exactly how the arm moved if a skill later behaves differently.
+   How: Start a recording before each first live run, save it to the shared drive (not the repo; faces must be cropped or consented), and note the file name in the handoff entry.
+   Status: ⏳ Unimplemented
+   Reason Deferred: Demo recording is owned by role D and starts once skills run end to end.
+
 1. Enforce the hover skill's limits in a hook, not only in text — Priority 86% (High value) [Security]
    What: A Claude Code PreToolUse hook that blocks `calib goto ... --yes` unless the z is >= 66 mm and HANDOFF.md names the session's user as hardware owner.
    Why: The skill lets the agent move the arm without asking. A hook makes that rule hard to break by accident, for example a typo in z or a session run by someone else.
