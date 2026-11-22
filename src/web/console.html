@@ -65,8 +65,18 @@
   #mic.busy { background: var(--panel-2); cursor: progress; box-shadow: none; }
   #mic:disabled { background: var(--panel-2); cursor: not-allowed; box-shadow: none; }
   @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,90,90,.6); } 70% { box-shadow: 0 0 0 22px rgba(255,90,90,0); } 100% { box-shadow: 0 0 0 0 rgba(255,90,90,0); } }
-  #mic-status { font-size: 13px; color: var(--muted); min-height: 18px; text-align: center; }
+  #mic-status { font-size: 13px; color: var(--muted); min-height: 18px; text-align: center; font-weight: 600; }
   #mic-status.err { color: var(--bad); }
+  .hf-meter { width: 200px; height: 6px; background: var(--panel-2); border-radius: 999px; overflow: hidden; display: none; }
+  .hf-meter.on { display: block; }
+  .hf-meter-fill { height: 100%; width: 0%; background: var(--ok); transition: width 60ms linear; }
+  .hf-pill { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted); display: none; }
+  .hf-pill.on { display: inline-block; }
+  .hf-pill.standby { background: #1e293b; color: #94a3b8; }
+  .hf-pill.hearing { background: #7f1d1d; color: #fca5a5; }
+  .hf-pill.busy { background: #78350f; color: #fcd34d; }
+  .hf-pill.speaking { background: #3b0764; color: #d8b4fe; }
 
   form { display: flex; gap: 8px; padding: 10px 16px 6px; }
   #text { flex: 1; resize: none; height: 44px; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--line);
@@ -103,6 +113,8 @@
       <button id="mic" type="button" aria-label="Start recording" title="Click to talk, click again to stop (or hold Space)">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
       </button>
+      <div class="hf-pill" id="hf-pill">STANDBY</div>
+      <div class="hf-meter" id="hf-meter"><div class="hf-meter-fill" id="hf-meter-fill"></div></div>
       <div id="mic-status">Checking speech-to-text…</div>
     </div>
 
@@ -229,11 +241,10 @@ async function speakText(text, force = false) {
     // Brief echo guard before resuming hands-free mic listening
     setTimeout(() => {
       ttsPlaying = false;
-      followupUntil = performance.now() + 12000;
       if ($("handsfree")?.checked && !recording && !busy) {
-        setStatus('Hands-Free: Listening… (reply now or say "Robo")');
+        setHfState("standby", 'Say "Robo, ..." to command (or "Stop" anytime)');
       }
-    }, 350);
+    }, 500);
   }
 }
 
@@ -277,7 +288,9 @@ typing.textContent = "Claude is working…";
 const AGENT_LABEL = { ready: "· Claude connected", starting: "· connecting to Claude…",
                       unavailable: "· Claude not connected", off: "· Claude off" };
 
+let agentBusy = false;
 function showAgent(d) {
+  agentBusy = Boolean(d.busy);
   const el = $("agent-state");
   el.textContent = AGENT_LABEL[d.agent] || "";
   el.title = d.agent_error || "";
@@ -461,8 +474,9 @@ document.addEventListener("keyup", (e) => {
 });
 
 // ---------------------------------------------------------------- hands-free voice loop (VAD + wake word)
-const HF_RMS_THRESHOLD = 0.022;
-const HF_SILENCE_MS = 1100;
+const HF_RMS_THRESHOLD = 0.045;     // ignores background hum / breathing
+const HF_SILENCE_MS = 1350;         // natural pause before sending
+const HF_MIN_SPEECH_MS = 400;       // ignores short clicks / coughs
 const HF_MAX_UTTERANCE_MS = 7500;
 const STOP_RE = /\b(stop|stopp|halt|freeze|wait)\b/i;
 const WAKE_RE = /^(?:hey\s+|ok\s+|okay\s+|hi\s+)?(robo|robot|robbo|roboh)\b[\s,.:;!?-]*(.*)$/i;
@@ -472,15 +486,32 @@ let hfStream = null, hfCtx = null, hfAnalyser = null, hfTimer = null;
 let hfRecorder = null, hfChunks = [], hfSpeaking = false;
 let hfSpeechFrames = 0, hfLastVoiceAt = 0, hfStartedAt = 0;
 
+function setHfState(mode, msg) {
+  const pill = $("hf-pill");
+  const meter = $("hf-meter");
+  if (pill) {
+    pill.className = "hf-pill" + (hfActive ? ` on ${mode}` : "");
+    const labels = {
+      standby: 'STANDBY — SAY "ROBO"',
+      hearing: "RECORDING — SPEAK NOW",
+      busy: "THINKING / TRANSCRIBING…",
+      speaking: "SPEAKING — MIC MUTED",
+    };
+    pill.textContent = labels[mode] || mode.toUpperCase();
+  }
+  if (meter) meter.classList.toggle("on", hfActive);
+  if (msg) setStatus(msg);
+}
+
 async function handleHandsFreeTranscript(rawText) {
   const text = (rawText || "").trim();
   if (!text) return;
 
   // 1. Emergency stop ALWAYS bypasses wake word immediately
   if (STOP_RE.test(text)) {
-    setStatus("STOP heard — halting arm!", true);
+    setHfState("busy", "STOP heard — halting arm!");
     await fetch("/api/stop", { method: "POST" });
-    speakText("Stopped, holding still.");
+    await speakText("Stopped, holding still.");
     return;
   }
 
@@ -490,25 +521,28 @@ async function handleHandsFreeTranscript(rawText) {
 
   if (requireWake && !inFollowup) {
     if (!m) {
-      setStatus(`Hands-Free: Heard "${text}" (say "Robo ..." to command)`);
+      setHfState("standby", `Ignored background: "${text}" (say "Robo ..." to command)`);
       return;
     }
     const cmd = (m[2] || "").trim();
     if (!cmd) {
-      followupUntil = performance.now() + 12000;
-      setStatus('Hands-Free: Awake! Say your request now…');
+      // Bare "Robo" opens a short 7s window for the user to state their command
+      followupUntil = performance.now() + 7000;
+      setHfState("speaking", 'Awake! Listening for your command…');
       await speakText("Yes? What would you like?");
       return;
     }
-    setStatus(`Hands-Free command: "${cmd}"`);
+    followupUntil = 0;
+    setHfState("busy", `Sending: "${cmd}"`);
     await send(cmd);
     return;
   }
 
-  // Either wake word not required, or inside 12 s follow-up window
+  // Wake word disabled, OR user just said bare "Robo" and is now giving the command
+  followupUntil = 0;
   const cleanCmd = m ? (m[2] || "").trim() : text;
   if (!cleanCmd) return;
-  setStatus(`Hands-Free command: "${cleanCmd}"`);
+  setHfState("busy", `Sending: "${cleanCmd}"`);
   await send(cleanCmd);
 }
 
@@ -538,20 +572,36 @@ async function startHandsFree() {
   hfActive = true;
   hfSpeaking = false;
   hfSpeechFrames = 0;
-  setStatus('Hands-Free ON: Say "Robo, I want grapes" (or "Stop" anytime)');
+  setHfState("standby", 'Hands-Free ON: Say "Robo, I want grapes" (or "Stop" anytime)');
 
   hfTimer = setInterval(() => {
-    if (!hfActive || ttsPlaying || busy) return;
+    if (!hfActive) return;
+    if (ttsPlaying) {
+      setHfState("speaking");
+      if ($("hf-meter-fill")) $("hf-meter-fill").style.width = "0%";
+      return;
+    }
+    if (busy || agentBusy) {
+      setHfState("busy");
+      if ($("hf-meter-fill")) $("hf-meter-fill").style.width = "0%";
+      return;
+    }
     hfAnalyser.getFloatTimeDomainData(buf);
     let sum = 0;
     for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
     const rms = Math.sqrt(sum / buf.length);
+    const fill = $("hf-meter-fill");
+    if (fill) {
+      const pct = Math.min(100, Math.round((rms / (HF_RMS_THRESHOLD * 2.2)) * 100));
+      fill.style.width = `${pct}%`;
+      fill.style.background = rms >= HF_RMS_THRESHOLD ? "var(--bad)" : "var(--ok)";
+    }
     const now = performance.now();
 
     if (!hfSpeaking) {
       if (rms >= HF_RMS_THRESHOLD) {
         hfSpeechFrames++;
-        if (hfSpeechFrames >= 2) {
+        if (hfSpeechFrames >= 3) {
           hfSpeaking = true;
           hfStartedAt = now;
           hfLastVoiceAt = now;
@@ -559,9 +609,13 @@ async function startHandsFree() {
           hfRecorder = new MediaRecorder(hfStream, { audioBitsPerSecond: 128000 });
           hfRecorder.ondataavailable = (e) => e.data.size && hfChunks.push(e.data);
           hfRecorder.onstop = async () => {
+            const durMs = performance.now() - hfStartedAt;
             const blob = new Blob(hfChunks, { type: hfRecorder.mimeType || "audio/webm" });
-            if (blob.size < 1200) return;
-            busy = true; mic.classList.add("busy"); setStatus("Hands-Free: Transcribing…");
+            if (durMs < HF_MIN_SPEECH_MS + HF_SILENCE_MS * 0.5 || blob.size < 2000) {
+              if (hfActive && !ttsPlaying) setHfState("standby", 'Say "Robo, ..." to command');
+              return;
+            }
+            busy = true; mic.classList.add("busy"); setHfState("busy", "Transcribing…");
             try {
               const r = await fetch("/api/transcribe", { method: "POST", body: blob, headers: { "Content-Type": blob.type } });
               const d = await r.json();
@@ -571,12 +625,12 @@ async function startHandsFree() {
               setStatus(`Hands-Free error: ${err.message}`, true);
             } finally {
               busy = false; mic.classList.remove("busy");
-              if (hfActive && !ttsPlaying) setStatus('Hands-Free: Listening… (say "Robo ..." or "Stop")');
+              if (hfActive && !ttsPlaying && !agentBusy) setHfState("standby", 'Say "Robo, ..." to command');
             }
           };
           hfRecorder.start();
           setRecording(true);
-          setStatus("Hands-Free: Hearing you… (pause to send)");
+          setHfState("hearing", "Hearing you… pause 1.3s to finish");
         }
       } else {
         hfSpeechFrames = 0;
@@ -596,12 +650,13 @@ async function startHandsFree() {
 function stopHandsFree() {
   hfActive = false;
   hfSpeaking = false;
+  followupUntil = 0;
   setRecording(false);
   if (hfTimer) { clearInterval(hfTimer); hfTimer = null; }
   if (hfRecorder?.state === "recording") { try { hfRecorder.stop(); } catch (_) {} }
   if (hfStream) { hfStream.getTracks().forEach(t => t.stop()); hfStream = null; }
   if (hfCtx) { hfCtx.close().catch(() => {}); hfCtx = null; }
-  setStatus("Hands-Free OFF. Click the microphone to speak.");
+  setHfState("standby", "Hands-Free OFF. Click the microphone to speak.");
 }
 
 $("handsfree")?.addEventListener("change", (e) => {
