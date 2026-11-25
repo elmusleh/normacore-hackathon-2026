@@ -25,6 +25,5 @@ Welcome to the documentation for **CareArm (Team 6)** — our voice-controlled a
 - [bench_safety.md](bench_safety.md) — Mandatory physical bench safety checklist
 - [team_setup.md](team_setup.md) & [hardware_setup_and_usb_serial.md](hardware_setup_and_usb_serial.md) — Machine & USB serial setup
 
-## Historical Day-1 Drafts (`docs/archive/`)
-- Earlier hackathon planning & event reference docs preserved in [`docs/archive/`](archive/).
-- Draft pitch decks, story-film script and submission checklist (not the final versions) in [`docs/archive/pitch-drafts/`](archive/pitch-drafts/).
+## Engineering Log
+- [FINDINGS.md](FINDINGS.md) — hardware, SDK and camera findings recorded during the hackathon, with evidence

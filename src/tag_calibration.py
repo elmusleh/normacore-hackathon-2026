@@ -9,7 +9,7 @@ What this module does (no arm motion, no Station access):
   * detect_tags(image)            -> tag centres and corners in pixels
   * fit_camera(detections, ...)   -> pixel -> table homography + a size check in mm
   * TableCamera.pixel_to_table()  -> where a pixel lies on the table (z = 0 plane only:
-                                     an object 30 mm tall appears shifted, see FINDINGS.md)
+                                     an object 30 mm tall appears shifted, see docs/FINDINGS.md)
   * draw_overlay()                -> picture with tags, a 50 mm grid and the arm base
 The arm base pose in this frame comes from touching tags with the fingertips (arm_kinematics).
 """

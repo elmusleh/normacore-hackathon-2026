@@ -39,7 +39,7 @@ The submodule is the only supported SDK source. An old unpacked copy (no `.git` 
 mv external/norma-core ~/norma-core-old-unpacked
 git submodule update --init --recursive
 ```
-- To change the SDK version, change the pin in its own commit, approved by the owner (see `AGENTS.md` Team Workflow). Do not edit files inside `external/norma-core/`. Do not regenerate `target/gen_python` (the generated protobuf code).
+- To change the SDK version, change the pin in its own commit. Do not edit files inside `external/norma-core/`. Do not regenerate `target/gen_python` (the generated protobuf code).
 
 **b. Station binary (`bin/station`)**
 `bin/` is gitignored, so the binary is not in the repo. Download release v0.1.0-beta.10 as described in [NormaCore_Repositories_and_Tooling.md](NormaCore_Repositories_and_Tooling.md), place it at `bin/station`, then run `chmod +x bin/station`. Check it with `./bin/station --version`. It must print `0.1.0-beta.10 (5f4f805)`.
@@ -48,7 +48,7 @@ git submodule update --init --recursive
 ```bash
 ./cli.sh sdk-check        # must end with RESULT: PASS
 ```
-Run this after any SDK or Station change, and before a bench session. Do not start the Station if it fails. Record the result in `HANDOFF.md` if it fails.
+Run this after any SDK or Station change, and before a bench session. Do not start the Station if it fails. Record the result in `docs/FINDINGS.md` if it fails.
 
 ## 5. Serial permissions (once per machine)
 ```bash
@@ -56,7 +56,7 @@ Run this after any SDK or Station change, and before a bench session. Do not sta
 ```
 This adds you to the `dialout` group and installs the udev rule that makes the USB serial adapters readable. Then unplug and replug the adapters (or run `sudo udevadm trigger`). If `groups` does not show `dialout` yet, log out and back in.
 
-Do not run robot scripts with `sudo` (see GUIDELINES.md §5). Only the setup script uses it.
+Do not run robot scripts with `sudo`. Only the setup script uses it.
 
 Check it worked:
 ```bash
@@ -76,7 +76,7 @@ Camera numbers (`/dev/video0`, `/dev/video2`, ...) change after replugging. Do n
 
 Always pass `--bus` explicitly when two serial adapters are plugged in. `--bus auto` works only with exactly one.
 
-Record which serial number is which arm in `HANDOFF.md` once it is confirmed. Confirmed 2026-11-21: follower `5B61034962`, leader `5B61037051` (`config/elrobot.json` `station.bus` / `station.leader_bus`).
+Confirmed 2026-11-21: follower `5B61034962`, leader `5B61037051` (`config/elrobot.json` `station.bus` / `station.leader_bus`).
 
 ## 8. Web console: cameras and voice chat (optional)
 1. With the Station running: `./cli.sh console`, then open http://localhost:8890 on the same laptop (the microphone only works on `localhost`).
@@ -103,4 +103,4 @@ Record which serial number is which arm in `HANDOFF.md` once it is confirmed. Co
 | `./cli.sh sdk-check` fails on the SDK pin or local changes | Run `git submodule update --init --recursive`. If local changes are listed, reset that folder. Do not commit them. |
 | `./cli.sh sdk-check` fails on the Station build | Replace `bin/station` with release v0.1.0-beta.10 (see step 4b). |
 
-If none of these fix it, record the symptom and the log path in `HANDOFF.md` under Blockers.
+If none of these fix it, record the symptom and the log path in `docs/FINDINGS.md`.

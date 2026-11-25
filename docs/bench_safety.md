@@ -1,9 +1,9 @@
 # Bench Safety
 
-Read this before any command that moves a motor or turns torque on (`hw jog`, `hw goto`, `hw torque on`, `hw identify`, `hw probe-current`). Owner: the hardware owner named in `HANDOFF.md`. Last reviewed 2026-11-21.
+Read this before any command that moves a motor or turns torque on (`hw jog`, `hw goto`, `hw torque on`, `hw identify`, `hw probe-current`). Owner: the hardware owner. Last reviewed 2026-11-21.
 
 ## Before the arm is powered
-- The hardware owner is named in `HANDOFF.md`. Only that person sends motion commands.
+- One named person is the hardware owner. Only that person sends motion commands.
 - The workspace is clear. No hands, tools, cables or loose objects in the arm's reach. Mark the area on the table if needed.
 - A second person is in the room.
 - The 12 V supply switch is within reach.
@@ -18,11 +18,11 @@ Read this before any command that moves a motor or turns torque on (`hw jog`, `h
 1. Stop the software: `./cli.sh hw stop`. This turns torque off on all motors.
    Torque off means the arm goes limp and can drop. Support any raised part of the arm before you run it.
 2. If the arm does not respond, or moves in a way you did not command: cut the 12 V supply at the switch. Do not reach into the arm's reach until it has stopped.
-3. Tell the hardware owner, and record what happened in `HANDOFF.md` under Blockers. Attach the output of `./cli.sh logs`.
+3. Tell the hardware owner, and record what happened in `docs/FINDINGS.md`. Attach the output of `./cli.sh logs`.
 
 ## Who to call
-- Anything on the arm: the hardware owner in `HANDOFF.md`.
+- Anything on the arm: the hardware owner.
 - Safety questions and rule changes: whoever holds Systems, Kinematics & Safety in the team split in `README.md`.
 
 ## Recordings
-Camera frames and logs can show people in the room. Follow the privacy rule in `AGENTS.md`.
+Camera frames and logs can show people in the room. Do not publish frames or logs that show people without their consent.

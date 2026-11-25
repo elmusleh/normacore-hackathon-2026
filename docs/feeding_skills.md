@@ -14,7 +14,7 @@ recorded plans (`play_sequence("grapes")`, `play_sequence("choc")`) are the fall
 
 ## `grab <object>`
 
-1. **Ready check** (reads only): HANDOFF names the hardware owner, camera frame < 2 s old, teleop off.
+1. **Ready check** (reads only): a hardware owner is at the bench, camera frame < 2 s old, teleop off.
 2. **Find it:** `look("table")`, centre pixel -> table mm (`calib pixel`). Not seen or ambiguous: ask, do not move.
 3. **Hover** 70 mm above it: the existing `hover-above-object` procedure.
 4. **Centre:** gripper camera, small x/y corrections (z unchanged, at most 3) until the object sits between
@@ -54,7 +54,7 @@ Voice "stop" is not part of the skills: it is the always-on local process `scrip
 
 `grab` (skill `grip-object`) and `drop-in-bowl` run without asking: Jafer gave a standing OK on 2026-11-22,
 written into both skill files, retries allowed. `feed` toward a person still needs the hardware owner's typed
-confirmation per request. A new hardware owner must renew these OKs (see HANDOFF).
+confirmation per request. A new hardware owner must renew these OKs.
 
 ## Later (Could tier)
 

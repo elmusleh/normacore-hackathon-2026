@@ -167,7 +167,7 @@ Claude cannot turn torque off. Do that yourself with `./cli.sh hw torque off` (s
        - format: "640x480@maxfps,yuyv"
    ```
    Each camera takes the first mode it can open. All cameras sit on one 480 Mbps USB 2.0 link (the hub's
-   USB 3 side does not help USB 2.0 cameras), so not every camera gets Full HD: see FINDINGS.md.
+   USB 3 side does not help USB 2.0 cameras), so not every camera gets Full HD: see [FINDINGS.md](FINDINGS.md).
 4. **Gripper direction.** `config/elrobot.json` → `gripper.open_at` (`"max"` or `"min"`) says which
    end of motor 8's range is open. Check with `./cli.sh hw identify 8`, fix if needed, set `"verified": true`.
 5. **Waypoints.** Teach at least `clear` (above the table, gripper open), then the pick spots and bins

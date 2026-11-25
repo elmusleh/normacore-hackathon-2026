@@ -4,7 +4,7 @@ Goal: one table coordinate frame in mm that the camera, the arm and Claude all s
 food seen at pixel (u, v) becomes a fingertip target (x, y, z) and then joint steps (IK).
 Every command below **reads only**. The arm is moved by hand (torque off) or with the leader
 arm. Commands that move the motors are still covered by `docs/bench_safety.md`, and only the
-hardware owner named in `.ai-sync/HANDOFF.md` runs them.
+hardware owner runs them.
 
 Code: `src/tag_calibration.py` (tags, homography), `src/arm_kinematics.py` (URDF FK/IK, base fit,
 joint-zero fit), `scripts/calib.py` (`./cli.sh calib ...`). Values: `config/calibration.json`.

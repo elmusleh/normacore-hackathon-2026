@@ -76,7 +76,6 @@ print_usage() {
     echo -e "  ${C_CYAN}preflight${C_RESET}            Read-only ElRobot readiness check (writes logs/)"
     echo ""
     echo -e "${C_BOLD}Team Sync:${C_RESET}"
-    echo -e "  ${C_CYAN}sync${C_RESET}                Fetch, then fast-forward if clean and behind (never stashes or force-pulls)"
     echo -e "  ${C_CYAN}sdk-check${C_RESET}           Read-only: SDK and Station must both be release 0.1.0-beta.10 (5f4f805)"
     echo ""
     echo -e "${C_BOLD}General Commands:${C_RESET}"
@@ -273,11 +272,6 @@ print('[OK] Saved fresh snapshot with metric grid to sample_calibrated_view.png'
     demos)
         # Teleop demonstrations for ACT training (reads only), e.g. demos record --skill pick --food grape
         "$PY" scripts/record_demos.py "$@"
-        ;;
-
-    sync)
-        # Fetch and fast-forward before implementing. Never stashes or force-pulls.
-        bash scripts/agent_sync.sh "$@"
         ;;
 
     sdk-check)

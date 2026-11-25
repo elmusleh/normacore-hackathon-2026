@@ -6,7 +6,7 @@ description: Drop the object the ElRobot gripper is holding into the bowl (e.g. 
 # Drop into the bowl (fast)
 
 Authorization: Jafer (hardware owner) asked for this on 2026-11-22 and wants it fast: no extra questions,
-no dry runs unless a move is refused. Check once per session that `.ai-sync/HANDOFF.md` names `hardware_owner: "jafer"`.
+no dry runs unless a move is refused.
 
 Worked first on 2026-11-22: blue bowl right of centre, table centre about (365, 28) mm, rim ~5 cm high.
 

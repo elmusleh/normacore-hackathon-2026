@@ -1,12 +1,6 @@
 # Findings
 
-Verified observations about the hardware, the SDK and the setup, each with its evidence. Owner: whoever observed it. Add new findings at the top. Never delete a finding. Mark it resolved and say how.
-
-- **Rules** (how to act) live in `GUIDELINES.md` and `docs/bench_safety.md`.
-- **Current state** (what is happening now) lives in `.ai-sync/HANDOFF.md`.
-- **Ideas and next steps** live in `SUGGESTIONS.md`.
-
-This file holds facts that stay true, with the evidence behind them.
+Engineering log from the hackathon (21–22 Nov 2026): verified observations about the ElRobot hardware, the NormaCore SDK and the camera setup, each with its evidence. Newest first. Bench safety rules are in [bench_safety.md](bench_safety.md).
 
 | Date | Finding | Evidence | Status |
 |---|---|---|---|

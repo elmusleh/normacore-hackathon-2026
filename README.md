@@ -2,7 +2,7 @@
 
 [![Track: NormaCore](https://img.shields.io/badge/Track-NormaCore%20Physical%20AI-0D9488?style=flat-square)](docs/FEEDING_ASSISTANT_PLAN.md)
 [![Hardware: ElRobot 7+1 DOF](https://img.shields.io/badge/Hardware-ElRobot%207%2B1%20DOF-111827?style=flat-square)](docs/elrobot_hardware_bridge.md)
-[![Tests: 170 Passing](https://img.shields.io/badge/Tests-170%20Passing-059669?style=flat-square)](tests/)
+[![Tests: pytest](https://img.shields.io/badge/Tests-pytest%20(offline)-059669?style=flat-square)](tests/)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-4F46E5?style=flat-square)](requirements.txt)
 [![License: MIT](https://img.shields.io/badge/License-MIT-64748B?style=flat-square)](LICENSE)
 
@@ -10,6 +10,9 @@
 **Team 6:** Jan Schulz · Jafer Sharfeddin · Mohammad El-Musleh
 
 > **CareArm: Hands-Free, Voice-Controlled Assistive Feeding Robot — Restoring Mealtime Independence Safely & Affordably.**
+
+> [!NOTE]
+> **Project status: completed hackathon prototype (21–22 Nov 2026), no longer maintained.** The code and docs are a snapshot of what the team built during the event. See the demo video for what worked on the real arm.
 
 ## 🎥 Demo & Presentation
 
@@ -61,11 +64,13 @@ Most LLM-to-robot prototypes send raw camera images and raw motor commands strai
 
 ---
 
-## Verified Benchmarks & Test Coverage
+## Safety Features & Benchmarks
 
-| Area | Metric / Benchmark | Verified Result |
+Figures are design targets and bench measurements from the hackathon; they were not independently validated.
+
+| Area | Mechanism | Target / Bench Result |
 | :--- | :--- | :--- |
-| **Automated Test Suite** | `.venv/bin/python -m pytest tests/` (offline + fake-arm) | **100% passing (`170 / 170` tests)** |
+| **Automated Test Suite** | `.venv/bin/python -m pytest tests/` (offline + fake-arm) | **170 tests, all passing at the end of the event** |
 | **AI Scope Guardrails** | `classify_intent()` pre-LLM prompt-injection & off-topic gate | **< 1 ms latency · 0 API calls** |
 | **Emergency Stop** | Voice `"Stop!"` or red button (`stop_now()` bypasses Claude) | **< 0.5 s pose-hold halt** |
 | **Mouth-Open Safety Gate** | OBSBOT MediaPipe MAR (`Closed ~0.01 → Open ~0.35+`) | **30 FPS · 0.6 s face-loss watchdog** |
@@ -115,7 +120,6 @@ cp .env.example .env                    # Add ANTHROPIC_API_KEY & OPENAI_API_KEY
 | `./cli.sh teleop` | 50 Hz Leader → Follower mirroring |
 | `./cli.sh cameras` | Apply fixed manual exposure to KD-USB cameras (Station stopped) |
 | `./cli.sh reset` | Quick bench recovery |
-| `./cli.sh sync` | Safe git sync + pinned NormaCore submodule check |
 
 ---
 
@@ -137,10 +141,10 @@ cp .env.example .env                    # Add ANTHROPIC_API_KEY & OPENAI_API_KEY
 │   ├── elrobot_camera.py       # Cross-platform (Linux/macOS) USB-port camera discovery & decoding
 │   ├── speech.py               # OpenAI gpt-transcribe bilingual (EN/DE) speech-to-text
 │   └── digital_twin_server.py  # Mission Control dashboard & 1-click per-user mouth calibration
-├── scripts/                    # Hardware-day CLI, calibration, pitch & media generators
+├── scripts/                    # Hardware-day CLI, calibration, camera & bench tools
 ├── config/                     # Committed calibration, joint waypoints, sequences & safety envelope
-├── tests/                      # 170 offline unit & integration tests (zero hardware required)
-├── docs/                       # Organized pitch decks, diagrams, illustrations & active guides (see docs/README.md)
+├── tests/                      # Offline unit & integration tests (no hardware required)
+├── docs/                       # Final presentation, diagrams, engineering guides & findings log (see docs/README.md)
 ├── .claude/skills/             # Modular Claude feeding skills (hover-above-object, grip-object, drop-in-bowl)
 ├── .env.example                # Environment variable template (never commit .env)
 ├── LICENSE                     # MIT License
@@ -149,12 +153,18 @@ cp .env.example .env                    # Add ANTHROPIC_API_KEY & OPENAI_API_KEY
 
 ---
 
-## Team 6 Roster
+## Team 6
 
-| Member | Contact |
+| Member | GitHub |
 | :--- | :--- |
-| **Jan Schulz** | `jan.schulz@cileria.com` |
-| **Jafer Sharfeddin** | `j.sharfeddin@gmail.com` |
-| **Mohammad El-Musleh** | `elmusleh.mohammad@gmail.com` |
+| **Jan Schulz** | [@jan-cileria](https://github.com/jan-cileria) |
+| **Jafer Sharfeddin** | [@JaferShar](https://github.com/JaferShar) |
+| **Mohammad El-Musleh** | [@elmusleh](https://github.com/elmusleh) |
+
+## Acknowledgements
+
+Thanks to [NormaCore](https://github.com/norma-core) for lending the ElRobot arm and supporting the track, and to HackLab Robotics and BRISA for organising the 2nd Berlin Robotics & AI Hackathon.
+
+## License
 
 Licensed under the [MIT License](LICENSE).

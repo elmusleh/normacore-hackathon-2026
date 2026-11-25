@@ -9,10 +9,9 @@ Standing authorization: on 2026-11-22 the hardware owner (Jafer) said to execute
 automatically, without asking each time. That covers ONLY the hover move below (the fingertip
 stops above the object, at or above the safety floor). It does not cover grasping, going lower,
 gripper commands, `--down` without a clean `reach`, or any other motion. Anything else still needs
-typed confirmation (AGENTS.md rule 7).
+typed confirmation.
 
-Before moving, check that `.ai-sync/HANDOFF.md` still names `hardware_owner: "jafer"`. If the
-owner changed, stop and ask the new owner.
+Before moving, confirm with whoever is at the bench that motion is allowed.
 
 ## Steps
 

@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-hackathon] - 2026-11-25
+
+Final cleanup before archiving the repository. The project is a completed hackathon prototype and is no longer maintained.
+
+### Removed
+- AI coding-agent configuration and session logs: `AGENTS.md`, `GUIDELINES.md`, `PREFERENCES.md`, `SUGGESTIONS.md`, `.ai-sync/`, `prompts/`, `.cursorrules`, `.windsurfrules`, `.clinerules`, `.continuerules`, `.aider.conf.yml`, `.github/copilot-instructions.md`, `scripts/agent_sync.sh` and `./cli.sh sync`.
+- Draft pitch material and its generators: `docs/archive/` (draft decks, story script, submission checklist, day-1 planning docs), `scripts/generate_pitch_deck.py`, `scripts/generate_use_case_deck.py`, `scripts/build_pitch_video.py`, `scripts/build_story_film.py`, `scripts/build_illustrated_video.py`. All remain in git history.
+- Team members' email addresses from the README (replaced with GitHub profiles).
+
+### Changed
+- README: project-status banner, acknowledgements, and the benchmark table relabelled as design targets / bench results.
+- `FINDINGS.md` moved to `docs/FINDINGS.md` as the engineering log; docs and feeding skills no longer refer to the removed handoff files.
+
+## [0.9.0] - 2026-11-25
+
+Hackathon build (21–22 Nov) and the follow-up documentation work.
 
 ### Changed
 - README and `docs/README.md`: replaced the submission-asset table with a Demo & Presentation section (YouTube demo video, final PDF deck), added a demo-status note and labelled the use-case images as illustrations.

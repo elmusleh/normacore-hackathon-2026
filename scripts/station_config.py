@@ -14,7 +14,7 @@ What it does:
   - Anything else: leaves the file alone (you chose your own formats).
 
 Set ELROBOT_KEEP_STATION_YAML=1 to skip it. See docs/mcp_server.md
-("Frame size") and FINDINGS.md for why the cameras end up at 1280x720
+("Frame size") and docs/FINDINGS.md for why the cameras end up at 1280x720
 captured and 1920x1080 stored.
 """
 

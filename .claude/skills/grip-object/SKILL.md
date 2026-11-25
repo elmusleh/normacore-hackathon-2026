@@ -9,9 +9,7 @@ Authorization: on 2026-11-22 the hardware owner (Jafer) asked for this to run wi
 and said retries are fine. It covers the steps below for an object he named. It does not cover
 feeding, carrying the object somewhere else, or playing sequences.
 
-Before moving, check that `.ai-sync/HANDOFF.md` still names `hardware_owner: "jafer"`.
-
-Worked first on 2026-11-22 (right grape, temporary arm `5B61034679`). See the HANDOFF entry "FIRST GRAPE GRASP".
+Worked first on 2026-11-22 (right grape, temporary arm `5B61034679`).
 
 ## RULE: grip only with the fingers pointing vertically down (Jafer, 2026-11-22)
 

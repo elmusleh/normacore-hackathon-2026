@@ -2,7 +2,6 @@
 
 **Read this first if you are a teammate or an AI agent working in this repo.** It replaces the earlier
 Cartesian pick_at/place_at plan. **Diagrams:** [FEEDING_ASSISTANT_DIAGRAMS.md](FEEDING_ASSISTANT_DIAGRAMS.md). Last updated 2026-11-22 (Sunday morning handover). Demo is Sunday.
-**Live state (which arm, who owns the hardware, what works, blockers) is in `.ai-sync/HANDOFF.md`, "START HERE" entry. Where this plan and HANDOFF disagree, HANDOFF wins.**
 
 > **Decision 2026-11-21 late (Jafer): the ACT imitation-learning approach is dropped.** Motion now
 > targets come from one calibrated **table frame**: 4 AprilTags (36h11, IDs 0-3) on the table corners
@@ -14,7 +13,6 @@ Cartesian pick_at/place_at plan. **Diagrams:** [FEEDING_ASSISTANT_DIAGRAMS.md](F
 > as the fallback.
 >
 > **Status 2026-11-22:** calibration measured and `calib goto` runs on a temporary arm; hover, grip from the
-> flat table and drop in the bowl work. Current state and next steps: `.ai-sync/HANDOFF.md`, section "START HERE".
 
 ## 1. The goal
 
@@ -68,12 +66,12 @@ no longer required. They are still a simple fallback if calibration is off: food
 (e.g. `zone_a` plate, `zone_b` bowl, `spoon_holder`). Claude's vision job is to say *what is in which zone*,
 not to compute coordinates. Mark the zones on the table with tape.
 
-## 3. Current state (snapshot 2026-11-22 ~09:30; HANDOFF.md is the live version)
+## 3. Current state (final snapshot, 2026-11-22)
 
 | Thing | State |
 | :--- | :--- |
 | Code | All current work is on branch `feat/vision-apriltag-ik`, PR into `main` open. `main` lacks the calib/IK code and skills |
-| Hardware owner | `jafer` (see `hardware_owner` in HANDOFF). Only the owner runs motion; hand over by editing that line and committing |
+| Hardware owner | `jafer`. Only the hardware owner runs motion |
 | Arms | Usual follower `5B61034962` is out for a motor repair. **Temporary follower `5B61034679`** in use (`config/elrobot.json`, `.mcp.json`). Leader `5B61037051` |
 | Waypoints / sequences | Taught on the OLD arm. **Do not play them on the temporary arm** |
 | Calibration | AprilTag table frame (2.4 mm RMS) and arm fit (15.6 mm RMS, target < 10) in `config/calibration.json`. Wrist zeros (motors 5-7) look wrong: blocks fingers-down grips |
@@ -236,7 +234,6 @@ from their laptops with `ELROBOT_STATION=<main laptop IP>` and `ELROBOT_CAMERA_Q
 - Config the team decides goes in `config/elrobot.json`; taught poses in `config/waypoints.json`. Commit both.
   Local state (`data/`, `logs/`, `station_data/`) is gitignored.
 - Logs: `logs/mcp-latest.log`, `./cli.sh logs`.
-- Update `.ai-sync/HANDOFF.md` and `.ai-sync/PROGRESS.md` when you stop, with exact next steps.
 - Stage files explicitly (`git add <path>`), never `git add -A`.
 
 ## 13. Key references

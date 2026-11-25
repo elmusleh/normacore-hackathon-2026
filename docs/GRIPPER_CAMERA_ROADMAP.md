@@ -2,7 +2,6 @@
 
 This document defines the 5-stage evolution of the ElRobot **gripper (eye-in-hand) camera** — from a zero-risk hackathon demo baseline (**Stage 0**) up to a clinical-grade assistive feeding architecture (**Stage 4**) — along with the concrete implementation plan for **Stages 0–2**.
 
-> **Related spec:** See [prompts/05-nudging-before-gripping.md](../prompts/05-nudging-before-gripping.md) for the original team specification on pre-grasp base nudging and post-grasp verification.
 
 ---
 
