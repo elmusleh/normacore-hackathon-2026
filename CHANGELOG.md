@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- README and `docs/README.md`: replaced the submission-asset table with a Demo & Presentation section (YouTube demo video, final PDF deck), added a demo-status note and labelled the use-case images as illustrations.
+- Moved the draft decks, story script and submission checklist from `docs/pitch/` to `docs/archive/pitch-drafts/`; generator scripts now write there.
+- Added `docs/pitch/CareArm_Presentation.pdf`: final 9-slide hackathon presentation.
 - Repository renamed from `normacore-hackathon-2026` to `carearm-feeding-robot` (2026-11-25); updated clone URLs, repo links and video footers in docs, prompts and scripts. Old GitHub URLs redirect.
 - `FINDINGS.md`/`HANDOFF.md`: first hover on `5B61034962` (within 3 mm by joint readings, grape centred in the gripper camera) and the person-camera numbering problem.
 - `config/elrobot.json`: camera exposure table 250 -> 20, gripper 250 -> 50 (`./cli.sh cameras --tune`, daylight 2026-11-22). At 250 the table camera was 71% pure white and the grape was invisible.

@@ -11,13 +11,18 @@
 
 > **CareArm: Hands-Free, Voice-Controlled Assistive Feeding Robot — Restoring Mealtime Independence Safely & Affordably.**
 
-| Submission Asset | Link |
+## 🎥 Demo & Presentation
+
+[![CareArm demo video on YouTube](https://img.youtube.com/vi/h6ilZ18guAE/maxresdefault.jpg)](https://youtu.be/h6ilZ18guAE)
+
+| | |
 | :--- | :--- |
-| **Technical Pitch Deck (10 slides)** | [docs/pitch/Assistive_Feeding_Robot_Pitch.pptx](docs/pitch/Assistive_Feeding_Robot_Pitch.pptx) |
-| **Use-Case & Impact Deck (9 slides)** | [docs/pitch/CareArm_Use_Case_Pitch.pptx](docs/pitch/CareArm_Use_Case_Pitch.pptx) |
-| **Story Film Script (*Marta's Dinner*)** | [docs/pitch/CAREARM_STORY_SCRIPT.md](docs/pitch/CAREARM_STORY_SCRIPT.md) |
-| **Architecture & Flow Diagrams (PDF/PNG)** | [System Overview (PDF)](docs/diagrams/carearm_overview.pdf) · [Safe Feeding Flow (PDF)](docs/diagrams/carearm_feeding_sequence.pdf) |
-| **Documentation Index** | [docs/README.md](docs/README.md) · [Submission Checklist](docs/pitch/Hackathon_submission_requirements.md) |
+| **Demo video** | [youtu.be/h6ilZ18guAE](https://youtu.be/h6ilZ18guAE) |
+| **Final presentation (PDF, 9 slides)** | [docs/pitch/CareArm_Presentation.pdf](docs/pitch/CareArm_Presentation.pdf) |
+| **Architecture & flow diagrams** | [System Overview (PDF)](docs/diagrams/carearm_overview.pdf) · [Safe Feeding Flow (PDF)](docs/diagrams/carearm_feeding_sequence.pdf) |
+| **Documentation index** | [docs/README.md](docs/README.md) |
+
+> **Demo status:** in the hackathon demo, Claude chose the action from the voice request and camera context, and the arm executed **recorded waypoint sequences** for that action. AprilTag/IK-based moves and a learned grasp policy (ACT) are the next steps.
 
 ---
 
@@ -30,6 +35,8 @@ With **CareArm**, a diner simply speaks naturally in English or German (*"Give m
 | Respectful 5–10 cm Standoff & Mouth-Open Cue | Restored Shared Family Dinners |
 | :---: | :---: |
 | ![CareArm respectful face standoff](docs/assets/scene_04_standoff.png) | ![Shared family dinner with CareArm](docs/assets/scene_05_family.png) |
+
+*Illustrations of the use case, not photos of the prototype. See the demo video for the real robot.*
 
 ---
 

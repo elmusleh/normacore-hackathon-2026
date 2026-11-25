@@ -4,11 +4,9 @@ Welcome to the documentation for **CareArm (Team 6)** — our voice-controlled a
 
 ---
 
-## Pitch & Submission (`docs/pitch/`)
-- [Assistive_Feeding_Robot_Pitch.pptx](pitch/Assistive_Feeding_Robot_Pitch.pptx) — 10-slide technical & results pitch deck (with speaker notes)
-- [CareArm_Use_Case_Pitch.pptx](pitch/CareArm_Use_Case_Pitch.pptx) — 9-slide human-impact & use-case pitch deck (with speaker notes)
-- [CAREARM_STORY_SCRIPT.md](pitch/CAREARM_STORY_SCRIPT.md) — 9-scene narrated story film script (*"Marta's Dinner"*)
-- [Hackathon_submission_requirements.md](pitch/Hackathon_submission_requirements.md) — Team 6 submission links, roster, and pre-deadline checklist
+## Demo & Presentation
+- [Demo video (YouTube)](https://youtu.be/h6ilZ18guAE)
+- [pitch/CareArm_Presentation.pdf](pitch/CareArm_Presentation.pdf) — final 9-slide presentation shown at the hackathon
 
 ## Architecture Diagrams & Illustrations (`docs/diagrams/`, `docs/assets/`)
 - **System Overview (4-Layer Architecture):** [PNG](diagrams/carearm_overview.png) · [PDF](diagrams/carearm_overview.pdf) · [PlantUML](diagrams/carearm_overview.puml)
@@ -29,3 +27,4 @@ Welcome to the documentation for **CareArm (Team 6)** — our voice-controlled a
 
 ## Historical Day-1 Drafts (`docs/archive/`)
 - Earlier hackathon planning & event reference docs preserved in [`docs/archive/`](archive/).
+- Draft pitch decks, story-film script and submission checklist (not the final versions) in [`docs/archive/pitch-drafts/`](archive/pitch-drafts/).
