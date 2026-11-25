@@ -94,7 +94,7 @@ https://docs.google.com/presentation/d/1K_Qs0a0WqHv027SaB6GGvUq6lRjIOtOPxUlSuUZV
 
 ### 7. GitHub Repository Link *(Required — must be public)*
 ```text
-https://github.com/elmusleh/normacore-hackathon-2026
+https://github.com/elmusleh/carearm-feeding-robot
 ```
 
 ### 8. Which track are you competing in? *(Required)*
@@ -114,5 +114,5 @@ https://github.com/elmusleh/normacore-hackathon-2026
 - [ ] Confirm final team name for **Team 6** (update Field #2 above if changed)
 - [ ] Upload 3-minute demo video to the [shared Google Drive folder](https://drive.google.com/drive/folders/1Q5BmuXYwDzb8l9mM50GJKotJGi_aoseH?usp=sharing) and verify public "Viewer" access in an incognito tab
 - [ ] Upload/finalize slides in [Google Slides](https://docs.google.com/presentation/d/1K_Qs0a0WqHv027SaB6GGvUq6lRjIOtOPxUlSuUZVYMk/edit?usp=sharing) and verify public "Viewer" access in an incognito tab
-- [ ] Push final code and confirm `https://github.com/elmusleh/normacore-hackathon-2026` is **Public**
+- [ ] Push final code and confirm `https://github.com/elmusleh/carearm-feeding-robot` is **Public**
 - [ ] Open `https://tally.so/r/GexoxQ`, paste Fields #1–#7, check **Normacore** and **I agree**, and click **Register**

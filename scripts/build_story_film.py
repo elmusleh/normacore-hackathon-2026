@@ -104,7 +104,7 @@ STORY_SCENES = [
         "eyebrow": "DIGNITY  ·  TRUST  ·  ACCESS",
         "title": "CareArm",
         "subtitle": "Eating independently is a human right.\nBuilt in Berlin with Claude MCP & NormaCore ElRobot.",
-        "footer": "Team 6: Jan Schulz · Jafer Sharfeddin · Mohammad El-Musleh  |  github.com/elmusleh/normacore-hackathon-2026",
+        "footer": "Team 6: Jan Schulz · Jafer Sharfeddin · Mohammad El-Musleh  |  github.com/elmusleh/carearm-feeding-robot",
         "narration": "CareArm — built in Berlin by Team Six. Because eating independently is a human right.",
     },
 ]

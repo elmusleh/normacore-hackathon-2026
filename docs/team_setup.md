@@ -4,8 +4,8 @@ Read this before the first run on a new computer. Owner: the team. Last reviewed
 
 ## 1. Get the code (with the NormaCore submodule)
 ```bash
-git clone --recurse-submodules https://github.com/elmusleh/normacore-hackathon-2026.git
-cd normacore-hackathon-2026
+git clone --recurse-submodules https://github.com/elmusleh/carearm-feeding-robot.git
+cd carearm-feeding-robot
 git checkout main && git pull --rebase
 ```
 `--recurse-submodules` fetches the NormaCore SDK at `external/norma-core/`, pinned to commit `5f4f805`.

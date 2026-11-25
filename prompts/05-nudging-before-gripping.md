@@ -1,6 +1,6 @@
 # Prompt: Nachjustieren vor dem Greifen und Greifprüfung danach
 
-Alles unterhalb der Linie in Claude Code einfügen, geöffnet im Repo `normacore-hackathon-2026` (Branch `jan`).
+Alles unterhalb der Linie in Claude Code einfügen, geöffnet im Repo `carearm-feeding-robot` (Branch `jan`).
 
 ---
 

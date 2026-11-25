@@ -242,7 +242,7 @@ def build_illustrated_video(
             "DIGNITY  ·  TRUST  ·  ACCESS",
             "CareArm",
             "Eating independently is a human right.\nBuilt with Claude MCP, 3-Camera Vision & NormaCore ElRobot.",
-            "Team 6: Jan Schulz · Jafer Sharfeddin · Mohammad El-Musleh  |  github.com/elmusleh/normacore-hackathon-2026",
+            "Team 6: Jan Schulz · Jafer Sharfeddin · Mohammad El-Musleh  |  github.com/elmusleh/carearm-feeding-robot",
         )
         close_mp4 = tmp_dir / "99_close.mp4"
         subprocess.run(

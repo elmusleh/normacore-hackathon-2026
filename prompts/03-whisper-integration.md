@@ -1,6 +1,6 @@
 # Prompt: Spracheingabe der Web-Konsole auf OpenAI gpt-transcribe umstellen
 
-Alles unterhalb der Linie in Claude Code einfügen, geöffnet im Repo `normacore-hackathon-2026`.
+Alles unterhalb der Linie in Claude Code einfügen, geöffnet im Repo `carearm-feeding-robot`.
 
 ---
 

@@ -1,4 +1,4 @@
-# Repo Summary: normacore-hackathon-2026
+# Repo Summary: carearm-feeding-robot
 
 ## What it is
 

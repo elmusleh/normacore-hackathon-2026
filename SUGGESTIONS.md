@@ -1,6 +1,6 @@
 ### Post-Implementation Suggestions
 
-1. Merge `feat/agent-commit-and-push-policy` into `main` so `github.com/elmusleh/normacore-hackathon-2026` shows the polished repo by default — Priority 96% (Critical) [Professionalism]
+1. Merge `feat/agent-commit-and-push-policy` into `main` so `github.com/elmusleh/carearm-feeding-robot` shows the polished repo by default — Priority 96% (Critical) [Professionalism]
    What: Merge the verified `feat/agent-commit-and-push-policy` branch into `main` and push `main` to `origin`.
    Why: The Tally submission link opens `main` by default; merging ensures judges land directly on the visual `README.md`, organized `docs/pitch/`, and 169 passing tests.
    How: Run `git checkout main && git merge feat/agent-commit-and-push-policy && git push origin main`, or create and merge a PR on GitHub.

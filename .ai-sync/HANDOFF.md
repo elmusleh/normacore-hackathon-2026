@@ -17,7 +17,7 @@ previous_session: Claude Code 2026-11-22 ~09:00 — Stage 1.1 camera check, Full
   - **Showpiece `README.md`:** Embedded `docs/diagrams/carearm_overview.png`, `docs/diagrams/carearm_feeding_sequence.png`, and 2 editorial use-case illustrations (`scene_04_standoff.png`, `scene_05_family.png`), added status badges, top Submission Asset links, AprilTag IK & feeding skills coverage, and verified 0 broken links.
 - **Files Changed:** `.gitignore`, `.env.example`, `LICENSE`, `README.md`, `docs/README.md`, `docs/pitch/*`, `docs/archive/*`, `scripts/generate_pitch_deck.py`, `scripts/generate_use_case_deck.py`, `scripts/build_pitch_video.py`, `CHANGELOG.md`, `SUGGESTIONS.md`, `.ai-sync/HANDOFF.md`.
 - **Next Steps:**
-  1. Push `feat/agent-commit-and-push-policy` and merge into `main` so `https://github.com/elmusleh/normacore-hackathon-2026` shows the polished repo by default.
+  1. Push `feat/agent-commit-and-push-policy` and merge into `main` so `https://github.com/elmusleh/carearm-feeding-robot` shows the polished repo by default.
   2. Upload final demo video + pitch deck to Google Drive / Slides and submit `https://tally.so/r/GexoxQ` before **16:30**.
 
 ## Session (2026-11-22 ~09:00, Claude Code for steve): Stage 1.1 camera check, Full HD and person-mouth fix

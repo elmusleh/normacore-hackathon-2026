@@ -1,6 +1,6 @@
 # Prompt: export the Station calibration so a teammate can import it
 
-Paste everything below the line into Claude Code, opened in the `normacore-hackathon-2026` repo on the laptop where the ElRobot was calibrated.
+Paste everything below the line into Claude Code, opened in the `carearm-feeding-robot` repo on the laptop where the ElRobot was calibrated.
 
 ---
 
